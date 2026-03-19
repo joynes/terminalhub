@@ -11,13 +11,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import se.joynes.aiterminalhub.ui.screen.sessions.ProjectTab
 import se.joynes.aiterminalhub.ui.theme.*
 
 @Composable
 fun SessionTabBar(
-    sessionIds: List<String>,
+    tabs: List<ProjectTab>,
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit,
+    onTabClose: (Int) -> Unit,
+    onAddProject: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyRow(
@@ -27,28 +30,40 @@ fun SessionTabBar(
             .height(40.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        itemsIndexed(sessionIds) { index, id ->
+        itemsIndexed(tabs) { index, tab ->
             val isSelected = index == selectedIndex
-            Box(
+            val isConnected = tab.sessionId != null
+            Row(
                 modifier = Modifier
                     .clickable { onTabSelected(index) }
                     .background(if (isSelected) MegaDrivePrimary.copy(alpha = 0.2f) else MegaDriveBg)
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center
+                    .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = "SSH ${index + 1}",
-                    color = if (isSelected) MegaDrivePrimary else MegaDriveDim,
-                    fontSize = 12.sp,
+                    text = tab.project.name.uppercase(),
+                    color = if (isSelected) MegaDrivePrimary else if (isConnected) MegaDriveOnSurface else MegaDriveDim,
+                    fontSize = 11.sp,
                     fontFamily = MonoFontFamily
+                )
+                // × close button
+                Text(
+                    text = "×",
+                    color = MegaDriveAccent,
+                    fontSize = 14.sp,
+                    fontFamily = MonoFontFamily,
+                    modifier = Modifier.clickable { onTabClose(index) }
                 )
             }
         }
+        // + add project button
         item {
             Box(
                 modifier = Modifier
-                    .clickable { /* TODO: add new session */ }
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .clickable { onAddProject() }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
             ) {
                 Text("+", color = MegaDriveAccent, fontSize = 18.sp)
             }

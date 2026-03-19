@@ -63,17 +63,24 @@ class SshConnection @Inject constructor(
         withContext(Dispatchers.IO) {
             try {
                 val ch = session.openChannel("exec") as ChannelExec
-                ch.setCommand(command)
+                // Use login shell so ~ expands and PATH includes tmux/brew paths
+                ch.setCommand("bash -lc '${command.replace("'", "'\\''")}'")
+                val errStream = ch.errStream  // capture stderr before connect
                 ch.connect()
-                // drain output so the channel closes cleanly
                 val buf = ByteArray(1024)
-                val stream = ch.inputStream
+                val stdout = ch.inputStream
+                val stderr = errStream
                 while (!ch.isClosed) {
-                    while (stream.available() > 0) stream.read(buf)
+                    while (stdout.available() > 0) stdout.read(buf)
+                    if (stderr.available() > 0) {
+                        val n = stderr.read(buf)
+                        if (n > 0) logger.log(LogLevel.WARN, TAG, "Setup stderr: ${String(buf, 0, n)}")
+                    }
                     delay(50)
                 }
+                val exitCode = ch.exitStatus
                 ch.disconnect()
-                logger.log(LogLevel.DEBUG, TAG, "Silent exec done: $command")
+                logger.log(LogLevel.DEBUG, TAG, "Silent exec done (exit=$exitCode): $command")
             } catch (e: Exception) {
                 logger.log(LogLevel.WARN, TAG, "Silent exec failed: ${e.message}")
             }

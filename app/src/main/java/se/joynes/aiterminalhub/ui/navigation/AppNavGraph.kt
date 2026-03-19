@@ -8,7 +8,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import se.joynes.aiterminalhub.ui.screen.applog.AppLogScreen
 import se.joynes.aiterminalhub.ui.screen.projects.AddEditProjectScreen
-import se.joynes.aiterminalhub.ui.screen.projects.ProjectListScreen
 import se.joynes.aiterminalhub.ui.screen.servers.AddEditServerScreen
 import se.joynes.aiterminalhub.ui.screen.servers.ServerListScreen
 import se.joynes.aiterminalhub.ui.screen.sessions.SessionHostScreen
@@ -32,7 +31,7 @@ fun AppNavGraph() {
             ServerListScreen(
                 onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
                 onEditServer = { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) },
-                onOpenProjects = { id -> navController.navigate(Screen.ProjectList.createRoute(id)) },
+                onOpenTerminal = { id -> navController.navigate(Screen.SessionHost.createRoute(id)) },
                 onOpenStatus = { id -> navController.navigate(Screen.ServerStatus.createRoute(id)) },
                 onOpenUpload = { id -> navController.navigate(Screen.FileUpload.createRoute(id)) },
                 onOpenLog = { navController.navigate(Screen.AppLog.route) },
@@ -47,19 +46,6 @@ fun AppNavGraph() {
             AddEditServerScreen(serverId = serverId, onBack = { navController.popBackStack() })
         }
         composable(
-            Screen.ProjectList.route,
-            arguments = listOf(navArgument("serverId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val serverId = backStackEntry.arguments?.getLong("serverId") ?: return@composable
-            ProjectListScreen(
-                serverId = serverId,
-                onAddProject = { navController.navigate(Screen.AddEditProject.createRoute(serverId)) },
-                onEditProject = { pid -> navController.navigate(Screen.AddEditProject.createRoute(serverId, pid)) },
-                onConnect = { pid -> navController.navigate(Screen.SessionHost.createRoute(serverId, pid)) },
-                onBack = { navController.popBackStack() }
-            )
-        }
-        composable(
             Screen.AddEditProject.route,
             arguments = listOf(
                 navArgument("projectId") { type = NavType.LongType; defaultValue = -1L },
@@ -72,14 +58,14 @@ fun AppNavGraph() {
         }
         composable(
             Screen.SessionHost.route,
-            arguments = listOf(
-                navArgument("serverId") { type = NavType.LongType },
-                navArgument("projectId") { type = NavType.LongType; defaultValue = -1L }
-            )
+            arguments = listOf(navArgument("serverId") { type = NavType.LongType })
         ) { backStackEntry ->
             val serverId = backStackEntry.arguments?.getLong("serverId") ?: return@composable
-            val projectId = backStackEntry.arguments?.getLong("projectId")?.takeIf { it >= 0 }
-            SessionHostScreen(serverId = serverId, projectId = projectId, onBack = { navController.popBackStack() })
+            SessionHostScreen(
+                serverId = serverId,
+                onBack = { navController.popBackStack() },
+                onAddProject = { navController.navigate(Screen.AddEditProject.createRoute(serverId)) }
+            )
         }
         composable(
             Screen.ServerStatus.route,
