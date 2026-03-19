@@ -1,6 +1,9 @@
 package se.joynes.aiterminalhub.ui.screen.terminal
 
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.view.View
 import android.webkit.JavascriptInterface
 import se.joynes.aiterminalhub.BuildConfig
@@ -78,6 +81,11 @@ fun TerminalScreen(
                         fun send(data: String) { viewModel.send(data) }
                         @JavascriptInterface
                         fun log(msg: String) { viewModel.logFromJs(msg) }
+                        @JavascriptInterface
+                        fun copyToClipboard(text: String) {
+                            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            cm.setPrimaryClip(ClipData.newPlainText("terminal", text))
+                        }
                     }, "Android")
                     // Software rendering is needed in debug builds so that Canvas2D
                     // content is captured by screencap / UiAutomator screenshots.
@@ -91,7 +99,10 @@ fun TerminalScreen(
                 .weight(1f)
                 .fillMaxWidth()
         )
-        SpecialKeyBar(onKey = { viewModel.send(it) })
+        SpecialKeyBar(
+            onKey = { viewModel.send(it) },
+            onCopy = { webView?.evaluateJavascript("window.termCopySelection()", null) }
+        )
         FontSizeControl(
             onIncrease = { webView?.evaluateJavascript("window.termFontSize(1)", null) },
             onDecrease = { webView?.evaluateJavascript("window.termFontSize(-1)", null) }

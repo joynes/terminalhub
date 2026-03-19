@@ -32,7 +32,9 @@
       fontSize: 14,
       cursorBlink: true,
       cursorStyle: 'block',
-      scrollback: 5000
+      scrollback: 1000,
+      scrollSensitivity: 3,
+      fastScrollSensitivity: 10
     });
 
     const fitAddon = new FitAddon.FitAddon();
@@ -41,6 +43,16 @@
     const container = document.getElementById('terminal');
     term.open(container);
     androidLog('opened');
+
+    // Disable autocapitalize/autocorrect on xterm's hidden textarea so Android IME
+    // doesn't capitalise the first character of every input sequence.
+    var _ta = container.querySelector('textarea');
+    if (_ta) {
+      _ta.setAttribute('autocapitalize', 'none');
+      _ta.setAttribute('autocorrect', 'off');
+      _ta.setAttribute('autocomplete', 'off');
+      _ta.setAttribute('spellcheck', 'false');
+    }
 
     function doFit() {
       try {
@@ -94,6 +106,12 @@
     term.onData(function(data) {
       if (window.Android) window.Android.send(data);
     });
+
+    // Copy current selection to Android clipboard
+    window.termCopySelection = function() {
+      var sel = term.getSelection();
+      if (sel && window.Android) window.Android.copyToClipboard(sel);
+    };
 
     // Tap to focus for keyboard input
     container.addEventListener('touchend', function() { term.focus(); });
