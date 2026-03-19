@@ -4,7 +4,10 @@ import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.text.InputType
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.webkit.JavascriptInterface
 import se.joynes.aiterminalhub.BuildConfig
 import android.webkit.WebView
@@ -16,6 +19,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.aiterminalhub.ui.theme.MegaDriveBg
+
+/** WebView subclass that forces TYPE_NULL input flags so Android IME never autocapitalizes. */
+private class TerminalWebView(context: Context) : WebView(context) {
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
+        val ic = super.onCreateInputConnection(outAttrs)
+        outAttrs.inputType = InputType.TYPE_NULL
+        outAttrs.imeOptions = outAttrs.imeOptions or
+                EditorInfo.IME_FLAG_NO_FULLSCREEN or
+                EditorInfo.IME_FLAG_NO_EXTRACT_UI
+        return ic
+    }
+}
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -53,7 +68,7 @@ fun TerminalScreen(
     Column(modifier = Modifier.fillMaxSize().background(MegaDriveBg)) {
         AndroidView(
             factory = { ctx ->
-                WebView(ctx).apply {
+                TerminalWebView(ctx).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     isFocusable = true

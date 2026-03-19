@@ -44,15 +44,20 @@
     term.open(container);
     androidLog('opened');
 
-    // Disable autocapitalize/autocorrect on xterm's hidden textarea so Android IME
-    // doesn't capitalise the first character of every input sequence.
-    var _ta = container.querySelector('textarea');
-    if (_ta) {
-      _ta.setAttribute('autocapitalize', 'none');
-      _ta.setAttribute('autocorrect', 'off');
-      _ta.setAttribute('autocomplete', 'off');
-      _ta.setAttribute('spellcheck', 'false');
+    // Disable autocapitalize on the xterm hidden textarea.
+    // Use MutationObserver to re-apply whenever xterm recreates the element.
+    function fixInputAttrs(root) {
+      root.querySelectorAll('textarea, input').forEach(function(el) {
+        el.setAttribute('autocapitalize', 'off');
+        el.setAttribute('autocorrect', 'off');
+        el.setAttribute('autocomplete', 'off');
+        el.setAttribute('spellcheck', 'false');
+        el.setAttribute('data-gramm', 'false');
+      });
     }
+    fixInputAttrs(container);
+    new MutationObserver(function() { fixInputAttrs(container); })
+      .observe(container, { childList: true, subtree: true });
 
     function doFit() {
       try {
