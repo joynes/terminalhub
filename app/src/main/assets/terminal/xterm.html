@@ -65,6 +65,9 @@
         if (dims && dims.cols > 0 && dims.rows > 0) {
           fitAddon.fit();
           androidLog('fit done cols=' + term.cols + ' rows=' + term.rows);
+          if (window.Android && window.Android.onResize) {
+            window.Android.onResize(term.cols, term.rows);
+          }
         }
       } catch(e) { androidLog('fit error: ' + e); }
     }
@@ -75,9 +78,16 @@
     }
     window.addEventListener('resize', doFit);
 
-    // Write output from Android
+    // Write raw bytes (Base64-encoded) from Android — avoids JS string encoding issues
+    window.termWriteB64 = function(b64) {
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      term.write(bytes);
+    };
+
+    // Legacy plain-text write (kept for compatibility)
     window.termWrite = function(data) {
-      androidLog('write ' + data.length + ' chars');
       term.write(data);
     };
 

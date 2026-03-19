@@ -22,8 +22,8 @@ class SshConnection @Inject constructor(
     private var outputStream: OutputStream? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val _output = MutableSharedFlow<String>(replay = 200, extraBufferCapacity = 512)
-    val output: SharedFlow<String> = _output.asSharedFlow()
+    private val _output = MutableSharedFlow<ByteArray>(replay = 200, extraBufferCapacity = 512)
+    val output: SharedFlow<ByteArray> = _output.asSharedFlow()
 
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
@@ -87,6 +87,12 @@ class SshConnection @Inject constructor(
         }
     }
 
+    /** Notify the server that the terminal has been resized. */
+    fun resizePty(cols: Int, rows: Int) {
+        shellChannel?.setPtySize(cols, rows, 0, 0)
+        logger.log(LogLevel.DEBUG, TAG, "PTY resize: ${cols}x${rows}")
+    }
+
     private fun readOutput(inputStream: InputStream) {
         scope.launch {
             val buffer = ByteArray(4096)
@@ -94,9 +100,8 @@ class SshConnection @Inject constructor(
                 while (_connected.value) {
                     val n = inputStream.read(buffer)
                     if (n < 0) break
-                    val text = String(buffer, 0, n, Charsets.UTF_8)
                     logger.log(LogLevel.TRACE, TAG, "RX $n bytes", LogEvent.SshReceive(sessionId, n))
-                    _output.emit(text)
+                    _output.emit(buffer.copyOf(n))
                 }
             } catch (_: Exception) {}
             _connected.value = false
@@ -104,10 +109,11 @@ class SshConnection @Inject constructor(
         }
     }
 
-    fun send(text: String) {
+    fun send(text: String) = sendBytes(text.toByteArray(Charsets.UTF_8))
+
+    fun sendBytes(bytes: ByteArray) {
         scope.launch {
             try {
-                val bytes = text.toByteArray(Charsets.UTF_8)
                 outputStream?.write(bytes)
                 outputStream?.flush()
                 logger.log(LogLevel.TRACE, TAG, "TX ${bytes.size} bytes", LogEvent.SshSend(sessionId, bytes.size))
