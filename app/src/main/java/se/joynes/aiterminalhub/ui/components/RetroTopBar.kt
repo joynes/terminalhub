@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,7 +36,16 @@ fun RetroTopBar(
                 }
             }
         },
-        actions = actions,
+        actions = {
+            actions()
+            Text(
+                text = "v${BuildConfig.VERSION_NAME}",
+                fontFamily = MonoFontFamily,
+                color = MegaDriveDim,
+                fontSize = 10.sp,
+                modifier = Modifier.padding(end = 12.dp)
+            )
+        },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MegaDriveSurface,
             titleContentColor = MegaDrivePrimary

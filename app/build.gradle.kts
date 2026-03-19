@@ -5,6 +5,12 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+fun gitCommitCount(): Int = try {
+    ProcessBuilder("git", "rev-list", "--count", "HEAD")
+        .directory(rootDir).start()
+        .inputStream.bufferedReader().readLine().trim().toInt()
+} catch (_: Exception) { 1 }
+
 android {
     namespace = "se.joynes.aiterminalhub"
     compileSdk = 36
@@ -13,8 +19,8 @@ android {
         applicationId = "se.joynes.aiterminalhub"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = gitCommitCount()
+        versionName = "1.${gitCommitCount()}"
 
         testInstrumentationRunner = "se.joynes.aiterminalhub.HiltTestRunner"
     }
