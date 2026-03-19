@@ -70,7 +70,8 @@ class LocalConnectionTest {
     }
 
     private fun screenshot(name: String) {
-        try { device.takeScreenshot(File("$screenshotDir/$name.png")) } catch (_: Exception) {}
+        // screencap captures GPU-composited frames (including WebGL/Canvas2D content in WebView)
+        device.executeShellCommand("screencap -p $screenshotDir/$name.png")
     }
 
     private fun waitFor(text: String, timeoutMs: Long = 10_000) =
@@ -159,7 +160,8 @@ class LocalConnectionTest {
         checkNotNull(device.findObject(By.textContains("TAB")))    { "TAB key not found" }
         checkNotNull(device.findObject(By.textContains("CTRL-C"))) { "CTRL-C key not found" }
 
-        Thread.sleep(2_000)
+        // Wait for fit retries and SSH output to render
+        Thread.sleep(5_000)
         screenshot("07_terminal_with_output")
 
         // ── 6. Navigate back to server list ──────────────────────────────────

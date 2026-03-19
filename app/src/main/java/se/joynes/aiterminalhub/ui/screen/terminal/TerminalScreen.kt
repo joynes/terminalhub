@@ -1,6 +1,7 @@
 package se.joynes.aiterminalhub.ui.screen.terminal
 
 import android.annotation.SuppressLint
+import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -55,13 +56,20 @@ fun TerminalScreen(
                     isFocusableInTouchMode = true
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView?, url: String?) {
-                            // Post fit+focus after Android has laid out the WebView
-                            view?.post {
-                                view.evaluateJavascript("window.termFit()", null)
-                                view.evaluateJavascript("term.focus()", null)
-                                view.requestFocus()
-                            }
                             pageReady = true
+                        }
+                    }
+                    // Re-fit after Compose assigns the real height.
+                    // onPageFinished fires before layout so fit() gives rows=1 there.
+                    // window.termFit is a no-op until xterm.js is initialised, so it's
+                    // safe to call unconditionally whenever the height changes.
+                    addOnLayoutChangeListener { v, _, _, _, _, _, oldTop, _, oldBottom ->
+                        val newH = v.height
+                        val oldH = oldBottom - oldTop
+                        if (newH > 100 && newH != oldH) {
+                            evaluateJavascript("if(window.termFit)window.termFit()", null)
+                            evaluateJavascript("if(window.term)term.focus()", null)
+                            requestFocus()
                         }
                     }
                     addJavascriptInterface(object {
@@ -70,6 +78,10 @@ fun TerminalScreen(
                         @JavascriptInterface
                         fun log(msg: String) { viewModel.logFromJs(msg) }
                     }, "Android")
+                    // Software rendering ensures Canvas2D content is captured by
+                    // screencap / UiAutomator screenshots (hardware-composited layers
+                    // are opaque black in screenshot tools on many emulator configs).
+                    setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                     loadUrl("file:///android_asset/terminal/xterm.html")
                     webView = this
                 }

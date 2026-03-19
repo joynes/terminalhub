@@ -7,8 +7,10 @@
   <link rel="stylesheet" href="xterm.css" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html, body { width: 100%; height: 100%; background: #0D0D1A; overflow: hidden; }
-    #terminal { width: 100%; height: 100%; }
+    html, body { overflow: hidden; background: #0D0D1A; }
+    /* Fixed positioning sizes against the viewport, bypassing height:100% inheritance
+       which breaks when LAYER_TYPE_SOFTWARE is set on the Android WebView. */
+    #terminal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
   </style>
 </head>
 <body>
@@ -43,7 +45,6 @@
     function doFit() {
       try {
         const dims = fitAddon.proposeDimensions();
-        androidLog('fit dims=' + JSON.stringify(dims));
         if (dims && dims.cols > 0 && dims.rows > 0) {
           fitAddon.fit();
           androidLog('fit done cols=' + term.cols + ' rows=' + term.rows);
@@ -63,8 +64,24 @@
       term.write(data);
     };
 
-    // Fit from Android after layout
-    window.termFit = function() { doFit(); };
+    // Fit from Android after layout.
+    // proposeDimensions() reads clientHeight which may be 0 if the browser hasn't
+    // reflowed yet. Poll with rAF + setTimeout until rows > 1 (up to 2 s).
+    var _fitRetryTimer = null;
+    window.termFit = function() {
+      if (_fitRetryTimer) { clearTimeout(_fitRetryTimer); _fitRetryTimer = null; }
+      var attempts = 0;
+      function attempt() {
+        requestAnimationFrame(function() {
+          doFit();
+          if (term.rows <= 1 && attempts < 20) {
+            attempts++;
+            _fitRetryTimer = setTimeout(attempt, 100);
+          }
+        });
+      }
+      attempt();
+    };
 
     // Change font size
     window.termFontSize = function(delta) {
