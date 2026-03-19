@@ -3,6 +3,7 @@ package se.joynes.aiterminalhub.ui.screen.terminal
 import android.annotation.SuppressLint
 import android.view.View
 import android.webkit.JavascriptInterface
+import se.joynes.aiterminalhub.BuildConfig
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -78,10 +79,10 @@ fun TerminalScreen(
                         @JavascriptInterface
                         fun log(msg: String) { viewModel.logFromJs(msg) }
                     }, "Android")
-                    // Software rendering ensures Canvas2D content is captured by
-                    // screencap / UiAutomator screenshots (hardware-composited layers
-                    // are opaque black in screenshot tools on many emulator configs).
-                    setLayerType(View.LAYER_TYPE_SOFTWARE, null)
+                    // Software rendering is needed in debug builds so that Canvas2D
+                    // content is captured by screencap / UiAutomator screenshots.
+                    // Release builds keep hardware acceleration for full performance.
+                    if (BuildConfig.DEBUG) setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                     loadUrl("file:///android_asset/terminal/xterm.html")
                     webView = this
                 }
