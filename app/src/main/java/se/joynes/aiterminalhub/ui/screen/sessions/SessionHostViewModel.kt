@@ -3,6 +3,7 @@ package se.joynes.aiterminalhub.ui.screen.sessions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import se.joynes.aiterminalhub.data.model.SshSession
@@ -31,7 +32,8 @@ class SessionHostViewModel @Inject constructor(
             // Run setup script once the shell channel is open
             val project = projectId?.let { projectRepo.getById(it) }
             if (project != null) {
-                conn.connected.first { it } // wait for shell to be ready
+                conn.connected.first { it } // wait for channel open
+                delay(1500)              // let shell finish printing login banner
                 applySessionScript(conn.sessionId, server, project)
             }
         }

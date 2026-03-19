@@ -107,10 +107,19 @@
       if (window.Android) window.Android.send(data);
     });
 
-    // Copy current selection to Android clipboard
+    // Copy selection to Android clipboard; if nothing selected, copy all visible lines.
     window.termCopySelection = function() {
-      var sel = term.getSelection();
-      if (sel && window.Android) window.Android.copyToClipboard(sel);
+      var text = term.getSelection();
+      if (!text) {
+        // Grab every line in the active buffer
+        var lines = [];
+        var buf = term.buffer.active;
+        for (var i = 0; i < buf.length; i++) {
+          lines.push(buf.getLine(i).translateToString(true));
+        }
+        text = lines.join('\n').trimEnd();
+      }
+      if (text && window.Android) window.Android.copyToClipboard(text);
     };
 
     // Tap to focus for keyboard input

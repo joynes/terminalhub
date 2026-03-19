@@ -18,9 +18,9 @@ data class ServerEntity(
 ) {
     companion object {
         const val DEFAULT_SETUP_SCRIPT =
-            "mkdir -p {{PROJECT_PATH}}\n" +
-            "tmux has-session -t {{SESSION_NAME}} 2>/dev/null || tmux new-session -d -s {{SESSION_NAME}}\n" +
-            "tmux send-keys -t {{SESSION_NAME}} \"cd {{PROJECT_PATH}}\" Enter\n" +
+            "mkdir -p {{PROJECT_PATH}} 2>/dev/null; " +
+            "tmux has-session -t {{SESSION_NAME}} 2>/dev/null || " +
+            "tmux new-session -d -s {{SESSION_NAME}} -c {{PROJECT_PATH}}; " +
             "tmux attach -t {{SESSION_NAME}}"
     }
 }
