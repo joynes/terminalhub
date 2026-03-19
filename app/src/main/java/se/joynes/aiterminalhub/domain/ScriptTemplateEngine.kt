@@ -1,5 +1,6 @@
 package se.joynes.aiterminalhub.domain
 
+import se.joynes.aiterminalhub.data.db.entity.ServerEntity
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.model.Server
 import javax.inject.Inject
@@ -15,10 +16,15 @@ class ScriptTemplateEngine @Inject constructor() {
         project.name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
     fun render(server: Server, project: Project): String {
-        // Project-level script overrides the server default.
-        // null → use server default; empty string → run nothing.
         val template = project.setupScript ?: server.setupScript
         return render(template, server, project)
+    }
+
+    /** Returns the shell command to send after setup (e.g. `tmux attach -t name`).
+     *  Empty string means no attach command (plain shell). */
+    fun renderAttach(server: Server, project: Project): String {
+        if (project.setupScript != null) return "" // custom or empty script — no auto-attach
+        return render(ServerEntity.DEFAULT_ATTACH_COMMAND, server, project)
     }
 
     fun render(template: String, server: Server, project: Project): String {

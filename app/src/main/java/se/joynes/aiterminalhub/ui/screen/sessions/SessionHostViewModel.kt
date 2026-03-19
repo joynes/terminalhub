@@ -3,6 +3,7 @@ package se.joynes.aiterminalhub.ui.screen.sessions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import se.joynes.aiterminalhub.data.model.SshSession
@@ -26,16 +27,23 @@ class SessionHostViewModel @Inject constructor(
         viewModelScope.launch {
             val server = serverRepo.getById(serverId) ?: return@launch
             val project = projectId?.let { projectRepo.getById(it) }
-            // Render setup script as the SSH exec command so it runs silently
-            // via ChannelExec+PTY instead of echoing through the interactive shell.
-            // Empty script → plain shell (null command).
-            val command = project?.let {
-                val rendered = engine.render(server, it)
-                rendered.ifBlank { null }
-            }
-            val conn = connectToServer(server, command)
+            val conn = connectToServer(server)
             val session = SshSession(id = conn.sessionId, server = server, isConnected = conn.connected.value)
             _sessions.value = listOf(session)
+
+            if (project != null) {
+                val setupCmd = engine.render(server, project)
+                val attachCmd = engine.renderAttach(server, project)
+
+                conn.connected.first { it }          // wait for shell channel
+                if (setupCmd.isNotBlank()) {
+                    conn.runSilent(setupCmd)          // mkdir + tmux new-session, no echo
+                }
+                if (attachCmd.isNotBlank()) {
+                    delay(1000)                       // let login banner finish
+                    conn.send("$attachCmd\n")         // tmux attach via interactive shell
+                }
+            }
         }
     }
 

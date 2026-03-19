@@ -17,10 +17,13 @@ data class ServerEntity(
     val createdAt: Long = System.currentTimeMillis()
 ) {
     companion object {
+        // Runs silently via exec channel (no PTY) — creates dir + tmux session
         const val DEFAULT_SETUP_SCRIPT =
             "mkdir -p {{PROJECT_PATH}} 2>/dev/null; " +
             "tmux has-session -t {{SESSION_NAME}} 2>/dev/null || " +
-            "tmux new-session -d -s {{SESSION_NAME}} -c {{PROJECT_PATH}}; " +
-            "tmux attach -t {{SESSION_NAME}}"
+            "tmux new-session -d -s {{SESSION_NAME}} -c {{PROJECT_PATH}}"
+
+        // Sent to the interactive shell after the banner — attaches to the session
+        const val DEFAULT_ATTACH_COMMAND = "tmux attach -t {{SESSION_NAME}}"
     }
 }
