@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import se.joynes.aiterminalhub.data.db.entity.ServerEntity
 import se.joynes.aiterminalhub.data.model.Server
 import se.joynes.aiterminalhub.data.repository.ServerRepository
 import se.joynes.aiterminalhub.data.security.SecurePrefsManager
@@ -18,6 +19,8 @@ data class AddEditServerState(
     val port: String = "22",
     val username: String = "",
     val password: String = "",
+    val projectsFolder: String = "~/aiterminalhub",
+    val setupScript: String = ServerEntity.DEFAULT_SETUP_SCRIPT,
     val saved: Boolean = false
 )
 
@@ -41,7 +44,9 @@ class AddEditServerViewModel @Inject constructor(
                 host = server.host,
                 port = server.port.toString(),
                 username = server.username,
-                password = securePrefs.getPassword(id) ?: ""
+                password = securePrefs.getPassword(id) ?: "",
+                projectsFolder = server.projectsFolder,
+                setupScript = server.setupScript
             )
         }
     }
@@ -58,7 +63,9 @@ class AddEditServerViewModel @Inject constructor(
                 name = s.name.ifBlank { s.host },
                 host = s.host,
                 port = s.port.toIntOrNull() ?: 22,
-                username = s.username
+                username = s.username,
+                projectsFolder = s.projectsFolder,
+                setupScript = s.setupScript
             )
             val savedId = if (editingId != null) {
                 repo.update(server); editingId!!

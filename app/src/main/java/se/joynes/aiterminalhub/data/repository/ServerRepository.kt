@@ -24,6 +24,6 @@ class ServerRepository @Inject constructor(
 
     suspend fun delete(server: Server) = dao.delete(server.toEntity())
 
-    private fun ServerEntity.toModel() = Server(id, name, host, port, username, authType, keyAlias)
-    private fun Server.toEntity() = ServerEntity(id, name, host, port, username, authType, keyAlias)
+    private fun ServerEntity.toModel() = Server(id, name, host, port, username, authType, keyAlias, projectsFolder, setupScript)
+    private fun Server.toEntity() = ServerEntity(id, name, host, port, username, authType, keyAlias, projectsFolder, setupScript)
 }

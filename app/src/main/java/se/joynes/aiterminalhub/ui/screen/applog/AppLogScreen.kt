@@ -5,16 +5,19 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.aiterminalhub.data.model.AppLogEntry
 import se.joynes.aiterminalhub.ui.components.*
 import se.joynes.aiterminalhub.ui.theme.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val LOG_LEVEL_COLORS = mapOf(
     "TRACE" to MegaDriveDim,
@@ -23,6 +26,8 @@ private val LOG_LEVEL_COLORS = mapOf(
     "WARN" to MegaDriveWarning,
     "ERROR" to MegaDriveError
 )
+
+private val TIME_FMT = SimpleDateFormat("HH:mm:ss.SSS", Locale.US)
 
 @Composable
 fun AppLogScreen(
@@ -51,7 +56,12 @@ fun AppLogScreen(
                         Text("EXP", color = MegaDriveWarning, fontSize = 10.sp, fontFamily = MonoFontFamily)
                     }
                     IconButton(onClick = { viewModel.toggleAutoScroll() }) {
-                        Text(if (autoScroll) "AS:ON" else "AS:OFF", color = if (autoScroll) MegaDriveGreen else MegaDriveDim, fontSize = 8.sp, fontFamily = MonoFontFamily)
+                        Text(
+                            if (autoScroll) "AS:ON" else "AS:OFF",
+                            color = if (autoScroll) MegaDriveGreen else MegaDriveDim,
+                            fontSize = 8.sp,
+                            fontFamily = MonoFontFamily
+                        )
                     }
                 }
             )
@@ -59,7 +69,6 @@ fun AppLogScreen(
         containerColor = MegaDriveBg
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).background(MegaDriveBg)) {
-            // Search bar
             OutlinedTextField(
                 value = search,
                 onValueChange = { viewModel.setSearch(it) },
@@ -75,13 +84,11 @@ fun AppLogScreen(
                 singleLine = true
             )
 
-            // Level filter chips
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                val levels = listOf("ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR")
-                levels.forEach { level ->
+                listOf("ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR").forEach { level ->
                     val isSelected = selectedLevel == level
                     FilterChip(
                         selected = isSelected,
@@ -99,14 +106,16 @@ fun AppLogScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                items(logs, key = { it.id }) { entry ->
-                    LogEntryRow(entry)
+            SelectionContainer(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    items(logs, key = { it.id }) { entry ->
+                        LogEntryRow(entry)
+                    }
                 }
             }
         }
@@ -116,10 +125,15 @@ fun AppLogScreen(
 @Composable
 private fun LogEntryRow(entry: AppLogEntry) {
     val color = LOG_LEVEL_COLORS[entry.level] ?: MegaDriveOnSurface
+    val time = remember(entry.timestamp) { TIME_FMT.format(Date(entry.timestamp)) }
     Row(
-        modifier = Modifier.fillMaxWidth().background(MegaDriveSurface.copy(alpha = 0.5f)).padding(horizontal = 8.dp, vertical = 2.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MegaDriveSurface.copy(alpha = 0.5f))
+            .padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        Text(time, color = MegaDriveDim, fontSize = 9.sp, fontFamily = MonoFontFamily)
         Text(entry.level.take(5).padEnd(5), color = color, fontSize = 9.sp, fontFamily = MonoFontFamily)
         Text("[${entry.tag}]", color = MegaDriveDim, fontSize = 9.sp, fontFamily = MonoFontFamily)
         Text(entry.message, color = MegaDriveOnSurface, fontSize = 9.sp, fontFamily = MonoFontFamily, modifier = Modifier.weight(1f))

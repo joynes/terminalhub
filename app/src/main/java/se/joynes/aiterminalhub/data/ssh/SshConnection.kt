@@ -21,7 +21,7 @@ class SshConnection @Inject constructor(
     private var outputStream: OutputStream? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    private val _output = MutableSharedFlow<String>(replay = 0, extraBufferCapacity = 256)
+    private val _output = MutableSharedFlow<String>(replay = 200, extraBufferCapacity = 512)
     val output: SharedFlow<String> = _output.asSharedFlow()
 
     private val _connected = MutableStateFlow(false)

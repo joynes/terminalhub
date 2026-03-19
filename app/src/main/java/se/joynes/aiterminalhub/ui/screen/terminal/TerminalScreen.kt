@@ -19,18 +19,30 @@ fun TerminalScreen(
     viewModel: TerminalViewModel = hiltViewModel()
 ) {
     var webView by remember { mutableStateOf<WebView?>(null) }
-    val output by viewModel.output.collectAsState("")
+    var pageReady by remember { mutableStateOf(false) }
 
     LaunchedEffect(sessionId) { viewModel.attachSession(sessionId) }
 
-    LaunchedEffect(output) {
+    // Collect SSH output only after xterm.html has finished loading
+    LaunchedEffect(pageReady, sessionId) {
+        if (!pageReady) return@LaunchedEffect
         val web = webView ?: return@LaunchedEffect
-        val escaped = output
-            .replace("\\", "\\\\")
-            .replace("'", "\\'")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-        web.post { web.evaluateJavascript("window.termWrite('$escaped')", null) }
+        viewModel.onPageReady(sessionId)
+        var firstChunk = true
+        viewModel.output.collect { text ->
+            val escaped = text
+                .replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+            web.post {
+                if (firstChunk) {
+                    firstChunk = false
+                    web.evaluateJavascript("window.termFit()", null)
+                }
+                web.evaluateJavascript("window.termWrite('$escaped')", null)
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(MegaDriveBg)) {
@@ -39,16 +51,32 @@ fun TerminalScreen(
                 WebView(ctx).apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
-                    webViewClient = WebViewClient()
+                    isFocusable = true
+                    isFocusableInTouchMode = true
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            // Post fit+focus after Android has laid out the WebView
+                            view?.post {
+                                view.evaluateJavascript("window.termFit()", null)
+                                view.evaluateJavascript("term.focus()", null)
+                                view.requestFocus()
+                            }
+                            pageReady = true
+                        }
+                    }
                     addJavascriptInterface(object {
                         @JavascriptInterface
                         fun send(data: String) { viewModel.send(data) }
+                        @JavascriptInterface
+                        fun log(msg: String) { viewModel.logFromJs(msg) }
                     }, "Android")
                     loadUrl("file:///android_asset/terminal/xterm.html")
                     webView = this
                 }
             },
-            modifier = Modifier.weight(1f).fillMaxWidth()
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
         )
         SpecialKeyBar(onKey = { viewModel.send(it) })
         FontSizeControl(

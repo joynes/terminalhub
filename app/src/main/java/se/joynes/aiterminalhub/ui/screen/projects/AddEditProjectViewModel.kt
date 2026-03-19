@@ -11,9 +11,6 @@ import javax.inject.Inject
 
 data class AddEditProjectState(
     val name: String = "",
-    val projectPath: String = "",
-    val sessionName: String = "",
-    val setupScript: String = "",
     val saved: Boolean = false
 )
 
@@ -32,7 +29,7 @@ class AddEditProjectViewModel @Inject constructor(
         viewModelScope.launch {
             val p = repo.getById(id) ?: return@launch
             editingId = id
-            _state.value = AddEditProjectState(p.name, p.projectPath, p.sessionName, p.setupScript)
+            _state.value = AddEditProjectState(name = p.name)
         }
     }
 
@@ -43,14 +40,7 @@ class AddEditProjectViewModel @Inject constructor(
     fun save() {
         viewModelScope.launch {
             val s = _state.value
-            val project = Project(
-                id = editingId ?: 0L,
-                serverId = serverId,
-                name = s.name,
-                projectPath = s.projectPath,
-                sessionName = s.sessionName.ifBlank { s.name },
-                setupScript = s.setupScript
-            )
+            val project = Project(id = editingId ?: 0L, serverId = serverId, name = s.name)
             if (editingId != null) repo.update(project) else repo.save(project)
             _state.value = s.copy(saved = true)
         }

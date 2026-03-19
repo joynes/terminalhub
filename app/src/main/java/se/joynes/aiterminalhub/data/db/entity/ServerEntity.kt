@@ -12,5 +12,14 @@ data class ServerEntity(
     val username: String,
     val authType: String = "password", // "password" or "key"
     val keyAlias: String? = null,
+    val projectsFolder: String = "~/aiterminalhub",
+    val setupScript: String = DEFAULT_SETUP_SCRIPT,
     val createdAt: Long = System.currentTimeMillis()
-)
+) {
+    companion object {
+        const val DEFAULT_SETUP_SCRIPT =
+            "mkdir -p {{PROJECT_PATH}}\n" +
+            "tmux has-session -t {{SESSION_NAME}} 2>/dev/null || tmux new-session -d -s {{SESSION_NAME}}\n" +
+            "tmux send-keys -t {{SESSION_NAME}} \"cd {{PROJECT_PATH}}\" Enter"
+    }
+}

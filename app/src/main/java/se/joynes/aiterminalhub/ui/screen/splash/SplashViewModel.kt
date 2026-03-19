@@ -28,6 +28,12 @@ class SplashViewModel @Inject constructor(
     private val _authState = MutableStateFlow<AuthState>(AuthState.Idle)
     val authState: StateFlow<AuthState> = _authState.asStateFlow()
 
+    fun checkBiometricAvailability(activity: FragmentActivity?) {
+        if (activity == null || !biometricAuthManager.canAuthenticate(activity)) {
+            _authState.value = AuthState.NoBiometric
+        }
+    }
+
     fun authenticate(activity: FragmentActivity) {
         if (!biometricAuthManager.canAuthenticate(activity)) {
             _authState.value = AuthState.NoBiometric

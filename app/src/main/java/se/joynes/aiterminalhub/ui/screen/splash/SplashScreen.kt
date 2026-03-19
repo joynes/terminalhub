@@ -25,9 +25,14 @@ fun SplashScreen(
     val authState by viewModel.authState.collectAsState()
     val context = LocalContext.current
 
+    // Auto-check biometric availability on first composition
+    LaunchedEffect(Unit) {
+        viewModel.checkBiometricAvailability(context as? FragmentActivity)
+    }
+
     LaunchedEffect(authState) {
         when (authState) {
-            is AuthState.Success -> onAuthSuccess()
+            is AuthState.Success, is AuthState.NoBiometric -> onAuthSuccess()
             else -> {}
         }
     }
@@ -81,8 +86,7 @@ fun SplashScreen(
                     Text("ACCESS GRANTED", color = MegaDriveGreen, fontSize = 14.sp, fontFamily = MonoFontFamily)
                 }
                 is AuthState.NoBiometric -> {
-                    // No biometric - skip to app
-                    LaunchedEffect(Unit) { onAuthSuccess() }
+                    Text("BIOMETRIC N/A — BYPASSING", color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily)
                 }
             }
         }

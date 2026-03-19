@@ -8,8 +8,5 @@ data class ProjectEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val serverId: Long,
     val name: String,
-    val projectPath: String,
-    val sessionName: String,
-    val setupScript: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )

@@ -2,8 +2,6 @@ package se.joynes.aiterminalhub.ui.screen.projects
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -38,34 +36,27 @@ fun AddEditProjectScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .background(MegaDriveBg)
-                .padding(16.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            RetroTextField(state.name, { viewModel.update { copy(name = it) } }, "Project Name *", Modifier.fillMaxWidth())
-            RetroTextField(state.projectPath, { viewModel.update { copy(projectPath = it) } }, "Project Path *", Modifier.fillMaxWidth())
-            RetroTextField(state.sessionName, { viewModel.update { copy(sessionName = it) } }, "tmux Session Name *", Modifier.fillMaxWidth())
-
-            Text("SETUP SCRIPT", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
-            Text("Placeholders: {{PROJECT_NAME}}, {{PROJECT_PATH}}, {{SESSION_NAME}}", color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily)
-            OutlinedTextField(
-                value = state.setupScript,
-                onValueChange = { viewModel.update { copy(setupScript = it) } },
-                modifier = Modifier.fillMaxWidth().height(200.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MegaDrivePrimary,
-                    unfocusedBorderColor = MegaDriveDim,
-                    focusedTextColor = MegaDriveOnSurface,
-                    unfocusedTextColor = MegaDriveOnSurface,
-                    cursorColor = MegaDrivePrimary
-                )
+            RetroTextField(
+                state.name,
+                { viewModel.update { copy(name = it) } },
+                "Project Name *",
+                Modifier.fillMaxWidth()
             )
-
+            Text(
+                "Path and tmux session are derived from the server's projects folder and this name.",
+                color = MegaDriveDim,
+                fontSize = 10.sp,
+                fontFamily = MonoFontFamily
+            )
+            Spacer(Modifier.height(8.dp))
             RetroButton(
                 text = "[ SAVE ]",
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.name.isNotBlank() && state.projectPath.isNotBlank()
+                enabled = state.name.isNotBlank()
             )
         }
     }

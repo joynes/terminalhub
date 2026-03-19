@@ -35,7 +35,8 @@ fun AppNavGraph() {
                 onOpenProjects = { id -> navController.navigate(Screen.ProjectList.createRoute(id)) },
                 onOpenStatus = { id -> navController.navigate(Screen.ServerStatus.createRoute(id)) },
                 onOpenUpload = { id -> navController.navigate(Screen.FileUpload.createRoute(id)) },
-                onOpenLog = { navController.navigate(Screen.AppLog.route) }
+                onOpenLog = { navController.navigate(Screen.AppLog.route) },
+                onOpenSessionLog = { navController.navigate(Screen.SessionLog.route) }
             )
         }
         composable(

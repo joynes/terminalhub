@@ -25,6 +25,7 @@ fun ServerListScreen(
     onOpenStatus: (Long) -> Unit,
     onOpenUpload: (Long) -> Unit,
     onOpenLog: () -> Unit,
+    onOpenSessionLog: () -> Unit,
     viewModel: ServerListViewModel = hiltViewModel()
 ) {
     val servers by viewModel.servers.collectAsState()
@@ -34,6 +35,9 @@ fun ServerListScreen(
             RetroTopBar(
                 title = "SERVERS",
                 actions = {
+                    IconButton(onClick = onOpenSessionLog) {
+                        Text("SLOG", color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily)
+                    }
                     IconButton(onClick = onOpenLog) {
                         Text("LOG", color = MegaDriveWarning, fontSize = 10.sp, fontFamily = MonoFontFamily)
                     }

@@ -2,7 +2,7 @@ package se.joynes.aiterminalhub
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.test.ext.junit4.runners.AndroidJUnit4
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Before
@@ -24,7 +24,7 @@ class ServerListScreenTest {
     fun emptyStateIsShown() {
         composeRule.setContent {
             AITerminalHubTheme {
-                ServerListScreen({}, {}, {}, {}, {}, {})
+                ServerListScreen({}, {}, {}, {}, {}, {}, {})
             }
         }
         composeRule.onNodeWithText("NO SERVERS CONFIGURED").assertIsDisplayed()
@@ -34,7 +34,7 @@ class ServerListScreenTest {
     fun addButtonIsVisible() {
         composeRule.setContent {
             AITerminalHubTheme {
-                ServerListScreen({}, {}, {}, {}, {}, {})
+                ServerListScreen({}, {}, {}, {}, {}, {}, {})
             }
         }
         composeRule.onNodeWithContentDescription("Add server").assertIsDisplayed()

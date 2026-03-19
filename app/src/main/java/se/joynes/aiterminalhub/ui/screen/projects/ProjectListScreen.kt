@@ -63,9 +63,6 @@ fun ProjectListScreen(
                         RetroCard(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text(project.name, color = MegaDrivePrimary, fontFamily = MonoFontFamily, fontSize = 14.sp)
-                                Spacer(Modifier.height(4.dp))
-                                Text(project.projectPath, color = MegaDriveOnSurface, fontSize = 11.sp, fontFamily = MonoFontFamily)
-                                Text("session: ${project.sessionName}", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
                                 Spacer(Modifier.height(8.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     RetroButton("CONNECT", { onConnect(project.id) }, Modifier.weight(1f))

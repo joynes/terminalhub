@@ -25,6 +25,6 @@ class ProjectRepository @Inject constructor(
 
     suspend fun delete(project: Project) = dao.delete(project.toEntity())
 
-    private fun ProjectEntity.toModel() = Project(id, serverId, name, projectPath, sessionName, setupScript)
-    private fun Project.toEntity() = ProjectEntity(id, serverId, name, projectPath, sessionName, setupScript)
+    private fun ProjectEntity.toModel() = Project(id, serverId, name)
+    private fun Project.toEntity() = ProjectEntity(id, serverId, name)
 }
