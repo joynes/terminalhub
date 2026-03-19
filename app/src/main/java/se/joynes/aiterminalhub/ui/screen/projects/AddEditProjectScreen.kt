@@ -51,6 +51,44 @@ fun AddEditProjectScreen(
                 fontSize = 10.sp,
                 fontFamily = MonoFontFamily
             )
+            Spacer(Modifier.height(4.dp))
+            // Setup script override
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text(
+                    "CUSTOM SETUP SCRIPT",
+                    color = MegaDrivePrimary,
+                    fontSize = 11.sp,
+                    fontFamily = MonoFontFamily
+                )
+                Switch(
+                    checked = state.setupScript != null,
+                    onCheckedChange = { on ->
+                        viewModel.update { copy(setupScript = if (on) "" else null) }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = MegaDrivePrimary,
+                        checkedTrackColor = MegaDrivePrimary.copy(alpha = 0.4f)
+                    )
+                )
+            }
+            if (state.setupScript != null) {
+                Text(
+                    "Leave empty to run nothing on connect. Use {{SESSION_NAME}}, {{PROJECT_PATH}}.",
+                    color = MegaDriveDim,
+                    fontSize = 10.sp,
+                    fontFamily = MonoFontFamily
+                )
+                RetroTextField(
+                    value = state.setupScript ?: "",
+                    onValueChange = { viewModel.update { copy(setupScript = it) } },
+                    label = "Setup script (blank = no tmux)",
+                    modifier = Modifier.fillMaxWidth().height(140.dp)
+                )
+            }
             Spacer(Modifier.height(8.dp))
             RetroButton(
                 text = "[ SAVE ]",

@@ -4,6 +4,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import se.joynes.aiterminalhub.data.db.entity.ServerEntity
 
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Add per-project setup script override (NULL = use server default)
+        db.execSQL("ALTER TABLE projects ADD COLUMN setupScript TEXT DEFAULT NULL")
+    }
+}
+
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(db: SupportSQLiteDatabase) {
         // Add new columns to servers (SQLite supports ADD COLUMN)

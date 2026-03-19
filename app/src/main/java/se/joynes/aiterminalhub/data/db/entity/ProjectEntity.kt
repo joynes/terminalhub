@@ -8,5 +8,7 @@ data class ProjectEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val serverId: Long,
     val name: String,
+    // null = use server's default setupScript; empty string = run nothing on connect
+    val setupScript: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
