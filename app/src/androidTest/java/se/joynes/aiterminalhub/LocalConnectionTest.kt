@@ -26,6 +26,11 @@ import java.io.File
  *  - SSH server running on the host Mac (brew / Remote Login enabled)
  *  - Username below must match your Mac login
  *
+ * Pass SSH_PASS via instrumentation args to test a full authenticated connection:
+ *   SSH_PASS=mypassword ./gradlew connectedAndroidTest \
+ *     -Pandroid.testInstrumentationRunnerArguments.class=se.joynes.aiterminalhub.LocalConnectionTest \
+ *     -Pandroid.testInstrumentationRunnerArguments.SSH_PASS=$SSH_PASS
+ *
  * Screenshots are saved to ~/Downloads/ and can be pulled with:
  *   adb pull /sdcard/Download/test-screenshots/ ~/Desktop/
  */
@@ -36,8 +41,13 @@ class LocalConnectionTest {
     // ── Adjust these for your local machine ─────────────────────────────────
     private val host     = "10.0.2.2"   // emulator → host Mac
     private val port     = "22"
-    private val username = "demo"
-    private val password = ""           // leave blank to skip password auth
+    private val username = "sshtest"    // dedicated test account with limited access
+    // Read SSH_PASS from instrumentation args — run with:
+    //   SSH_PASS=sshtest123 ./gradlew connectedAndroidTest \
+    //     -Pandroid.testInstrumentationRunnerArguments.class=...LocalConnectionTest \
+    //     -Pandroid.testInstrumentationRunnerArguments.SSH_PASS=$SSH_PASS
+    private val password: String
+        get() = InstrumentationRegistry.getArguments().getString("SSH_PASS", "")
     // ────────────────────────────────────────────────────────────────────────
 
     // HiltAndroidRule must come first so the component is ready before MainActivity launches
@@ -164,14 +174,13 @@ class LocalConnectionTest {
         }.click()
         screenshot("09_log_screen_before_wait")
 
-        // "Connecting to" is always logged (DEBUG) even if auth fails.
-        // Set `password` above to your Mac login password to also verify "Shell channel opened".
+        // "Connecting to" is always logged even if auth fails
         waitFor("Connecting to", 15_000)
         screenshot("10_log_with_connect_entry")
 
-        // If SSH auth succeeded, "Shell channel opened" should also appear
-        val shellOpened = device.wait(Until.findObject(By.textContains("Shell channel opened")), 3_000)
-        if (shellOpened != null) {
+        // When SSH_PASS is provided the connection should fully authenticate
+        if (password.isNotBlank()) {
+            waitFor("Shell channel opened", 15_000)
             screenshot("11_log_shell_opened")
         }
     }
