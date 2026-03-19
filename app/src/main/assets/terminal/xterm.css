@@ -1,0 +1,4 @@
+/* xterm.css 5.x - Download from https://github.com/xtermjs/xterm.js/releases */
+/* Replace this file with the actual xterm.css */
+.xterm { position: relative; user-select: none; }
+.xterm-viewport { position: absolute; }

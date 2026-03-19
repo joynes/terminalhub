@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Terminal</title>
+  <link rel="stylesheet" href="xterm.css" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; background: #0D0D1A; overflow: hidden; }
+    #terminal { width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="terminal"></div>
+  <script src="xterm.js"></script>
+  <script src="xterm-addon-fit.js"></script>
+  <script src="retro-theme.js"></script>
+  <script>
+    const term = new Terminal({
+      theme: retroTheme,
+      fontFamily: 'Courier New, Courier, monospace',
+      fontSize: 14,
+      cursorBlink: true,
+      cursorStyle: 'block',
+      scrollback: 5000,
+      cols: 80,
+      rows: 24
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal'));
+
+    function doFit() {
+      try { fitAddon.fit(); } catch(e) {}
+    }
+    window.addEventListener('resize', doFit);
+    setTimeout(doFit, 100);
+
+    // Write output from Android
+    window.termWrite = function(data) {
+      term.write(data);
+    };
+
+    // Change font size
+    window.termFontSize = function(delta) {
+      const cur = term.options.fontSize || 14;
+      term.options.fontSize = Math.max(8, Math.min(24, cur + delta));
+      doFit();
+    };
+
+    // Send input to Android
+    term.onData(function(data) {
+      if (window.Android) {
+        window.Android.send(data);
+      }
+    });
+
+    term.writeln('\x1b[1;32mAITerminalHub Terminal Ready\x1b[0m');
+    term.writeln('\x1b[2;37mConnecting...\x1b[0m');
+  </script>
+</body>
+</html>
