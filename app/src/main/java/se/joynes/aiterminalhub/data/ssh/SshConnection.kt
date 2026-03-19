@@ -1,5 +1,6 @@
 package se.joynes.aiterminalhub.data.ssh
 
+import com.jcraft.jsch.ChannelExec
 import com.jcraft.jsch.ChannelShell
 import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
@@ -18,6 +19,7 @@ class SshConnection @Inject constructor(
 ) {
     private var jschSession: Session? = null
     private var shellChannel: ChannelShell? = null
+    private var execChannel: ChannelExec? = null
     private var outputStream: OutputStream? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -29,7 +31,9 @@ class SshConnection @Inject constructor(
 
     val sessionId = java.util.UUID.randomUUID().toString()
 
-    fun connect(server: Server, password: String?) {
+    // command = null  → plain interactive shell (ChannelShell)
+    // command = "..." → exec with PTY; setup commands run silently, then e.g. tmux attach
+    fun connect(server: Server, password: String?, command: String? = null) {
         scope.launch {
             try {
                 logger.log(LogLevel.DEBUG, TAG, "Connecting to ${server.host}:${server.port}", LogEvent.SshConnect(server.host, server.port))
@@ -41,15 +45,27 @@ class SshConnection @Inject constructor(
                 jschSession = session
                 logger.log(LogLevel.INFO, TAG, "SSH session established to ${server.host}")
 
-                val channel = session.openChannel("shell") as ChannelShell
-                channel.setPtyType("xterm-256color")
-                outputStream = channel.outputStream
-                channel.connect()
-                shellChannel = channel
+                val inputStream = if (command != null) {
+                    val ch = session.openChannel("exec") as ChannelExec
+                    ch.setCommand(command)
+                    ch.setPty(true)
+                    ch.setPtyType("xterm-256color")
+                    outputStream = ch.outputStream
+                    ch.connect()
+                    execChannel = ch
+                    logger.log(LogLevel.DEBUG, TAG, "Exec channel opened: $command")
+                    ch.inputStream
+                } else {
+                    val ch = session.openChannel("shell") as ChannelShell
+                    ch.setPtyType("xterm-256color")
+                    outputStream = ch.outputStream
+                    ch.connect()
+                    shellChannel = ch
+                    ch.inputStream
+                }
                 _connected.value = true
                 logger.log(LogLevel.INFO, TAG, "Shell channel opened")
-
-                readOutput(channel.inputStream)
+                readOutput(inputStream)
             } catch (e: Exception) {
                 logger.log(LogLevel.ERROR, TAG, "Connection failed: ${e.message}")
                 _connected.value = false
@@ -90,8 +106,10 @@ class SshConnection @Inject constructor(
     fun disconnect() {
         _connected.value = false
         shellChannel?.disconnect()
+        execChannel?.disconnect()
         jschSession?.disconnect()
         shellChannel = null
+        execChannel = null
         jschSession = null
         outputStream = null
         logger.log(LogLevel.INFO, TAG, "Disconnected")
