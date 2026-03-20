@@ -39,6 +39,7 @@ fun AddEditServerScreen(
                 .padding(padding)
                 .background(MegaDriveBg)
                 .padding(16.dp)
+                .navigationBarsPadding()
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
