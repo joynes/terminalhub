@@ -9,6 +9,8 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import se.joynes.aiterminalhub.domain.TerminalSessionId
+import se.joynes.aiterminalhub.domain.TerminalSessionMeta
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
 import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
 
@@ -20,27 +22,44 @@ class SessionTabSwipeTest {
 
     @Before fun setup() { hiltRule.inject() }
 
+    private fun makeMeta(name: String) = TerminalSessionMeta(
+        id = TerminalSessionId(name),
+        projectName = name,
+        isConnected = true,
+        hasUnreadOutput = false,
+        previewLines = emptyList()
+    )
+
     @Test
     fun sessionTabBarShowsTabs() {
-        val sessions = listOf("session-1", "session-2")
+        val sessions = listOf(makeMeta("session-1"), makeMeta("session-2"))
         composeRule.setContent {
             AITerminalHubTheme {
                 SessionTabBar(
-                    sessionIds = sessions,
-                    selectedIndex = 0,
-                    onTabSelected = {}
+                    sessions = sessions,
+                    activeId = sessions.first().id,
+                    onSelect = {},
+                    onClose = {},
+                    onAddProject = {}
                 )
             }
         }
-        composeRule.onNodeWithText("SSH 1").assertIsDisplayed()
-        composeRule.onNodeWithText("SSH 2").assertIsDisplayed()
+        composeRule.onNodeWithText("SESSION-1").assertIsDisplayed()
+        composeRule.onNodeWithText("SESSION-2").assertIsDisplayed()
     }
 
     @Test
     fun sessionTabBarShowsAddButton() {
+        val sessions = listOf(makeMeta("session-1"))
         composeRule.setContent {
             AITerminalHubTheme {
-                SessionTabBar(sessionIds = listOf("session-1"), selectedIndex = 0, onTabSelected = {})
+                SessionTabBar(
+                    sessions = sessions,
+                    activeId = sessions.first().id,
+                    onSelect = {},
+                    onClose = {},
+                    onAddProject = {}
+                )
             }
         }
         composeRule.onNodeWithText("+").assertIsDisplayed()

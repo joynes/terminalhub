@@ -23,7 +23,7 @@ class TerminalScreenTest {
     @Test
     fun specialKeyBarIsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { TerminalScreen(sessionId = "test-session") }
+            AITerminalHubTheme { TerminalScreen() }
         }
         composeRule.onNodeWithText("ESC").assertIsDisplayed()
         composeRule.onNodeWithText("TAB").assertIsDisplayed()
@@ -33,7 +33,7 @@ class TerminalScreenTest {
     @Test
     fun fontSizeControlsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { TerminalScreen(sessionId = "test-session") }
+            AITerminalHubTheme { TerminalScreen() }
         }
         composeRule.onNodeWithText("A+").assertIsDisplayed()
         composeRule.onNodeWithText("A-").assertIsDisplayed()

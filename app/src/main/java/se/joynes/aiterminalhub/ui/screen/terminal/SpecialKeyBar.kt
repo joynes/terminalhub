@@ -27,7 +27,7 @@ private val SPECIAL_KEYS = listOf(
 @Composable
 fun SpecialKeyBar(
     onKey: (String) -> Unit,
-    onCopy: () -> Unit = {},
+    onPaste: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {}
 ) {
     Row(
@@ -42,6 +42,6 @@ fun SpecialKeyBar(
         SPECIAL_KEYS.forEach { (label, value) ->
             RetroButton(label, { onKey(value) })
         }
-        RetroButton("COPY", onCopy)
+        RetroButton("PASTE", onPaste)
     }
 }

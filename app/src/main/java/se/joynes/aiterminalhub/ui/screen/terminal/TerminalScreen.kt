@@ -23,19 +23,14 @@ private const val KEYBOARD_INACTIVITY_MS = 10_000L
 
 @Composable
 fun TerminalScreen(
-    sessionId: String,
     viewModel: TerminalViewModel = hiltViewModel()
 ) {
-    val terminalEmulator by viewModel.terminalEmulator.collectAsState()
+    val terminalEmulator by viewModel.activeEmulator.collectAsState()
     val focusRequester = remember { FocusRequester() }
 
     var keyboardVisible by remember { mutableStateOf(true) }
-    // Bumped on every keystroke or tap; restarting the inactivity timer.
     var lastActivityMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    LaunchedEffect(sessionId) { viewModel.attachSession(sessionId) }
-
-    // Auto-hide keyboard after 10 s of no typing or tapping.
     LaunchedEffect(lastActivityMs) {
         delay(KEYBOARD_INACTIVITY_MS)
         keyboardVisible = false
@@ -53,9 +48,6 @@ fun TerminalScreen(
                 focusRequester.requestFocus()
                 keyboardVisible = true
             }
-            // Detect taps on the terminal in the Initial pass (before the Terminal
-            // composable sees them) so we can show the keyboard without consuming
-            // the event — the Terminal still handles cursor placement normally.
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -105,7 +97,7 @@ fun TerminalScreen(
                 markActivity()
                 viewModel.sendBytes(it.toByteArray(Charsets.UTF_8))
             },
-            onCopy = { /* TODO: selection copy via termlib */ },
+            onPaste = {},
             onKeyboardToggle = {
                 keyboardVisible = !keyboardVisible
                 if (keyboardVisible) markActivity()
