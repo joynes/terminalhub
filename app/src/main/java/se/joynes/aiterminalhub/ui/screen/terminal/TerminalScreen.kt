@@ -6,6 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import org.connectbot.terminal.Terminal
@@ -19,18 +20,21 @@ fun TerminalScreen(
     viewModel: TerminalViewModel = hiltViewModel()
 ) {
     val terminalEmulator by viewModel.terminalEmulator.collectAsState()
+    val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(sessionId) { viewModel.attachSession(sessionId) }
 
     Column(modifier = Modifier.fillMaxSize().background(MegaDriveBg)) {
         val emulator = terminalEmulator
         if (emulator != null) {
+            LaunchedEffect(emulator) { focusRequester.requestFocus() }
             Terminal(
                 terminalEmulator = emulator,
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 keyboardEnabled = true,
                 showSoftKeyboard = true,
                 initialFontSize = 12.sp,
+                focusRequester = focusRequester,
             )
         } else {
             Box(
@@ -46,10 +50,7 @@ fun TerminalScreen(
             }
         }
         SpecialKeyBar(
-            onKey = { emulator?.let { e ->
-                // send special keys as raw bytes via the keyboard input path
-                e.writeInput(it.toByteArray(Charsets.UTF_8))
-            }},
+            onKey = { viewModel.sendBytes(it.toByteArray(Charsets.UTF_8)) },
             onCopy = { /* TODO: selection copy via termlib */ }
         )
         FontSizeControl(

@@ -17,13 +17,16 @@ data class ServerEntity(
     val createdAt: Long = System.currentTimeMillis()
 ) {
     companion object {
-        // Runs silently via exec channel (no PTY) — creates dir + tmux session
+        // Runs silently via exec channel (no PTY) — kills dead sessions, creates dir + tmux session
         const val DEFAULT_SETUP_SCRIPT =
             "mkdir -p {{PROJECT_PATH}} 2>/dev/null; " +
+            "(tmux has-session -t {{SESSION_NAME}} 2>/dev/null && " +
+            "tmux list-panes -t {{SESSION_NAME}} -F '#{pane_dead}' 2>/dev/null | grep -q 1 && " +
+            "tmux kill-session -t {{SESSION_NAME}} 2>/dev/null); " +
             "tmux has-session -t {{SESSION_NAME}} 2>/dev/null || " +
             "tmux new-session -d -s {{SESSION_NAME}} -c {{PROJECT_PATH}}"
 
-        // Sent to the interactive shell after the banner — attaches to the session
-        const val DEFAULT_ATTACH_COMMAND = "tmux attach -t {{SESSION_NAME}}"
+        // Sent to the interactive shell after the banner — attaches or creates the session
+        const val DEFAULT_ATTACH_COMMAND = "tmux new-session -A -s {{SESSION_NAME}}"
     }
 }

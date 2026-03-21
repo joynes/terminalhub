@@ -57,5 +57,11 @@ class TerminalViewModel @Inject constructor(
         }
     }
 
+    /** Send raw bytes to SSH (used by SpecialKeyBar). */
+    fun sendBytes(bytes: ByteArray) {
+        val sessionId = currentSessionId ?: return
+        sshManager.getSession(sessionId)?.sendBytes(bytes)
+    }
+
     companion object { private const val TAG = "TerminalVM" }
 }

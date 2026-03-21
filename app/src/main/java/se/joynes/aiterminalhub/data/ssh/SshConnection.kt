@@ -6,6 +6,8 @@ import com.jcraft.jsch.JSch
 import com.jcraft.jsch.Session
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogEvent
 import se.joynes.aiterminalhub.data.logging.LogLevel
@@ -21,6 +23,7 @@ class SshConnection @Inject constructor(
     private var shellChannel: ChannelShell? = null
     private var outputStream: OutputStream? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val writeMutex = Mutex()
 
     private val _output = MutableSharedFlow<ByteArray>(replay = 200, extraBufferCapacity = 512)
     val output: SharedFlow<ByteArray> = _output.asSharedFlow()
@@ -103,7 +106,9 @@ class SshConnection @Inject constructor(
                     logger.log(LogLevel.TRACE, TAG, "RX $n bytes", LogEvent.SshReceive(sessionId, n))
                     _output.emit(buffer.copyOf(n))
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                logger.log(LogLevel.WARN, TAG, "SSH read loop exception: ${e.javaClass.simpleName}: ${e.message}")
+            }
             _connected.value = false
             logger.log(LogLevel.INFO, TAG, "SSH read loop ended")
         }
@@ -112,13 +117,16 @@ class SshConnection @Inject constructor(
     fun send(text: String) = sendBytes(text.toByteArray(Charsets.UTF_8))
 
     fun sendBytes(bytes: ByteArray) {
+        val os = outputStream
         scope.launch {
-            try {
-                outputStream?.write(bytes)
-                outputStream?.flush()
-                logger.log(LogLevel.TRACE, TAG, "TX ${bytes.size} bytes", LogEvent.SshSend(sessionId, bytes.size))
-            } catch (e: Exception) {
-                logger.log(LogLevel.WARN, TAG, "Send failed: ${e.message}")
+            writeMutex.withLock {
+                try {
+                    os?.write(bytes)
+                    os?.flush()
+                    logger.log(LogLevel.TRACE, TAG, "TX ${bytes.size} bytes", LogEvent.SshSend(sessionId, bytes.size))
+                } catch (e: Exception) {
+                    logger.log(LogLevel.WARN, TAG, "Send failed: ${e.message}")
+                }
             }
         }
     }
