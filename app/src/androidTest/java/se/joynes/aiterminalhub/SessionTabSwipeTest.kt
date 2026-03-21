@@ -10,8 +10,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.domain.TerminalSessionId
-import se.joynes.aiterminalhub.domain.TerminalSessionMeta
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
+import se.joynes.aiterminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
 
 @HiltAndroidTest
@@ -22,24 +22,23 @@ class SessionTabSwipeTest {
 
     @Before fun setup() { hiltRule.inject() }
 
-    private fun makeMeta(name: String) = TerminalSessionMeta(
-        id = TerminalSessionId(name),
+    private fun makeTab(id: Long, name: String) = ProjectTabState(
+        projectId = id,
         projectName = name,
-        isConnected = true,
-        hasUnreadOutput = false,
-        previewLines = emptyList()
+        sessionId = TerminalSessionId(name),
+        isConnected = true
     )
 
     @Test
     fun sessionTabBarShowsTabs() {
-        val sessions = listOf(makeMeta("session-1"), makeMeta("session-2"))
+        val tabs = listOf(makeTab(1L, "session-1"), makeTab(2L, "session-2"))
         composeRule.setContent {
             AITerminalHubTheme {
                 SessionTabBar(
-                    sessions = sessions,
-                    activeId = sessions.first().id,
+                    tabs = tabs,
+                    activeId = tabs.first().sessionId,
                     onSelect = {},
-                    onClose = {},
+                    onClose = { _, _ -> },
                     onAddProject = {}
                 )
             }
@@ -50,14 +49,14 @@ class SessionTabSwipeTest {
 
     @Test
     fun sessionTabBarShowsAddButton() {
-        val sessions = listOf(makeMeta("session-1"))
+        val tabs = listOf(makeTab(1L, "session-1"))
         composeRule.setContent {
             AITerminalHubTheme {
                 SessionTabBar(
-                    sessions = sessions,
-                    activeId = sessions.first().id,
+                    tabs = tabs,
+                    activeId = tabs.first().sessionId,
                     onSelect = {},
-                    onClose = {},
+                    onClose = { _, _ -> },
                     onAddProject = {}
                 )
             }

@@ -18,6 +18,17 @@ import se.joynes.aiterminalhub.domain.TerminalSessionMeta
 import se.joynes.aiterminalhub.domain.usecase.ConnectToServer
 import javax.inject.Inject
 
+/**
+ * Represents one tab in the tab bar.
+ * [sessionId] is null while the SSH connection is still being established.
+ */
+data class ProjectTabState(
+    val projectId: Long,
+    val projectName: String,
+    val sessionId: TerminalSessionId?,   // null = connecting
+    val isConnected: Boolean
+)
+
 @HiltViewModel
 class SessionHostViewModel @Inject constructor(
     private val serverRepo: ServerRepository,
@@ -28,14 +39,30 @@ class SessionHostViewModel @Inject constructor(
     val sessionManager: TerminalSessionManager
 ) : ViewModel() {
 
-    val sessions: StateFlow<List<TerminalSessionMeta>> = sessionManager.sessions
+    // All projects from DB (shown immediately, even while connecting)
+    private val _dbProjects = MutableStateFlow<List<Project>>(emptyList())
+
+    /** Combined tab list: DB projects merged with live session state. */
+    val projectTabs: StateFlow<List<ProjectTabState>> = combine(
+        _dbProjects,
+        sessionManager.sessions
+    ) { projects, sessions ->
+        val sessionByName = sessions.associateBy { it.projectName }
+        projects.map { p ->
+            val session = sessionByName[p.name]
+            ProjectTabState(
+                projectId = p.id,
+                projectName = p.name,
+                sessionId = session?.id,
+                isConnected = session?.isConnected ?: false
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
     val activeId: StateFlow<TerminalSessionId?> = sessionManager.activeId
     val activeEmulator: StateFlow<TerminalEmulator?> = sessionManager.activeEmulator()
 
-    // Projects explicitly closed by the user; filtered out of the DB-driven list so they
-    // don't reappear when a new project is added and the Room Flow re-emits.
     private val closedProjectIds = mutableSetOf<Long>()
-    // Projects for which a connection has already been initiated.
     private val connectingProjectIds = mutableSetOf<Long>()
 
     private var serverId: Long = 0L
@@ -45,17 +72,17 @@ class SessionHostViewModel @Inject constructor(
         serverId = sId
         viewModelScope.launch {
             projectRepo.getByServer(sId).collect { projects ->
-                projects
-                    .filter { p -> p.id !in closedProjectIds }
-                    .forEach { p -> activateProject(p) }
+                val visible = projects.filter { it.id !in closedProjectIds }
+                _dbProjects.value = visible
+                visible.forEach { activateProject(it) }
             }
         }
     }
 
     private fun activateProject(project: Project) {
-        // Already connecting or registered → skip
-        val alreadyRegistered = sessions.value.any { it.id.value.contains(project.id.toString()) }
-        if (alreadyRegistered || project.id in connectingProjectIds) return
+        if (project.id in connectingProjectIds) return
+        // Already registered as a session
+        if (sessionManager.sessions.value.any { it.projectName == project.name }) return
         connectingProjectIds.add(project.id)
 
         viewModelScope.launch {
@@ -73,17 +100,15 @@ class SessionHostViewModel @Inject constructor(
         }
     }
 
-    fun switchToSession(id: TerminalSessionId) = sessionManager.switchTo(id)
+    fun switchToSession(id: TerminalSessionId) {
+        sessionManager.switchTo(id)
+    }
 
-    fun closeSession(id: TerminalSessionId) {
-        val meta = sessions.value.find { it.id == id } ?: return
-        // Derive project id from sessions list — mark as closed by name match
-        closedProjectIds.addAll(
-            sessions.value
-                .filter { it.projectName == meta.projectName }
-                .mapNotNull { it.id.value.toLongOrNull() }
-        )
-        sessionManager.close(id)
+    fun closeSession(projectId: Long, sessionId: TerminalSessionId?) {
+        closedProjectIds.add(projectId)
+        _dbProjects.value = _dbProjects.value.filter { it.id != projectId }
+        connectingProjectIds.remove(projectId)
+        sessionId?.let { sessionManager.close(it) }
     }
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)

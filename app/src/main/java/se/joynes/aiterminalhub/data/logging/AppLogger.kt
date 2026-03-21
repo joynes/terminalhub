@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import se.joynes.aiterminalhub.data.db.dao.AppLogDao
 import se.joynes.aiterminalhub.data.db.entity.AppLogEntity
+import android.util.Log
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,6 +30,16 @@ class AppLogger @Inject constructor(
             message = msg,
             eventType = event?.javaClass?.simpleName
         )
+        // Mirror to Android logcat for debugging (no-op in unit tests)
+        try {
+            when (level) {
+                LogLevel.TRACE -> Log.v(tag, msg)
+                LogLevel.DEBUG -> Log.d(tag, msg)
+                LogLevel.INFO  -> Log.i(tag, msg)
+                LogLevel.WARN  -> Log.w(tag, msg)
+                LogLevel.ERROR -> Log.e(tag, msg)
+            }
+        } catch (_: RuntimeException) { /* Android stub not available in unit tests */ }
         scope.launch {
             _logFlow.emit(entity)
             try { appLogDao.insert(entity) } catch (_: Exception) {}

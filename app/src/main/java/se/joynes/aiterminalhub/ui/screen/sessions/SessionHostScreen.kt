@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,10 +34,10 @@ fun SessionHostScreen(
     onAddProject: () -> Unit,
     viewModel: SessionHostViewModel = hiltViewModel()
 ) {
-    val sessions by viewModel.sessions.collectAsState()
+    val projectTabs by viewModel.projectTabs.collectAsState()
     val activeId by viewModel.activeId.collectAsState()
     val emulator by viewModel.activeEmulator.collectAsState()
-    val clipboardManager: ClipboardManager = LocalClipboardManager.current
+    val clipboardManager = LocalClipboardManager.current
 
     val focusRequester = remember { FocusRequester() }
     var keyboardVisible by remember { mutableStateOf(true) }
@@ -46,7 +45,6 @@ fun SessionHostScreen(
 
     LaunchedEffect(serverId) { viewModel.initForServer(serverId) }
 
-    // Request focus when emulator becomes available
     LaunchedEffect(emulator) {
         if (emulator != null) {
             focusRequester.requestFocus()
@@ -54,7 +52,6 @@ fun SessionHostScreen(
         }
     }
 
-    // Auto-hide keyboard after inactivity
     LaunchedEffect(lastActivityMs) {
         delay(KEYBOARD_INACTIVITY_MS)
         keyboardVisible = false
@@ -75,7 +72,8 @@ fun SessionHostScreen(
                 .padding(padding)
                 .background(MegaDriveBg)
         ) {
-            if (sessions.isEmpty()) {
+            if (projectTabs.isEmpty()) {
+                // No projects configured at all
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
@@ -90,10 +88,10 @@ fun SessionHostScreen(
                 }
             } else {
                 SessionTabBar(
-                    sessions = sessions,
+                    tabs = projectTabs,
                     activeId = activeId,
                     onSelect = { viewModel.switchToSession(it); focusRequester.requestFocus() },
-                    onClose = { viewModel.closeSession(it) },
+                    onClose = { projectId, sessionId -> viewModel.closeSession(projectId, sessionId) },
                     onAddProject = onAddProject
                 )
 

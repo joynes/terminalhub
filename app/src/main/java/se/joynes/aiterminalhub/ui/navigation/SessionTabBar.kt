@@ -12,15 +12,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.aiterminalhub.domain.TerminalSessionId
-import se.joynes.aiterminalhub.domain.TerminalSessionMeta
+import se.joynes.aiterminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.aiterminalhub.ui.theme.*
 
 @Composable
 fun SessionTabBar(
-    sessions: List<TerminalSessionMeta>,
+    tabs: List<ProjectTabState>,
     activeId: TerminalSessionId?,
     onSelect: (TerminalSessionId) -> Unit,
-    onClose: (TerminalSessionId) -> Unit,
+    onClose: (Long, TerminalSessionId?) -> Unit,
     onAddProject: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -31,21 +31,24 @@ fun SessionTabBar(
             .height(40.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        items(sessions) { session ->
-            val isSelected = session.id == activeId
+        items(tabs) { tab ->
+            val isSelected = tab.sessionId != null && tab.sessionId == activeId
+            val labelColor = when {
+                isSelected -> MegaDrivePrimary
+                tab.isConnected -> MegaDriveOnSurface
+                else -> MegaDriveDim   // connecting = dimmed
+            }
             Row(
                 modifier = Modifier
-                    .clickable { onSelect(session.id) }
+                    .clickable { tab.sessionId?.let { onSelect(it) } }
                     .background(if (isSelected) MegaDrivePrimary.copy(alpha = 0.2f) else MegaDriveBg)
                     .padding(start = 14.dp, end = 6.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = session.projectName.uppercase(),
-                    color = if (isSelected) MegaDrivePrimary
-                            else if (session.isConnected) MegaDriveOnSurface
-                            else MegaDriveDim,
+                    text = tab.projectName.uppercase(),
+                    color = labelColor,
                     fontSize = 11.sp,
                     fontFamily = MonoFontFamily
                 )
@@ -54,7 +57,7 @@ fun SessionTabBar(
                     color = MegaDriveAccent,
                     fontSize = 14.sp,
                     fontFamily = MonoFontFamily,
-                    modifier = Modifier.clickable { onClose(session.id) }
+                    modifier = Modifier.clickable { onClose(tab.projectId, tab.sessionId) }
                 )
             }
         }
