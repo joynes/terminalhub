@@ -32,30 +32,32 @@ class SessionHostViewModel @Inject constructor(
     private val _tabs = MutableStateFlow<List<ProjectTab>>(emptyList())
     val tabs: StateFlow<List<ProjectTab>> = _tabs.asStateFlow()
 
+    // Projects explicitly closed by the user; filtered out of the DB-driven list so they
+    // don't reappear when a new project is added and the Room Flow re-emits.
+    private val closedProjectIds = mutableSetOf<Long>()
+
     private var serverId: Long = 0L
-    private var server: Server? = null
 
     fun initForServer(sId: Long) {
         if (serverId == sId) return
         serverId = sId
         viewModelScope.launch {
-            server = serverRepo.getById(sId) ?: return@launch
-            // Observe project list — new projects appear as unconnected tabs automatically
             projectRepo.getByServer(sId).collect { projects ->
                 val existing = _tabs.value.associate { it.project.id to it.sessionId }
-                _tabs.value = projects.map { p ->
-                    ProjectTab(project = p, sessionId = existing[p.id])
-                }
+                _tabs.value = projects
+                    .filter { p -> p.id !in closedProjectIds }
+                    .map { p -> ProjectTab(project = p, sessionId = existing[p.id]) }
             }
         }
     }
 
-    /** Connect the tab at [index] if not already connected, then return its session id. */
+    /** Connect the tab at [index] if not already connected. Always reloads the server
+     *  from the DB so that edits to the setup script are picked up immediately. */
     fun activateTab(index: Int) {
         val tab = _tabs.value.getOrNull(index) ?: return
-        if (tab.sessionId != null) return   // already connected
-        val srv = server ?: return
+        if (tab.sessionId != null) return
         viewModelScope.launch {
+            val srv = serverRepo.getById(serverId) ?: return@launch
             val conn = connectToServer(srv)
             val setupCmd = engine.render(srv, tab.project)
             val attachCmd = engine.renderAttach(srv, tab.project)
@@ -73,6 +75,7 @@ class SessionHostViewModel @Inject constructor(
 
     fun closeTab(index: Int) {
         val tab = _tabs.value.getOrNull(index) ?: return
+        closedProjectIds.add(tab.project.id)
         tab.sessionId?.let { sshManager.destroySession(it) }
         _tabs.value = _tabs.value.toMutableList().also { it.removeAt(index) }
     }

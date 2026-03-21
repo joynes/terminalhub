@@ -25,7 +25,11 @@ private val SPECIAL_KEYS = listOf(
 )
 
 @Composable
-fun SpecialKeyBar(onKey: (String) -> Unit, onCopy: () -> Unit = {}) {
+fun SpecialKeyBar(
+    onKey: (String) -> Unit,
+    onCopy: () -> Unit = {},
+    onKeyboardToggle: () -> Unit = {}
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -34,6 +38,7 @@ fun SpecialKeyBar(onKey: (String) -> Unit, onCopy: () -> Unit = {}) {
             .padding(4.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        RetroButton("KBD", onKeyboardToggle)
         SPECIAL_KEYS.forEach { (label, value) ->
             RetroButton(label, { onKey(value) })
         }

@@ -17,6 +17,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroTopBar
@@ -67,38 +68,54 @@ fun SessionHostScreen(
                     onTabClose = { viewModel.closeTab(it) },
                     onAddProject = onAddProject
                 )
-                // Intercept horizontal swipes at the Initial pass so they reach the
-                // pager even when the Terminal composable consumes touch events.
+                // Intercept horizontal drags at PointerEventPass.Initial (before the Terminal
+                // composable sees them) and drive the pager continuously so the swipe feels
+                // like scrolling a list rather than a discrete gesture.
                 val swipeModifier = Modifier.pointerInput(pagerState, tabs.size) {
-                    val velocityTracker = VelocityTracker()
                     awaitEachGesture {
                         val down = awaitFirstDown(pass = PointerEventPass.Initial)
-                        velocityTracker.resetTracking()
-                        velocityTracker.addPosition(down.uptimeMillis, down.position)
+                        val vt = VelocityTracker()
+                        vt.resetTracking()
+                        vt.addPosition(down.uptimeMillis, down.position)
                         var dx = 0f
                         var dy = 0f
+                        var isHorizontal = false
+
+                        // Feed pixel deltas into the pager's scroll session so content
+                        // moves with the finger in real time.
+                        val deltas = Channel<Float>(Channel.UNLIMITED)
+                        val scrollJob = coroutineScope.launch {
+                            pagerState.scroll { for (d in deltas) scrollBy(d) }
+                        }
+
                         while (true) {
                             val event = awaitPointerEvent(pass = PointerEventPass.Initial)
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            velocityTracker.addPosition(change.uptimeMillis, change.position)
-                            val delta = change.position - change.previousPosition
+                            val c = event.changes.firstOrNull { it.id == down.id } ?: break
+                            vt.addPosition(c.uptimeMillis, c.position)
+                            val delta = c.position - c.previousPosition
                             dx += delta.x
                             dy += delta.y
-                            // Consume the event once we're confident it's a horizontal drag,
-                            // preventing the terminal from treating it as a scrollback gesture.
-                            if (abs(dx) > abs(dy) * 1.5f && abs(dx) > viewConfiguration.touchSlop) {
-                                change.consume()
+                            if (!isHorizontal && abs(dx) > viewConfiguration.touchSlop) {
+                                isHorizontal = abs(dx) >= abs(dy)
                             }
-                            if (!change.pressed) break
+                            if (isHorizontal) {
+                                c.consume()
+                                deltas.trySend(-delta.x)
+                            }
+                            if (!c.pressed) break
                         }
-                        val vx = velocityTracker.calculateVelocity().x
-                        val isHorizontal = abs(dx) > abs(dy)
-                        val isFling = abs(vx) > 400f || abs(dx) > 80.dp.toPx()
-                        if (isHorizontal && isFling && tabs.size > 1) {
-                            val target = if (dx < 0) {
-                                (pagerState.currentPage + 1).coerceAtMost(tabs.size - 1)
-                            } else {
-                                (pagerState.currentPage - 1).coerceAtLeast(0)
+
+                        deltas.close()
+
+                        // Snap to the target page based on velocity and distance.
+                        if (isHorizontal && tabs.size > 1) {
+                            val vx = vt.calculateVelocity().x
+                            val target = when {
+                                vx < -300f || dx < -60.dp.toPx() ->
+                                    (pagerState.currentPage + 1).coerceAtMost(tabs.size - 1)
+                                vx > 300f || dx > 60.dp.toPx() ->
+                                    (pagerState.currentPage - 1).coerceAtLeast(0)
+                                else -> pagerState.currentPage
                             }
                             coroutineScope.launch { pagerState.animateScrollToPage(target) }
                         }
