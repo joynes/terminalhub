@@ -1,6 +1,7 @@
 package se.joynes.aiterminalhub.ui.screen.sessions
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
@@ -35,6 +36,7 @@ fun SessionHostScreen(
     viewModel: SessionHostViewModel = hiltViewModel()
 ) {
     val projectTabs by viewModel.projectTabs.collectAsState()
+    val sessions by viewModel.sessionManager.sessions.collectAsState()
     val activeId by viewModel.activeId.collectAsState()
     val emulator by viewModel.activeEmulator.collectAsState()
     val clipboardManager = LocalClipboardManager.current
@@ -42,6 +44,7 @@ fun SessionHostScreen(
     val focusRequester = remember { FocusRequester() }
     var keyboardVisible by remember { mutableStateOf(true) }
     var lastActivityMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var showSessionHistory by remember { mutableStateOf(false) }
 
     LaunchedEffect(serverId) { viewModel.initForServer(serverId) }
 
@@ -62,8 +65,37 @@ fun SessionHostScreen(
         keyboardVisible = true
     }
 
+    if (showSessionHistory) {
+        SessionHistorySheet(
+            sessions = sessions,
+            activeId = activeId,
+            onSelect = { viewModel.switchToSession(it); focusRequester.requestFocus() },
+            onClose = { id ->
+                val tab = projectTabs.firstOrNull { it.sessionId == id } ?: return@SessionHistorySheet
+                viewModel.closeSession(tab.projectId, id)
+            },
+            onMoveUp = { idx -> viewModel.moveSession(idx, idx - 1) },
+            onMoveDown = { idx -> viewModel.moveSession(idx, idx + 1) },
+            onDismiss = { showSessionHistory = false }
+        )
+    }
+
     Scaffold(
-        topBar = { RetroTopBar(title = "TERMINAL", onBack = onBack) },
+        topBar = {
+            RetroTopBar(title = "TERMINAL", onBack = onBack, actions = {
+                if (sessions.isNotEmpty()) {
+                    Text(
+                        "≡",
+                        color = MegaDrivePrimary,
+                        fontSize = 20.sp,
+                        fontFamily = MonoFontFamily,
+                        modifier = androidx.compose.ui.Modifier
+                            .padding(end = 8.dp)
+                            .clickable { showSessionHistory = true }
+                    )
+                }
+            })
+        },
         containerColor = MegaDriveBg
     ) { padding ->
         Column(

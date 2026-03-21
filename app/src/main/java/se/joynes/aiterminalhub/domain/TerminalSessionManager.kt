@@ -23,7 +23,9 @@ data class TerminalSessionMeta(
     val projectName: String,
     val isConnected: Boolean,
     val hasUnreadOutput: Boolean,
-    val previewLines: List<String>
+    val previewLines: List<String>,
+    val lastOpenedAt: Long = System.currentTimeMillis(),
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 private data class SessionEntry(
@@ -42,12 +44,16 @@ class TerminalSessionManager @Inject constructor(
     private val _sessions = MutableStateFlow<List<TerminalSessionMeta>>(emptyList())
     val sessions: StateFlow<List<TerminalSessionMeta>> = _sessions.asStateFlow()
 
+    /** Sessions sorted by lastOpenedAt descending (most recent first). */
+    val sessionHistory: StateFlow<List<TerminalSessionMeta>> get() = _sessions
+
     private val _activeId = MutableStateFlow<TerminalSessionId?>(null)
     val activeId: StateFlow<TerminalSessionId?> = _activeId.asStateFlow()
 
     private val _activeEmulator = MutableStateFlow<TerminalEmulator?>(null)
 
-    private val entries = mutableMapOf<String, SessionEntry>()
+    // LinkedHashMap preserves insertion order (tab bar order)
+    private val entries = LinkedHashMap<String, SessionEntry>()
 
     fun activeEmulator(): StateFlow<TerminalEmulator?> = _activeEmulator.asStateFlow()
 
@@ -66,15 +72,18 @@ class TerminalSessionManager @Inject constructor(
         val adapter = TerminalBackendAdapter(conn, emulator, scope)
         adapter.start()
 
+        val now = System.currentTimeMillis()
         val meta = TerminalSessionMeta(
             id = TerminalSessionId(sessionId),
             projectName = projectName,
             isConnected = conn.connected.value,
             hasUnreadOutput = false,
-            previewLines = emptyList()
+            previewLines = emptyList(),
+            lastOpenedAt = now,
+            createdAt = now
         )
         entries[sessionId] = SessionEntry(meta, conn, emulator, adapter, scope)
-        _sessions.value = entries.values.map { it.meta }
+        publishSessions()
         logger.log(LogLevel.DEBUG, TAG, "Session registered: $sessionId ($projectName)")
 
         if (_activeId.value == null) switchTo(TerminalSessionId(sessionId))
@@ -82,16 +91,19 @@ class TerminalSessionManager @Inject constructor(
 
     fun switchTo(id: TerminalSessionId) {
         val entry = entries[id.value] ?: return
+        val updated = entry.copy(meta = entry.meta.copy(lastOpenedAt = System.currentTimeMillis()))
+        entries[id.value] = updated
         _activeId.value = id
-        _activeEmulator.value = entry.emulator
+        _activeEmulator.value = updated.emulator
+        publishSessions()
         logger.log(LogLevel.DEBUG, TAG, "Switched to session: ${id.value}")
     }
 
     fun close(id: TerminalSessionId) {
         val entry = entries.remove(id.value) ?: return
-        entry.scope.run { /* cancel via SupervisorJob */ }
+        entry.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         sshManager.destroySession(id.value)
-        _sessions.value = entries.values.map { it.meta }
+        publishSessions()
 
         if (_activeId.value == id) {
             val next = entries.keys.firstOrNull()
@@ -101,9 +113,26 @@ class TerminalSessionManager @Inject constructor(
         logger.log(LogLevel.DEBUG, TAG, "Session closed: ${id.value}")
     }
 
+    /** Move session at [fromIndex] to [toIndex] in tab bar order. */
+    fun moveSession(fromIndex: Int, toIndex: Int) {
+        val keys = entries.keys.toMutableList()
+        if (fromIndex !in keys.indices || toIndex !in keys.indices) return
+        val moved = keys.removeAt(fromIndex)
+        keys.add(toIndex, moved)
+        val reordered = LinkedHashMap<String, SessionEntry>()
+        keys.forEach { k -> entries[k]?.let { reordered[k] = it } }
+        entries.clear()
+        entries.putAll(reordered)
+        publishSessions()
+    }
+
     fun sendBytesToActive(bytes: ByteArray) {
         val id = _activeId.value?.value ?: return
         sshManager.getSession(id)?.sendBytes(bytes)
+    }
+
+    private fun publishSessions() {
+        _sessions.value = entries.values.map { it.meta }
     }
 
     companion object { private const val TAG = "TerminalSessionManager" }
