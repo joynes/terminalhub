@@ -152,14 +152,20 @@ fun SessionHostScreen(
                 ) {
                     val em = emulator
                     if (em != null) {
-                        Terminal(
-                            terminalEmulator = em,
-                            modifier = Modifier.fillMaxSize(),
-                            keyboardEnabled = true,
-                            showSoftKeyboard = keyboardVisible,
-                            initialFontSize = 12.sp,
-                            focusRequester = focusRequester,
-                        )
+                        // key(em) forces Terminal to fully recreate on tab switch, so its
+                        // ImeInputView is always wired to the current emulator's onKeyboardInput.
+                        // Without this, the old IME connection persists → input goes to the
+                        // wrong session and duplicate characters appear.
+                        key(em) {
+                            Terminal(
+                                terminalEmulator = em,
+                                modifier = Modifier.fillMaxSize(),
+                                keyboardEnabled = true,
+                                showSoftKeyboard = keyboardVisible,
+                                initialFontSize = 12.sp,
+                                focusRequester = focusRequester,
+                            )
+                        }
                     } else {
                         Box(
                             modifier = Modifier
