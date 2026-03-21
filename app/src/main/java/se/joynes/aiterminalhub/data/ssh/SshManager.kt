@@ -18,9 +18,9 @@ class SshManager @Inject constructor(
     private val _sessions = MutableStateFlow<Map<String, SshConnection>>(emptyMap())
     val sessions: StateFlow<Map<String, SshConnection>> = _sessions.asStateFlow()
 
-    fun createSession(server: Server, password: String?): SshConnection {
+    fun createSession(server: Server, password: String?, privateKeyPem: String? = null): SshConnection {
         val conn = connectionFactory.create()
-        conn.connect(server, password)
+        conn.connect(server, password, privateKeyPem)
         _sessions.value = _sessions.value + (conn.sessionId to conn)
         logger.log(LogLevel.INFO, TAG, "Session created: ${conn.sessionId} for ${server.host}")
         return conn

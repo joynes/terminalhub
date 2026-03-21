@@ -10,6 +10,9 @@ import se.joynes.aiterminalhub.data.logging.LogLevel
 import javax.inject.Inject
 import javax.inject.Singleton
 
+// Plain (unencrypted) prefs used only for injecting test credentials via adb run-as
+private const val TEST_PREFS = "test_ssh_prefs"
+
 @Singleton
 class SecurePrefsManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -41,6 +44,16 @@ class SecurePrefsManager @Inject constructor(
         prefs.edit().remove("pwd_$serverId").apply()
         logger.log(LogLevel.DEBUG, TAG, "Password deleted for server $serverId")
     }
+
+    fun savePrivateKey(serverId: Long, pem: String) {
+        prefs.edit().putString("pk_$serverId", pem).apply()
+        logger.log(LogLevel.DEBUG, TAG, "Private key stored for server $serverId")
+    }
+
+    fun getPrivateKey(serverId: Long): String? =
+        prefs.getString("pk_$serverId", null)
+            ?: context.getSharedPreferences(TEST_PREFS, Context.MODE_PRIVATE)
+                .getString("pk_$serverId", null)
 
     fun savePassphrase(keyAlias: String, passphrase: String) {
         prefs.edit().putString("pp_$keyAlias", passphrase).apply()

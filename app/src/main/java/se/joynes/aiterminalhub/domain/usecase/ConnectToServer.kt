@@ -12,6 +12,7 @@ class ConnectToServer @Inject constructor(
 ) {
     operator fun invoke(server: Server): SshConnection {
         val password = securePrefs.getPassword(server.id)
-        return sshManager.createSession(server, password)
+        val privateKey = securePrefs.getPrivateKey(server.id)
+        return sshManager.createSession(server, password, privateKey)
     }
 }

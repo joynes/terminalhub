@@ -33,11 +33,15 @@ class SshConnection @Inject constructor(
 
     val sessionId = java.util.UUID.randomUUID().toString()
 
-    fun connect(server: Server, password: String?) {
+    fun connect(server: Server, password: String?, privateKeyPem: String? = null) {
         scope.launch {
             try {
                 logger.log(LogLevel.DEBUG, TAG, "Connecting to ${server.host}:${server.port}", LogEvent.SshConnect(server.host, server.port))
                 val jsch = JSch()
+                if (privateKeyPem != null) {
+                    jsch.addIdentity("key", privateKeyPem.toByteArray(), null, null)
+                    logger.log(LogLevel.DEBUG, TAG, "Using SSH key auth")
+                }
                 val session = jsch.getSession(server.username, server.host, server.port)
                 if (password != null) session.setPassword(password)
                 session.setConfig("StrictHostKeyChecking", "no")
@@ -92,6 +96,10 @@ class SshConnection @Inject constructor(
 
     /** Notify the server that the terminal has been resized. */
     fun resizePty(cols: Int, rows: Int) {
+        if (cols <= 0 || rows <= 0) {
+            logger.log(LogLevel.WARN, TAG, "PTY resize ignored: invalid ${cols}x${rows}")
+            return
+        }
         shellChannel?.setPtySize(cols, rows, 0, 0)
         logger.log(LogLevel.DEBUG, TAG, "PTY resize: ${cols}x${rows}")
     }
@@ -102,15 +110,19 @@ class SshConnection @Inject constructor(
             try {
                 while (_connected.value) {
                     val n = inputStream.read(buffer)
-                    if (n < 0) break
+                    if (n < 0) {
+                        logger.log(LogLevel.WARN, TAG, "SSH read loop: EOF (n=$n), connected=${_connected.value}")
+                        break
+                    }
                     logger.log(LogLevel.TRACE, TAG, "RX $n bytes", LogEvent.SshReceive(sessionId, n))
                     _output.emit(buffer.copyOf(n))
                 }
             } catch (e: Exception) {
-                logger.log(LogLevel.WARN, TAG, "SSH read loop exception: ${e.javaClass.simpleName}: ${e.message}")
+                logger.log(LogLevel.WARN, TAG, "SSH read loop exception: ${e.javaClass.simpleName}: ${e.message}\n${e.stackTraceToString()}")
             }
+            val reason = if (!_connected.value) "connected=false" else "loop-exit"
             _connected.value = false
-            logger.log(LogLevel.INFO, TAG, "SSH read loop ended")
+            logger.log(LogLevel.INFO, TAG, "SSH read loop ended (reason=$reason)")
         }
     }
 

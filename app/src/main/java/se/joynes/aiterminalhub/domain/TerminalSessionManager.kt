@@ -60,7 +60,8 @@ class TerminalSessionManager @Inject constructor(
             defaultForeground = Color(0xFF00FF41),
             defaultBackground = Color(0xFF0D0D1A),
             onKeyboardInput = { bytes: ByteArray -> conn.sendBytes(bytes) },
-            onResize = { dims -> conn.resizePty(dims.columns, dims.rows) }
+            // PTY resize via onResize causes SSH EOF on some servers — disabled for now
+            onResize = { _ -> }
         )
         val adapter = TerminalBackendAdapter(conn, emulator, scope)
         adapter.start()
