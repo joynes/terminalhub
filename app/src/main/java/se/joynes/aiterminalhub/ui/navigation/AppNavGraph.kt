@@ -1,6 +1,8 @@
 package se.joynes.aiterminalhub.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -9,7 +11,6 @@ import androidx.navigation.navArgument
 import se.joynes.aiterminalhub.ui.screen.applog.AppLogScreen
 import se.joynes.aiterminalhub.ui.screen.projects.AddEditProjectScreen
 import se.joynes.aiterminalhub.ui.screen.servers.AddEditServerScreen
-import se.joynes.aiterminalhub.ui.screen.servers.ServerListScreen
 import se.joynes.aiterminalhub.ui.screen.sessions.SessionHostScreen
 import se.joynes.aiterminalhub.ui.screen.sessionlog.SessionLogScreen
 import se.joynes.aiterminalhub.ui.screen.splash.SplashScreen
@@ -22,21 +23,10 @@ fun AppNavGraph() {
     NavHost(navController = navController, startDestination = Screen.Splash.route) {
         composable(Screen.Splash.route) {
             SplashScreen(onAuthSuccess = {
-                navController.navigate(Screen.ServerList.route) {
+                navController.navigate(Screen.SessionHost.route) {
                     popUpTo(Screen.Splash.route) { inclusive = true }
                 }
             })
-        }
-        composable(Screen.ServerList.route) {
-            ServerListScreen(
-                onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
-                onEditServer = { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) },
-                onOpenTerminal = { id -> navController.navigate(Screen.SessionHost.createRoute(id)) },
-                onOpenStatus = { id -> navController.navigate(Screen.ServerStatus.createRoute(id)) },
-                onOpenUpload = { id -> navController.navigate(Screen.FileUpload.createRoute(id)) },
-                onOpenLog = { navController.navigate(Screen.AppLog.route) },
-                onOpenSessionLog = { navController.navigate(Screen.SessionLog.route) }
-            )
         }
         composable(
             Screen.AddEditServer.route,
@@ -56,15 +46,14 @@ fun AppNavGraph() {
             val serverId = backStackEntry.arguments?.getLong("serverId") ?: return@composable
             AddEditProjectScreen(serverId = serverId, projectId = projectId, onBack = { navController.popBackStack() })
         }
-        composable(
-            Screen.SessionHost.route,
-            arguments = listOf(navArgument("serverId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val serverId = backStackEntry.arguments?.getLong("serverId") ?: return@composable
+        composable(Screen.SessionHost.route) {
+            val viewModel = androidx.hilt.navigation.compose.hiltViewModel<se.joynes.aiterminalhub.ui.screen.sessions.SessionHostViewModel>()
+            val serverId by viewModel.serverId.collectAsState()
             SessionHostScreen(
-                serverId = serverId,
-                onBack = { navController.popBackStack() },
-                onAddProject = { navController.navigate(Screen.AddEditProject.createRoute(serverId)) }
+                viewModel = viewModel,
+                onEditServer = { serverId?.let { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) } },
+                onAddProject = { serverId?.let { id -> navController.navigate(Screen.AddEditProject.createRoute(id)) } },
+                onOpenLogs = { navController.navigate(Screen.AppLog.route) }
             )
         }
         composable(

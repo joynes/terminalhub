@@ -13,9 +13,7 @@ sealed class Screen(val route: String) {
         fun createRoute(serverId: Long, projectId: Long? = null) =
             "add_edit_project?projectId=${projectId ?: -1}&serverId=$serverId"
     }
-    object SessionHost : Screen("session_host?serverId={serverId}") {
-        fun createRoute(serverId: Long) = "session_host?serverId=$serverId"
-    }
+    object SessionHost : Screen("session_host")
     object ServerStatus : Screen("server_status?serverId={serverId}") {
         fun createRoute(serverId: Long) = "server_status?serverId=$serverId"
     }
