@@ -255,7 +255,6 @@ fun SessionHostScreen(
                                 .pointerInput(scrollbackExists) {
                                     if (scrollbackExists) return@pointerInput
                                     val scrollUnit = 80.dp.toPx()   // ~3.4 cm, clearly intentional
-                                    val startThreshold = 8.dp.toPx()
                                     var flingJob: Job? = null
                                     kotlinx.coroutines.coroutineScope {
                                     val gestureScope = this
@@ -268,8 +267,10 @@ fun SessionHostScreen(
                                         val velocityTracker = VelocityTracker()
                                         var lastY = 0f
                                         var accumulated = 0f
-                                        var gestureActive = false
                                         val down = awaitPointerEvent(PointerEventPass.Initial)
+                                        // Consume DOWN immediately so the terminal never starts a
+                                        // long-press text-selection gesture while the user is scrolling.
+                                        down.changes.forEach { it.consume() }
                                         down.changes.firstOrNull()?.also { c ->
                                             lastY = c.position.y
                                             velocityTracker.addPosition(c.uptimeMillis, c.position)
@@ -281,57 +282,51 @@ fun SessionHostScreen(
                                             val delta = change.position.y - lastY
                                             lastY = change.position.y
                                             accumulated += delta
-                                            if (!gestureActive && abs(accumulated) >= startThreshold) {
-                                                gestureActive = true
+                                            // Consume all move events — prevents terminal selection drag
+                                            change.consume()
+                                            // Finger DOWN → see older history (scroll up in copy mode)
+                                            while (accumulated >= scrollUnit) {
+                                                accumulated -= scrollUnit
+                                                val bytes = if (!inCopyMode) {
+                                                    inCopyMode = true
+                                                    viewModel.notifyEnteredCopyMode()
+                                                    "\u0002\u001B[5~".toByteArray() // prefix+PageUp = copy-mode -u
+                                                } else {
+                                                    "\u001B[5~".toByteArray()        // PageUp (already in copy mode)
+                                                }
+                                                viewModel.sendBytesToActive(bytes)
+                                                Log.d("ScrollFix", "Scroll older")
                                             }
-                                            if (gestureActive) {
-                                                change.consume()
-                                                // Finger DOWN → see older history (scroll up in copy mode)
-                                                while (accumulated >= scrollUnit) {
-                                                    accumulated -= scrollUnit
-                                                    val bytes = if (!inCopyMode) {
-                                                        inCopyMode = true
-                                                        viewModel.notifyEnteredCopyMode()
-                                                        "\u0002\u001B[5~".toByteArray() // prefix+PageUp = copy-mode -u
-                                                    } else {
-                                                        "\u001B[5~".toByteArray()        // PageUp (already in copy mode)
-                                                    }
-                                                    viewModel.sendBytesToActive(bytes)
-                                                    Log.d("ScrollFix", "Scroll older")
-                                                }
-                                                // Finger UP → see newer content (scroll down)
-                                                while (accumulated <= -scrollUnit) {
-                                                    accumulated += scrollUnit
-                                                    viewModel.sendBytesToActive("\u001B[6~".toByteArray()) // PageDown
-                                                    Log.d("ScrollFix", "Scroll newer")
-                                                }
+                                            // Finger UP → see newer content (scroll down)
+                                            while (accumulated <= -scrollUnit) {
+                                                accumulated += scrollUnit
+                                                viewModel.sendBytesToActive("\u001B[6~".toByteArray()) // PageDown
+                                                Log.d("ScrollFix", "Scroll newer")
                                             }
                                             if (!change.pressed) {
-                                                if (gestureActive) {
-                                                    val vy = velocityTracker.calculateVelocity().y
-                                                    // flingPages: scale velocity → extra pages, cap at 12
-                                                    val flingPages = (abs(vy) / scrollUnit * 0.15f)
-                                                        .toInt().coerceIn(0, 12)
-                                                    if (flingPages > 0) {
-                                                        val scrollOlder = vy > 0 // finger was moving down
-                                                        val wasInCopyMode = inCopyMode
-                                                        if (!wasInCopyMode) {
-                                                            inCopyMode = true
-                                                            viewModel.notifyEnteredCopyMode()
-                                                        }
-                                                        flingJob = gestureScope.launch {
-                                                            repeat(flingPages) { i ->
-                                                                val bytes = if (scrollOlder) {
-                                                                    if (i == 0 && !wasInCopyMode)
-                                                                        "\u0002\u001B[5~".toByteArray()
-                                                                    else
-                                                                        "\u001B[5~".toByteArray()
-                                                                } else {
-                                                                    "\u001B[6~".toByteArray()
-                                                                }
-                                                                viewModel.sendBytesToActive(bytes)
-                                                                delay(30L + i * 20L) // decelerate
+                                                val vy = velocityTracker.calculateVelocity().y
+                                                // flingPages: scale velocity → extra pages, cap at 12
+                                                val flingPages = (abs(vy) / scrollUnit * 0.15f)
+                                                    .toInt().coerceIn(0, 12)
+                                                if (flingPages > 0) {
+                                                    val scrollOlder = vy > 0 // finger was moving down
+                                                    val wasInCopyMode = inCopyMode
+                                                    if (!wasInCopyMode) {
+                                                        inCopyMode = true
+                                                        viewModel.notifyEnteredCopyMode()
+                                                    }
+                                                    flingJob = gestureScope.launch {
+                                                        repeat(flingPages) { i ->
+                                                            val bytes = if (scrollOlder) {
+                                                                if (i == 0 && !wasInCopyMode)
+                                                                    "\u0002\u001B[5~".toByteArray()
+                                                                else
+                                                                    "\u001B[5~".toByteArray()
+                                                            } else {
+                                                                "\u001B[6~".toByteArray()
                                                             }
+                                                            viewModel.sendBytesToActive(bytes)
+                                                            delay(30L + i * 20L) // decelerate
                                                         }
                                                     }
                                                 }
