@@ -17,14 +17,47 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 
 import org.connectbot.terminal.Terminal
+import org.connectbot.terminal.TerminalEmulator
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroTopBar
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
 import se.joynes.aiterminalhub.ui.screen.terminal.MutableModifierManager
 import se.joynes.aiterminalhub.ui.screen.terminal.SpecialKeyBar
 import se.joynes.aiterminalhub.ui.theme.*
+
+/**
+ * Returns true once the emulator's scrollback buffer has at least one line.
+ *
+ * The Terminal composable's pointerInput gesture handler captures maxScroll at creation time.
+ * Since pointerInput keys are (emulator, baseCharHeight) — NOT maxScroll — the handler is
+ * stuck with maxScroll=0 until baseCharHeight changes (e.g. font resize).
+ *
+ * Fix: recreate the Terminal composable (via key()) once scrollback first appears. At that
+ * point the new handler captures maxScroll = scrollback.size * charHeight > 0.
+ */
+@Composable
+private fun rememberScrollbackExists(emulator: TerminalEmulator?): Boolean {
+    var exists by remember(emulator) { mutableStateOf(false) }
+    if (emulator != null && !exists) {
+        LaunchedEffect(emulator) {
+            try {
+                val method = emulator.javaClass.getMethod("getSnapshot\$lib")
+                @Suppress("UNCHECKED_CAST")
+                val flow = method.invoke(emulator) as StateFlow<*>
+                flow.first { snapshot ->
+                    val scrollback = snapshot!!.javaClass.getMethod("getScrollback").invoke(snapshot)
+                    (scrollback as? Collection<*>)?.isNotEmpty() == true
+                }
+                exists = true
+            } catch (_: Exception) {}
+        }
+    }
+    return exists
+}
 
 @Composable
 fun SessionHostScreen(
@@ -164,7 +197,13 @@ fun SessionHostScreen(
                         // ImeInputView is always wired to the current emulator's onKeyboardInput.
                         // Without this, the old IME connection persists → input goes to the
                         // wrong session and duplicate characters appear.
-                        key(em) {
+                        //
+                        // scrollbackExists: the Terminal's pointerInput gesture handler captures
+                        // maxScroll at creation time. When first created, scrollback is empty →
+                        // maxScroll=0 → scroll is broken. Adding scrollbackExists as a key forces
+                        // one extra recreation once scrollback appears, capturing maxScroll > 0.
+                        val scrollbackExists = rememberScrollbackExists(em)
+                        key(em, scrollbackExists) {
                             Terminal(
                                 terminalEmulator = em,
                                 modifier = Modifier.fillMaxSize(),
