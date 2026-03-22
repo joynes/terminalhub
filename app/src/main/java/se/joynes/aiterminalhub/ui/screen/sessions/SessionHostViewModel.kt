@@ -3,6 +3,7 @@ package se.joynes.aiterminalhub.ui.screen.sessions
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -26,7 +27,8 @@ data class ProjectTabState(
     val projectId: Long,
     val projectName: String,
     val sessionId: TerminalSessionId?,   // null = connecting
-    val isConnected: Boolean
+    val isConnected: Boolean,
+    val colorSeed: Int = 0
 )
 
 @HiltViewModel
@@ -41,6 +43,7 @@ class SessionHostViewModel @Inject constructor(
 
     // All projects from DB (shown immediately, even while connecting)
     private val _dbProjects = MutableStateFlow<List<Project>>(emptyList())
+    private val _allDbProjects = MutableStateFlow<List<Project>>(emptyList())
 
     /** Combined tab list: DB projects merged with live session state. */
     val projectTabs: StateFlow<List<ProjectTabState>> = combine(
@@ -54,7 +57,8 @@ class SessionHostViewModel @Inject constructor(
                 projectId = p.id,
                 projectName = p.name,
                 sessionId = session?.id,
-                isConnected = session?.isConnected ?: false
+                isConnected = session?.isConnected ?: false,
+                colorSeed = p.colorSeed
             )
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -62,19 +66,28 @@ class SessionHostViewModel @Inject constructor(
     val activeId: StateFlow<TerminalSessionId?> = sessionManager.activeId
     val activeEmulator: StateFlow<TerminalEmulator?> = sessionManager.activeEmulator()
 
-    private val closedProjectIds = mutableSetOf<Long>()
     private val connectingProjectIds = mutableSetOf<Long>()
+    private val connectingJobs = mutableMapOf<Long, Job>()
 
-    private var serverId: Long = 0L
+    private val _serverId = MutableStateFlow<Long?>(null)
+    val serverId: StateFlow<Long?> = _serverId.asStateFlow()
 
-    fun initForServer(sId: Long) {
-        if (serverId == sId) return
-        serverId = sId
+    private var initialized = false
+
+    fun init() {
+        if (initialized) return
+        initialized = true
         viewModelScope.launch {
-            projectRepo.getByServer(sId).collect { projects ->
-                val visible = projects.filter { it.id !in closedProjectIds }
-                _dbProjects.value = visible
-                visible.forEach { activateProject(it) }
+            serverRepo.getAll().collect { servers ->
+                val sId = servers.firstOrNull()?.id ?: return@collect
+                if (_serverId.value == sId) return@collect
+                _serverId.value = sId
+                projectRepo.getByServer(sId).collect { projects ->
+                    _allDbProjects.value = projects
+                    val visible = projects.filter { !sessionManager.isProjectClosed(it.id) }
+                    _dbProjects.value = visible
+                    visible.forEach { activateProject(it) }
+                }
             }
         }
     }
@@ -85,18 +98,27 @@ class SessionHostViewModel @Inject constructor(
         if (sessionManager.sessions.value.any { it.projectName == project.name }) return
         connectingProjectIds.add(project.id)
 
-        viewModelScope.launch {
-            val srv = serverRepo.getById(serverId) ?: return@launch
+        connectingJobs[project.id] = viewModelScope.launch {
+            val srv = serverRepo.getById(_serverId.value ?: return@launch) ?: return@launch
             val conn = connectToServer(srv)
             val setupCmd = engine.render(srv, project)
             val attachCmd = engine.renderAttach(srv, project)
             conn.connected.first { it }
+            if (sessionManager.isProjectClosed(project.id)) {
+                sshManager.destroySession(conn.sessionId)
+                return@launch
+            }
             if (setupCmd.isNotBlank()) conn.runSilent(setupCmd)
             if (attachCmd.isNotBlank()) {
                 delay(1000)
                 conn.send("$attachCmd\n")
             }
-            sessionManager.register(conn.sessionId, conn, project.name)
+            if (!sessionManager.isProjectClosed(project.id)) {
+                sessionManager.register(conn.sessionId, conn, project.name, project.id)
+            } else {
+                sshManager.destroySession(conn.sessionId)
+            }
+            connectingJobs.remove(project.id)
         }
     }
 
@@ -105,10 +127,20 @@ class SessionHostViewModel @Inject constructor(
     }
 
     fun closeSession(projectId: Long, sessionId: TerminalSessionId?) {
-        closedProjectIds.add(projectId)
+        sessionManager.markProjectClosed(projectId)
+        connectingJobs.remove(projectId)?.cancel()
         _dbProjects.value = _dbProjects.value.filter { it.id != projectId }
         connectingProjectIds.remove(projectId)
         sessionId?.let { sessionManager.close(it) }
+    }
+
+    fun reopenSession(projectId: Long) {
+        sessionManager.markProjectOpen(projectId)
+        val project = _allDbProjects.value.find { it.id == projectId } ?: return
+        if (_dbProjects.value.none { it.id == projectId }) {
+            _dbProjects.value = _dbProjects.value + project
+        }
+        activateProject(project)
     }
 
     fun moveSession(fromIndex: Int, toIndex: Int) = sessionManager.moveSession(fromIndex, toIndex)

@@ -2,7 +2,10 @@ package se.joynes.aiterminalhub.domain
 
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,6 +24,7 @@ data class TerminalSessionId(val value: String)
 data class TerminalSessionMeta(
     val id: TerminalSessionId,
     val projectName: String,
+    val projectId: Long = 0L,
     val isConnected: Boolean,
     val hasUnreadOutput: Boolean,
     val previewLines: List<String>,
@@ -47,6 +51,9 @@ class TerminalSessionManager @Inject constructor(
     /** Sessions sorted by lastOpenedAt descending (most recent first). */
     val sessionHistory: StateFlow<List<TerminalSessionMeta>> get() = _sessions
 
+    private val _closedSessions = MutableStateFlow<List<TerminalSessionMeta>>(emptyList())
+    val closedSessions: StateFlow<List<TerminalSessionMeta>> = _closedSessions.asStateFlow()
+
     private val _activeId = MutableStateFlow<TerminalSessionId?>(null)
     val activeId: StateFlow<TerminalSessionId?> = _activeId.asStateFlow()
 
@@ -55,19 +62,35 @@ class TerminalSessionManager @Inject constructor(
     // LinkedHashMap preserves insertion order (tab bar order)
     private val entries = LinkedHashMap<String, SessionEntry>()
 
+    // Tracks projects explicitly closed by the user. Lives in the singleton so it
+    // survives ViewModel recreation (e.g. navigating away and back).
+    private val closedProjectIds = mutableSetOf<Long>()
+
+    fun markProjectClosed(projectId: Long) { closedProjectIds.add(projectId) }
+    fun markProjectOpen(projectId: Long)   { closedProjectIds.remove(projectId) }
+    fun isProjectClosed(projectId: Long)   = projectId in closedProjectIds
+
     fun activeEmulator(): StateFlow<TerminalEmulator?> = _activeEmulator.asStateFlow()
 
-    fun register(sessionId: String, conn: SshConnection, projectName: String) {
+    fun register(sessionId: String, conn: SshConnection, projectName: String, projectId: Long = 0L) {
         if (entries.containsKey(sessionId)) return
         val scope = CoroutineScope(SupervisorJob())
+        var resizeJob: Job? = null
         val emulator = TerminalEmulatorFactory.create(
             initialRows = 24,
             initialCols = 80,
             defaultForeground = Color(0xFF00FF41),
             defaultBackground = Color(0xFF0D0D1A),
             onKeyboardInput = { bytes: ByteArray -> conn.sendBytes(bytes) },
-            // PTY resize via onResize causes SSH EOF on some servers — disabled for now
-            onResize = { _ -> }
+            // Debounced PTY resize: short delay to coalesce rapid resize events
+            // (e.g. keyboard show/hide) without a perceptible lag.
+            onResize = { dims ->
+                resizeJob?.cancel()
+                resizeJob = scope.launch {
+                    delay(150)
+                    conn.resizePty(dims.columns, dims.rows)
+                }
+            }
         )
         val adapter = TerminalBackendAdapter(conn, emulator, scope)
         adapter.start()
@@ -76,6 +99,7 @@ class TerminalSessionManager @Inject constructor(
         val meta = TerminalSessionMeta(
             id = TerminalSessionId(sessionId),
             projectName = projectName,
+            projectId = projectId,
             isConnected = conn.connected.value,
             hasUnreadOutput = false,
             previewLines = emptyList(),
@@ -101,6 +125,9 @@ class TerminalSessionManager @Inject constructor(
 
     fun close(id: TerminalSessionId) {
         val entry = entries.remove(id.value) ?: return
+        // Keep in history (capped at 50) so user can reopen
+        val closedMeta = entry.meta.copy(isConnected = false)
+        _closedSessions.value = (_closedSessions.value + closedMeta).takeLast(50)
         entry.scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         sshManager.destroySession(id.value)
         publishSessions()
