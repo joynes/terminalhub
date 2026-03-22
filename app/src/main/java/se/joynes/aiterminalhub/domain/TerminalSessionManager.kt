@@ -1,6 +1,8 @@
 package se.joynes.aiterminalhub.domain
 
+import android.content.Context
 import androidx.compose.ui.graphics.Color
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -42,9 +44,11 @@ private data class SessionEntry(
 
 @Singleton
 class TerminalSessionManager @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val sshManager: SshManager,
     private val logger: AppLogger
 ) {
+    private val prefs = context.getSharedPreferences("session_manager", Context.MODE_PRIVATE)
     private val _sessions = MutableStateFlow<List<TerminalSessionMeta>>(emptyList())
     val sessions: StateFlow<List<TerminalSessionMeta>> = _sessions.asStateFlow()
 
@@ -62,12 +66,20 @@ class TerminalSessionManager @Inject constructor(
     // LinkedHashMap preserves insertion order (tab bar order)
     private val entries = LinkedHashMap<String, SessionEntry>()
 
-    // Tracks projects explicitly closed by the user. Lives in the singleton so it
-    // survives ViewModel recreation (e.g. navigating away and back).
-    private val closedProjectIds = mutableSetOf<Long>()
+    // Tracks projects explicitly closed by the user. Persisted in SharedPreferences so
+    // closed tabs stay closed across app restarts.
+    private val closedProjectIds: MutableSet<Long> =
+        prefs.getStringSet("closed_project_ids", emptySet())!!
+            .mapTo(mutableSetOf()) { it.toLong() }
 
-    fun markProjectClosed(projectId: Long) { closedProjectIds.add(projectId) }
-    fun markProjectOpen(projectId: Long)   { closedProjectIds.remove(projectId) }
+    private fun persistClosed() {
+        prefs.edit()
+            .putStringSet("closed_project_ids", closedProjectIds.map { it.toString() }.toSet())
+            .apply()
+    }
+
+    fun markProjectClosed(projectId: Long) { closedProjectIds.add(projectId); persistClosed() }
+    fun markProjectOpen(projectId: Long)   { closedProjectIds.remove(projectId); persistClosed() }
     fun isProjectClosed(projectId: Long)   = projectId in closedProjectIds
 
     fun activeEmulator(): StateFlow<TerminalEmulator?> = _activeEmulator.asStateFlow()
