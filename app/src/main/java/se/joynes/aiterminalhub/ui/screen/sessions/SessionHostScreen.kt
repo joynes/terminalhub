@@ -8,9 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
+
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -159,46 +157,6 @@ fun SessionHostScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .pointerInput(projectTabs, activeId) {
-                            var totalDragX = 0f
-                            detectHorizontalDragGestures(
-                                onDragStart = { totalDragX = 0f },
-                                onHorizontalDrag = { change, amount ->
-                                    change.consume()
-                                    totalDragX += amount
-                                },
-                                onDragEnd = {
-                                    if (kotlin.math.abs(totalDragX) > 80.dp.toPx()) {
-                                        val connected = projectTabs.filter { it.sessionId != null }
-                                        val curIdx = connected.indexOfFirst { it.sessionId == activeId }
-                                        if (curIdx >= 0) {
-                                            val nextIdx = if (totalDragX < 0)
-                                                (curIdx + 1).coerceAtMost(connected.size - 1)
-                                            else
-                                                (curIdx - 1).coerceAtLeast(0)
-                                            if (nextIdx != curIdx) {
-                                                connected[nextIdx].sessionId?.let {
-                                                    viewModel.switchToSession(it)
-                                                    focusRequester.requestFocus()
-                                                }
-                                            }
-                                        }
-                                    }
-                                },
-                                onDragCancel = { totalDragX = 0f }
-                            )
-                        }
-                        .pointerInput(Unit) {
-                            detectTapGestures {
-                                // Only request focus when keyboard is gone — calling requestFocus
-                                // while the terminal is visible scrolls the cursor into view,
-                                // jumping back to the bottom and interrupting scrollback.
-                                if (!keyboardVisible) {
-                                    keyboardVisible = true
-                                    focusRequester.requestFocus()
-                                }
-                            }
-                        }
                 ) {
                     val em = emulator
                     if (em != null) {
