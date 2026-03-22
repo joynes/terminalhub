@@ -2,6 +2,7 @@ package se.joynes.aiterminalhub.ui.screen.terminal
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -9,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -25,7 +27,9 @@ fun SpecialKeyBar(
     modifierManager: MutableModifierManager,
     onKey: (String) -> Unit,
     onPaste: () -> Unit = {},
-    onKeyboardToggle: () -> Unit = {}
+    onKeyboardToggle: () -> Unit = {},
+    onPrevTab: () -> Unit = {},
+    onNextTab: () -> Unit = {}
 ) {
     val ctrlActive  = modifierManager.ctrl
     val altActive   = modifierManager.alt
@@ -58,11 +62,27 @@ fun SpecialKeyBar(
 
     // Row 1:  ESC  TAB  :  /  @  [spacer]  ↑  ⌨
     // Row 2:  CTRL  ALT  SHIFT  [spacer]  ←  ↓  →
+    // Swipe left/right on the bar to switch tabs.
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(MegaDriveSurface)
-            .padding(horizontal = 4.dp, vertical = 3.dp),
+            .padding(horizontal = 4.dp, vertical = 3.dp)
+            .pointerInput(onPrevTab, onNextTab) {
+                var totalDragX = 0f
+                detectHorizontalDragGestures(
+                    onDragStart  = { totalDragX = 0f },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        totalDragX += amount
+                    },
+                    onDragEnd    = {
+                        if (totalDragX < -80.dp.toPx()) onNextTab()
+                        else if (totalDragX > 80.dp.toPx()) onPrevTab()
+                    },
+                    onDragCancel = { totalDragX = 0f }
+                )
+            },
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Row(

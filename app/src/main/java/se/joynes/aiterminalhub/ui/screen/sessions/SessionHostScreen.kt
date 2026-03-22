@@ -258,6 +258,26 @@ fun SessionHostScreen(
                     onKeyboardToggle = {
                         keyboardVisible = !keyboardVisible
                         if (keyboardVisible) focusRequester.requestFocus()
+                    },
+                    onPrevTab = {
+                        val connected = projectTabs.filter { it.sessionId != null }
+                        val curIdx = connected.indexOfFirst { it.sessionId == activeId }
+                        if (curIdx > 0) {
+                            connected[curIdx - 1].sessionId?.let {
+                                viewModel.switchToSession(it)
+                                focusRequester.requestFocus()
+                            }
+                        }
+                    },
+                    onNextTab = {
+                        val connected = projectTabs.filter { it.sessionId != null }
+                        val curIdx = connected.indexOfFirst { it.sessionId == activeId }
+                        if (curIdx in 0 until connected.size - 1) {
+                            connected[curIdx + 1].sessionId?.let {
+                                viewModel.switchToSession(it)
+                                focusRequester.requestFocus()
+                            }
+                        }
                     }
                 )
             }
