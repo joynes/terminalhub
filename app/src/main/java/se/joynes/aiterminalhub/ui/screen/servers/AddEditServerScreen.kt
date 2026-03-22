@@ -47,7 +47,7 @@ fun AddEditServerScreen(
             RetroTextField(state.host, { viewModel.update { copy(host = it) } }, "Hostname / IP *", Modifier.fillMaxWidth())
             RetroTextField(state.port, { viewModel.update { copy(port = it) } }, "Port (default 22)", Modifier.fillMaxWidth())
             RetroTextField(state.username, { viewModel.update { copy(username = it) } }, "Username *", Modifier.fillMaxWidth())
-            RetroTextField(state.password, { viewModel.update { copy(password = it) } }, "Password", Modifier.fillMaxWidth())
+            RetroTextField(state.password, { viewModel.update { copy(password = it) } }, "Password", Modifier.fillMaxWidth(), isPassword = true)
             RetroTextField(state.projectsFolder, { viewModel.update { copy(projectsFolder = it) } }, "Projects Folder", Modifier.fillMaxWidth())
 
             Spacer(Modifier.height(4.dp))
