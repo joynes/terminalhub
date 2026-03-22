@@ -1,9 +1,6 @@
 package se.joynes.aiterminalhub.ui.screen.sessions
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -11,42 +8,49 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import org.connectbot.terminal.Terminal
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroTopBar
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
-import se.joynes.aiterminalhub.ui.screen.terminal.FontSizeControl
+import se.joynes.aiterminalhub.ui.screen.terminal.MutableModifierManager
 import se.joynes.aiterminalhub.ui.screen.terminal.SpecialKeyBar
 import se.joynes.aiterminalhub.ui.theme.*
 
-private const val KEYBOARD_INACTIVITY_MS = 10_000L
-
 @Composable
 fun SessionHostScreen(
-    serverId: Long,
-    onBack: () -> Unit,
+    onEditServer: () -> Unit,
     onAddProject: () -> Unit,
+    onOpenLogs: () -> Unit = {},
     viewModel: SessionHostViewModel = hiltViewModel()
 ) {
     val projectTabs by viewModel.projectTabs.collectAsState()
     val sessions by viewModel.sessionManager.sessions.collectAsState()
     val activeId by viewModel.activeId.collectAsState()
     val emulator by viewModel.activeEmulator.collectAsState()
+    val serverId by viewModel.serverId.collectAsState()
+    val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val clipboardManager = LocalClipboardManager.current
 
     val focusRequester = remember { FocusRequester() }
     var keyboardVisible by remember { mutableStateOf(true) }
-    var lastActivityMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var showSessionHistory by remember { mutableStateOf(false) }
 
-    LaunchedEffect(serverId) { viewModel.initForServer(serverId) }
+    // Shared modifier manager: toggles in SpecialKeyBar are read by Terminal's KeyboardHandler
+    val modifierManager = remember { MutableModifierManager() }
+
+    LaunchedEffect(Unit) { viewModel.init() }
 
     LaunchedEffect(emulator) {
         if (emulator != null) {
@@ -55,25 +59,17 @@ fun SessionHostScreen(
         }
     }
 
-    LaunchedEffect(lastActivityMs) {
-        delay(KEYBOARD_INACTIVITY_MS)
-        keyboardVisible = false
-    }
-
-    fun markActivity() {
-        lastActivityMs = System.currentTimeMillis()
-        keyboardVisible = true
-    }
-
     if (showSessionHistory) {
         SessionHistorySheet(
             sessions = sessions,
+            closedSessions = closedSessions,
             activeId = activeId,
             onSelect = { viewModel.switchToSession(it); focusRequester.requestFocus() },
             onClose = { id ->
                 val tab = projectTabs.firstOrNull { it.sessionId == id } ?: return@SessionHistorySheet
                 viewModel.closeSession(tab.projectId, id)
             },
+            onReopen = { projectId -> viewModel.reopenSession(projectId) },
             onMoveUp = { idx -> viewModel.moveSession(idx, idx - 1) },
             onMoveDown = { idx -> viewModel.moveSession(idx, idx + 1) },
             onDismiss = { showSessionHistory = false }
@@ -82,7 +78,27 @@ fun SessionHostScreen(
 
     Scaffold(
         topBar = {
-            RetroTopBar(title = "TERMINAL", onBack = onBack, actions = {
+            RetroTopBar(title = "TERMINAL", onBack = null, actions = {
+                Text(
+                    "✦",
+                    color = MegaDriveDim,
+                    fontSize = 14.sp,
+                    fontFamily = MonoFontFamily,
+                    modifier = androidx.compose.ui.Modifier
+                        .padding(end = 12.dp)
+                        .clickable { onOpenLogs() }
+                )
+                if (serverId != null) {
+                    Text(
+                        "✎",
+                        color = MegaDriveDim,
+                        fontSize = 16.sp,
+                        fontFamily = MonoFontFamily,
+                        modifier = androidx.compose.ui.Modifier
+                            .padding(end = 12.dp)
+                            .clickable { onEditServer() }
+                    )
+                }
                 if (sessions.isNotEmpty()) {
                     Text(
                         "≡",
@@ -98,10 +114,33 @@ fun SessionHostScreen(
         },
         containerColor = MegaDriveBg
     ) { padding ->
+        val density = LocalDensity.current
+        val imeBottom = WindowInsets.ime.getBottom(density)
+
+        // Sync keyboardVisible with actual IME state.
+        // When the user swipes the keyboard away, imeBottom drops to 0 → we update our flag
+        // so the terminal can expand and tapping brings the keyboard back.
+        val imeBottomState = rememberUpdatedState(imeBottom)
+        LaunchedEffect(Unit) {
+            snapshotFlow { imeBottomState.value }
+                .distinctUntilChanged()
+                .collect { bottom ->
+                    if (bottom == 0) keyboardVisible = false
+                }
+        }
+
+        // Use the live IME inset directly — no saved-height tricks.
+        // When keyboardVisible is false we want 0 padding regardless.
+        // WindowInsets.ime animates smoothly in Compose so this is glitch-free.
+        val imeBottomDp = with(density) {
+            if (keyboardVisible && imeBottom > 0) imeBottom.toDp() else 0.dp
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .padding(bottom = imeBottomDp)
                 .background(MegaDriveBg)
         ) {
             if (projectTabs.isEmpty()) {
@@ -132,21 +171,41 @@ fun SessionHostScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .pointerInput(projectTabs, activeId) {
+                            var totalDragX = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = { totalDragX = 0f },
+                                onHorizontalDrag = { change, amount ->
+                                    change.consume()
+                                    totalDragX += amount
+                                },
+                                onDragEnd = {
+                                    if (kotlin.math.abs(totalDragX) > 80.dp.toPx()) {
+                                        val connected = projectTabs.filter { it.sessionId != null }
+                                        val curIdx = connected.indexOfFirst { it.sessionId == activeId }
+                                        if (curIdx >= 0) {
+                                            val nextIdx = if (totalDragX < 0)
+                                                (curIdx + 1).coerceAtMost(connected.size - 1)
+                                            else
+                                                (curIdx - 1).coerceAtLeast(0)
+                                            if (nextIdx != curIdx) {
+                                                connected[nextIdx].sessionId?.let {
+                                                    viewModel.switchToSession(it)
+                                                    focusRequester.requestFocus()
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                onDragCancel = { totalDragX = 0f }
+                            )
+                        }
                         .pointerInput(Unit) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown(pass = PointerEventPass.Initial)
-                                var moved = false
-                                while (true) {
-                                    val ev = awaitPointerEvent(pass = PointerEventPass.Initial)
-                                    val c = ev.changes.firstOrNull { it.id == down.id } ?: break
-                                    if ((c.position - down.position).getDistance() > viewConfiguration.touchSlop) {
-                                        moved = true
-                                    }
-                                    if (!c.pressed) {
-                                        if (!moved) markActivity()
-                                        break
-                                    }
-                                }
+                            detectTapGestures {
+                                // Always show keyboard on tap — handles both explicit hide and
+                                // system-gesture dismiss cases.
+                                keyboardVisible = true
+                                focusRequester.requestFocus()
                             }
                         }
                 ) {
@@ -164,6 +223,7 @@ fun SessionHostScreen(
                                 showSoftKeyboard = keyboardVisible,
                                 initialFontSize = 12.sp,
                                 focusRequester = focusRequester,
+                                modifierManager = modifierManager,
                             )
                         }
                     } else {
@@ -184,8 +244,8 @@ fun SessionHostScreen(
                 }
 
                 SpecialKeyBar(
+                    modifierManager = modifierManager,
                     onKey = {
-                        markActivity()
                         viewModel.sendBytesToActive(it.toByteArray(Charsets.UTF_8))
                     },
                     onPaste = {
@@ -194,12 +254,8 @@ fun SessionHostScreen(
                     },
                     onKeyboardToggle = {
                         keyboardVisible = !keyboardVisible
-                        if (keyboardVisible) markActivity()
+                        if (keyboardVisible) focusRequester.requestFocus()
                     }
-                )
-                FontSizeControl(
-                    onIncrease = { /* TODO: font size via termlib */ },
-                    onDecrease = { /* TODO: font size via termlib */ }
                 )
             }
         }

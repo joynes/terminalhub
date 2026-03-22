@@ -92,7 +92,9 @@ fun TerminalScreen(
                 )
             }
         }
+        val modifierManager = remember { MutableModifierManager() }
         SpecialKeyBar(
+            modifierManager = modifierManager,
             onKey = {
                 markActivity()
                 viewModel.sendBytes(it.toByteArray(Charsets.UTF_8))
