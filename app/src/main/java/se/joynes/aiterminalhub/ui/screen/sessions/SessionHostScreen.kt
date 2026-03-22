@@ -52,18 +52,16 @@ private fun rememberScrollbackExists(emulator: TerminalEmulator?): Boolean {
                 val flow = method.invoke(emulator) as? StateFlow<*>
                 if (flow != null) {
                     Log.d("ScrollFix", "Watching snapshot flow for scrollback")
-                    // Wait up to 60s for actual scrollback; if none, flip anyway so the
-                    // gesture handler is at least recreated with the latest state.
                     kotlinx.coroutines.withTimeoutOrNull(60_000) {
                         flow.first { snapshot ->
                             val scrollback = runCatching {
                                 snapshot!!.javaClass.getMethod("getScrollback").invoke(snapshot)
                             }.getOrNull()
-                            val nonEmpty = (scrollback as? Collection<*>)?.isNotEmpty() == true
-                            if (nonEmpty) Log.d("ScrollFix", "Scrollback non-empty → recreating Terminal")
-                            nonEmpty
+                            val size = (scrollback as? Collection<*>)?.size ?: 0
+                            Log.d("ScrollFix", "snapshot scrollback.size=$size")
+                            size > 0
                         }
-                    } ?: Log.d("ScrollFix", "Timeout waiting for scrollback")
+                    } ?: Log.d("ScrollFix", "Timeout after 60s — recreating anyway")
                 } else {
                     Log.d("ScrollFix", "Flow was null — using 2s fallback")
                     kotlinx.coroutines.delay(2000)
