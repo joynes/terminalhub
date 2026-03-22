@@ -17,15 +17,15 @@ import se.joynes.aiterminalhub.domain.TerminalSessionId
 import se.joynes.aiterminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.aiterminalhub.ui.theme.*
 
-private const val TAB_WIDTH_DP = 110
+private const val TAB_WIDTH_DP = 80
 
 /** Deterministic hue from seed → dark background colour that reads well against light text. */
 private fun tabColor(seed: Int, active: Boolean): Color {
     val hue = ((seed.toLong() and 0x7FFFFFFF) % 360).toFloat()
     return if (active)
-        Color.hsl(hue, saturation = 0.55f, lightness = 0.28f)
+        Color.hsl(hue, saturation = 0.60f, lightness = 0.30f)
     else
-        Color.hsl(hue, saturation = 0.35f, lightness = 0.14f)
+        Color.hsl(hue, saturation = 0.30f, lightness = 0.12f)
 }
 
 @Composable
@@ -41,16 +41,16 @@ fun SessionTabBar(
         modifier = modifier
             .fillMaxWidth()
             .background(MegaDriveSurface)
-            .height(40.dp),
+            .height(36.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         items(tabs) { tab ->
             val isSelected = tab.sessionId != null && tab.sessionId == activeId
             val bg = tabColor(tab.colorSeed, isSelected)
             val textColor = when {
-                isSelected   -> Color.White
-                tab.isConnected -> Color.White.copy(alpha = 0.75f)
-                else         -> Color.White.copy(alpha = 0.35f)  // connecting = dimmed
+                isSelected      -> Color.White
+                tab.isConnected -> Color.White.copy(alpha = 0.65f)
+                else            -> Color.White.copy(alpha = 0.28f)
             }
             Row(
                 modifier = Modifier
@@ -58,14 +58,14 @@ fun SessionTabBar(
                     .fillMaxHeight()
                     .background(bg)
                     .clickable { tab.sessionId?.let { onSelect(it) } }
-                    .padding(start = 10.dp, end = 6.dp),
+                    .padding(start = 8.dp, end = 5.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
                     text = tab.projectName.uppercase(),
                     color = textColor,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontFamily = MonoFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -73,8 +73,8 @@ fun SessionTabBar(
                 )
                 Text(
                     text = "×",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 13.sp,
+                    color = Color.White.copy(alpha = 0.40f),
+                    fontSize = 12.sp,
                     fontFamily = MonoFontFamily,
                     modifier = Modifier.clickable { onClose(tab.projectId, tab.sessionId) }
                 )
@@ -85,10 +85,10 @@ fun SessionTabBar(
                 modifier = Modifier
                     .fillMaxHeight()
                     .clickable { onAddProject() }
-                    .padding(horizontal = 14.dp),
+                    .padding(horizontal = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("+", color = MegaDriveAccent, fontSize = 18.sp)
+                Text("+", color = MegaDriveAccent, fontSize = 16.sp)
             }
         }
     }
