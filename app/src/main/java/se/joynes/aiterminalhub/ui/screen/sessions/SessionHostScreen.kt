@@ -2,7 +2,7 @@ package se.joynes.aiterminalhub.ui.screen.sessions
 
 import android.util.Log
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -12,16 +12,25 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlin.math.abs
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 
 import org.connectbot.terminal.Terminal
 import org.connectbot.terminal.TerminalEmulator
@@ -54,26 +63,26 @@ private fun rememberScrollbackExists(emulator: TerminalEmulator?): Boolean {
                 val flow = method.invoke(emulator) as? StateFlow<*>
                 if (flow != null) {
                     Log.d("ScrollFix", "Watching snapshot flow for scrollback")
-                    kotlinx.coroutines.withTimeoutOrNull(60_000) {
-                        flow.first { snapshot ->
-                            val scrollback = runCatching {
-                                snapshot!!.javaClass.getMethod("getScrollback").invoke(snapshot)
-                            }.getOrNull()
-                            val size = (scrollback as? Collection<*>)?.size ?: 0
-                            Log.d("ScrollFix", "snapshot scrollback.size=$size")
-                            size > 0
-                        }
-                    } ?: Log.d("ScrollFix", "Timeout after 60s — recreating anyway")
-                } else {
-                    Log.d("ScrollFix", "Flow was null — using 2s fallback")
-                    kotlinx.coroutines.delay(2000)
+                    // Wait indefinitely for real scrollback — no timeout.
+                    // In tmux (alt-screen) scrollback never appears in the emulator,
+                    // so exists stays false and the PageUp/PageDown handler stays active.
+                    // In a plain shell, scrollback builds up quickly and triggers this.
+                    flow.first { snapshot ->
+                        val scrollback = runCatching {
+                            snapshot!!.javaClass.getMethod("getScrollback").invoke(snapshot)
+                        }.getOrNull()
+                        val size = (scrollback as? Collection<*>)?.size ?: 0
+                        Log.d("ScrollFix", "snapshot scrollback.size=$size")
+                        size > 0
+                    }
+                    Log.d("ScrollFix", "exists = true → Terminal will recreate")
+                    exists = true
                 }
+                // If flow is null, leave exists=false — keeps PageUp/PageDown active.
             } catch (e: Exception) {
-                Log.e("ScrollFix", "Reflection failed: $e — using 2s fallback")
-                kotlinx.coroutines.delay(2000)
+                Log.e("ScrollFix", "Reflection failed: $e — leaving exists=false for tmux compat")
+                // Do NOT set exists=true — keep PageUp/PageDown active indefinitely.
             }
-            Log.d("ScrollFix", "exists = true → Terminal will recreate")
-            exists = true
         }
     }
     return exists
@@ -103,11 +112,17 @@ fun SessionHostScreen(
 
     LaunchedEffect(Unit) { viewModel.init() }
 
-    LaunchedEffect(emulator) {
-        if (emulator != null) {
-            focusRequester.requestFocus()
-            keyboardVisible = true
+    // Re-request focus when the app comes back from background (Bug: keyboard dead after re-enter)
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && emulator != null) {
+                focusRequester.requestFocus()
+                keyboardVisible = true
+            }
         }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     if (showSessionHistory) {
@@ -205,6 +220,8 @@ fun SessionHostScreen(
                     onAddProject = onAddProject
                 )
 
+                var showTextInput by remember { mutableStateOf(false) }
+
                 // Single active terminal pane
                 Box(
                     modifier = Modifier
@@ -223,47 +240,131 @@ fun SessionHostScreen(
                         // maxScroll=0 → scroll is broken. Adding scrollbackExists as a key forces
                         // one extra recreation once scrollback appears, capturing maxScroll > 0.
                         val scrollbackExists = rememberScrollbackExists(em)
-                        key(em, scrollbackExists) {
-                            SideEffect { Log.d("ScrollFix", "Terminal composed. scrollbackExists=$scrollbackExists") }
-                            Terminal(
-                                terminalEmulator = em,
-                                modifier = Modifier.fillMaxSize(),
-                                keyboardEnabled = true,
-                                showSoftKeyboard = keyboardVisible,
-                                initialFontSize = 12.sp,
-                                focusRequester = focusRequester,
-                                modifierManager = modifierManager,
-                            )
-                        }
-                        // Alt-screen scroll: when scrollback is empty (tmux / alternate screen),
-                        // intercept vertical swipes and send PageUp/PageDown to the session.
-                        // tmux maps PageUp to "enter copy mode + scroll one page up".
-                        if (!scrollbackExists) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        var totalDragY = 0f
-                                        detectVerticalDragGestures(
-                                            onDragStart   = { totalDragY = 0f },
-                                            onVerticalDrag = { change, amount ->
+                        // In alt-screen mode (tmux), intercept vertical swipes and translate
+                        // them to tmux scroll commands using the Initial pointer pass.
+                        // Direction (natural mobile): finger DOWN = older history, finger UP = newer.
+                        // First down-scroll: Ctrl+B + PageUp (\x02\033[5~) = "prefix PPage" =
+                        //   copy-mode -u (enters copy mode + scrolls up one page).
+                        // Subsequent down-scrolls: bare PageUp (\033[5~) — already in copy mode.
+                        // Up-scrolls: PageDown (\033[6~) — scrolls toward current output.
+                        // Speed: one page per 150dp of drag, fires continuously during the gesture.
+                        // When scrollbackExists=true (normal screen) the modifier is a no-op.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(scrollbackExists) {
+                                    if (scrollbackExists) return@pointerInput
+                                    val scrollUnit = 80.dp.toPx()   // ~3.4 cm, clearly intentional
+                                    val startThreshold = 8.dp.toPx()
+                                    var flingJob: Job? = null
+                                    kotlinx.coroutines.coroutineScope {
+                                    val gestureScope = this
+                                    awaitEachGesture {
+                                        flingJob?.cancel()
+                                        flingJob = null
+                                        // Reset per gesture: if user pressed q to exit copy mode
+                                        // between gestures, we correctly re-send the tmux prefix.
+                                        var inCopyMode = false
+                                        val velocityTracker = VelocityTracker()
+                                        var lastY = 0f
+                                        var accumulated = 0f
+                                        var gestureActive = false
+                                        val down = awaitPointerEvent(PointerEventPass.Initial)
+                                        down.changes.firstOrNull()?.also { c ->
+                                            lastY = c.position.y
+                                            velocityTracker.addPosition(c.uptimeMillis, c.position)
+                                        }
+                                        while (true) {
+                                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                                            val change = event.changes.firstOrNull() ?: break
+                                            velocityTracker.addPosition(change.uptimeMillis, change.position)
+                                            val delta = change.position.y - lastY
+                                            lastY = change.position.y
+                                            accumulated += delta
+                                            if (!gestureActive && abs(accumulated) >= startThreshold) {
+                                                gestureActive = true
+                                            }
+                                            if (gestureActive) {
                                                 change.consume()
-                                                totalDragY += amount
-                                            },
-                                            onDragEnd     = {
-                                                val threshold = 60.dp.toPx()
-                                                when {
-                                                    totalDragY < -threshold ->
-                                                        viewModel.sendBytesToActive("\u001B[5~".toByteArray())
-                                                    totalDragY >  threshold ->
-                                                        viewModel.sendBytesToActive("\u001B[6~".toByteArray())
+                                                // Finger DOWN → see older history (scroll up in copy mode)
+                                                while (accumulated >= scrollUnit) {
+                                                    accumulated -= scrollUnit
+                                                    val bytes = if (!inCopyMode) {
+                                                        inCopyMode = true
+                                                        viewModel.notifyEnteredCopyMode()
+                                                        "\u0002\u001B[5~".toByteArray() // prefix+PageUp = copy-mode -u
+                                                    } else {
+                                                        "\u001B[5~".toByteArray()        // PageUp (already in copy mode)
+                                                    }
+                                                    viewModel.sendBytesToActive(bytes)
+                                                    Log.d("ScrollFix", "Scroll older")
                                                 }
-                                                totalDragY = 0f
-                                            },
-                                            onDragCancel  = { totalDragY = 0f }
-                                        )
+                                                // Finger UP → see newer content (scroll down)
+                                                while (accumulated <= -scrollUnit) {
+                                                    accumulated += scrollUnit
+                                                    viewModel.sendBytesToActive("\u001B[6~".toByteArray()) // PageDown
+                                                    Log.d("ScrollFix", "Scroll newer")
+                                                }
+                                            }
+                                            if (!change.pressed) {
+                                                if (gestureActive) {
+                                                    val vy = velocityTracker.calculateVelocity().y
+                                                    // flingPages: scale velocity → extra pages, cap at 12
+                                                    val flingPages = (abs(vy) / scrollUnit * 0.15f)
+                                                        .toInt().coerceIn(0, 12)
+                                                    if (flingPages > 0) {
+                                                        val scrollOlder = vy > 0 // finger was moving down
+                                                        val wasInCopyMode = inCopyMode
+                                                        if (!wasInCopyMode) {
+                                                            inCopyMode = true
+                                                            viewModel.notifyEnteredCopyMode()
+                                                        }
+                                                        flingJob = gestureScope.launch {
+                                                            repeat(flingPages) { i ->
+                                                                val bytes = if (scrollOlder) {
+                                                                    if (i == 0 && !wasInCopyMode)
+                                                                        "\u0002\u001B[5~".toByteArray()
+                                                                    else
+                                                                        "\u001B[5~".toByteArray()
+                                                                } else {
+                                                                    "\u001B[6~".toByteArray()
+                                                                }
+                                                                viewModel.sendBytesToActive(bytes)
+                                                                delay(30L + i * 20L) // decelerate
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                // Restore keyboard focus after gesture
+                                                // (consuming touch events can cause ImeInputView to lose focus)
+                                                focusRequester.requestFocus()
+                                                break
+                                            }
+                                        }
                                     }
-                            )
+                                    } // coroutineScope
+                                }
+                        ) {
+                            key(em, scrollbackExists) {
+                                // Request focus INSIDE key() so it fires after the new ImeInputView
+                                // has attached to focusRequester. The outer LaunchedEffect(emulator)
+                                // fires too early — before the recreated Terminal has laid out,
+                                // causing the focus request to land in empty space.
+                                LaunchedEffect(em) {
+                                    focusRequester.requestFocus()
+                                    keyboardVisible = true
+                                }
+                                SideEffect { Log.d("ScrollFix", "Terminal composed. scrollbackExists=$scrollbackExists") }
+                                Terminal(
+                                    terminalEmulator = em,
+                                    modifier = Modifier.fillMaxSize(),
+                                    keyboardEnabled = true,
+                                    showSoftKeyboard = keyboardVisible,
+                                    initialFontSize = 12.sp,
+                                    focusRequester = focusRequester,
+                                    modifierManager = modifierManager,
+                                )
+                            }
                         }
                     } else {
                         Box(
@@ -280,6 +381,20 @@ fun SessionHostScreen(
                             )
                         }
                     }
+
+                    // Floating text input overlay — lives inside the terminal Box so it
+                    // shares the same window as the IME (required for voice/dictation to work).
+                    if (showTextInput) {
+                        FloatingTextInputDialog(
+                            onSend = { text ->
+                                viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
+                            },
+                            onDismiss = {
+                                showTextInput = false
+                                focusRequester.requestFocus()
+                            }
+                        )
+                    }
                 }
 
                 SpecialKeyBar(
@@ -291,6 +406,7 @@ fun SessionHostScreen(
                         val text = clipboardManager.getText()?.text ?: return@SpecialKeyBar
                         viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
                     },
+                    onTextInput = { showTextInput = true },
                     onKeyboardToggle = {
                         keyboardVisible = !keyboardVisible
                         if (keyboardVisible) focusRequester.requestFocus()

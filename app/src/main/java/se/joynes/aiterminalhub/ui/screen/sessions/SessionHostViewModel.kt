@@ -101,14 +101,18 @@ class SessionHostViewModel @Inject constructor(
         connectingJobs[project.id] = viewModelScope.launch {
             val srv = serverRepo.getById(_serverId.value ?: return@launch) ?: return@launch
             val conn = connectToServer(srv)
-            val setupCmd = engine.render(srv, project)
-            val attachCmd = engine.renderAttach(srv, project)
+            val setupCmd    = engine.renderSetup(srv, project)
+            val attachCmd   = engine.renderAttach(srv, project)
+            val customScript = engine.renderCustomScript(srv, project)
+            val aiCmd       = engine.renderAiCommand(project)
             conn.connected.first { it }
             if (sessionManager.isProjectClosed(project.id)) {
                 sshManager.destroySession(conn.sessionId)
                 return@launch
             }
+            // 1. Silent exec: mkdir + create tmux session if needed
             if (setupCmd.isNotBlank()) conn.runSilent(setupCmd)
+            // 2. Attach to tmux session (or plain shell if useTmux=false)
             if (attachCmd.isNotBlank()) {
                 delay(1000)
                 conn.send("$attachCmd\n")
@@ -117,6 +121,17 @@ class SessionHostViewModel @Inject constructor(
                 sessionManager.register(conn.sessionId, conn, project.name, project.id)
             } else {
                 sshManager.destroySession(conn.sessionId)
+                return@launch
+            }
+            // 3. Custom script (e.g. cd to project dir)
+            if (customScript.isNotBlank()) {
+                delay(800)
+                conn.send("$customScript\n")
+            }
+            // 4. AI tool last
+            if (aiCmd.isNotBlank()) {
+                delay(500)
+                conn.send("$aiCmd\n")
             }
             connectingJobs.remove(project.id)
         }
@@ -146,4 +161,6 @@ class SessionHostViewModel @Inject constructor(
     fun moveSession(fromIndex: Int, toIndex: Int) = sessionManager.moveSession(fromIndex, toIndex)
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)
+
+    fun notifyEnteredCopyMode() = sessionManager.notifyEnteredCopyMode()
 }
