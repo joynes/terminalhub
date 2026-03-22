@@ -1,5 +1,6 @@
 package se.joynes.aiterminalhub.ui.screen.sessions
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
@@ -44,16 +45,35 @@ private fun rememberScrollbackExists(emulator: TerminalEmulator?): Boolean {
     var exists by remember(emulator) { mutableStateOf(false) }
     if (emulator != null && !exists) {
         LaunchedEffect(emulator) {
+            Log.d("ScrollFix", "Starting scrollback watch")
             try {
                 val method = emulator.javaClass.getMethod("getSnapshot\$lib")
                 @Suppress("UNCHECKED_CAST")
-                val flow = method.invoke(emulator) as StateFlow<*>
-                flow.first { snapshot ->
-                    val scrollback = snapshot!!.javaClass.getMethod("getScrollback").invoke(snapshot)
-                    (scrollback as? Collection<*>)?.isNotEmpty() == true
+                val flow = method.invoke(emulator) as? StateFlow<*>
+                if (flow != null) {
+                    Log.d("ScrollFix", "Watching snapshot flow for scrollback")
+                    // Wait up to 60s for actual scrollback; if none, flip anyway so the
+                    // gesture handler is at least recreated with the latest state.
+                    kotlinx.coroutines.withTimeoutOrNull(60_000) {
+                        flow.first { snapshot ->
+                            val scrollback = runCatching {
+                                snapshot!!.javaClass.getMethod("getScrollback").invoke(snapshot)
+                            }.getOrNull()
+                            val nonEmpty = (scrollback as? Collection<*>)?.isNotEmpty() == true
+                            if (nonEmpty) Log.d("ScrollFix", "Scrollback non-empty → recreating Terminal")
+                            nonEmpty
+                        }
+                    } ?: Log.d("ScrollFix", "Timeout waiting for scrollback")
+                } else {
+                    Log.d("ScrollFix", "Flow was null — using 2s fallback")
+                    kotlinx.coroutines.delay(2000)
                 }
-                exists = true
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.e("ScrollFix", "Reflection failed: $e — using 2s fallback")
+                kotlinx.coroutines.delay(2000)
+            }
+            Log.d("ScrollFix", "exists = true → Terminal will recreate")
+            exists = true
         }
     }
     return exists
@@ -204,6 +224,7 @@ fun SessionHostScreen(
                         // one extra recreation once scrollback appears, capturing maxScroll > 0.
                         val scrollbackExists = rememberScrollbackExists(em)
                         key(em, scrollbackExists) {
+                            SideEffect { Log.d("ScrollFix", "Terminal composed. scrollbackExists=$scrollbackExists") }
                             Terminal(
                                 terminalEmulator = em,
                                 modifier = Modifier.fillMaxSize(),
