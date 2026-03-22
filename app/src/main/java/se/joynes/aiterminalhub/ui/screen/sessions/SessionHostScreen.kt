@@ -2,6 +2,7 @@ package se.joynes.aiterminalhub.ui.screen.sessions
 
 import android.util.Log
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -17,6 +18,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -231,6 +233,36 @@ fun SessionHostScreen(
                                 initialFontSize = 12.sp,
                                 focusRequester = focusRequester,
                                 modifierManager = modifierManager,
+                            )
+                        }
+                        // Alt-screen scroll: when scrollback is empty (tmux / alternate screen),
+                        // intercept vertical swipes and send PageUp/PageDown to the session.
+                        // tmux maps PageUp to "enter copy mode + scroll one page up".
+                        if (!scrollbackExists) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        var totalDragY = 0f
+                                        detectVerticalDragGestures(
+                                            onDragStart   = { totalDragY = 0f },
+                                            onVerticalDrag = { change, amount ->
+                                                change.consume()
+                                                totalDragY += amount
+                                            },
+                                            onDragEnd     = {
+                                                val threshold = 60.dp.toPx()
+                                                when {
+                                                    totalDragY < -threshold ->
+                                                        viewModel.sendBytesToActive("\u001B[5~".toByteArray())
+                                                    totalDragY >  threshold ->
+                                                        viewModel.sendBytesToActive("\u001B[6~".toByteArray())
+                                                }
+                                                totalDragY = 0f
+                                            },
+                                            onDragCancel  = { totalDragY = 0f }
+                                        )
+                                    }
                             )
                         }
                     } else {
