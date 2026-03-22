@@ -5,5 +5,6 @@ data class Project(
     val serverId: Long,
     val name: String,
     // null = use server's default setupScript; empty string = run nothing on connect
-    val setupScript: String? = null
+    val setupScript: String? = null,
+    val colorSeed: Int = 0
 )

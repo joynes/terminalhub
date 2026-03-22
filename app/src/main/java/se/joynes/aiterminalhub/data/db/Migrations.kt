@@ -33,3 +33,12 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         db.execSQL("ALTER TABLE projects_new RENAME TO projects")
     }
 }
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // SQLite ALTER TABLE only allows constant defaults — add with 0 then assign
+        // a unique seed per project using Knuth's multiplicative hash on the row id.
+        db.execSQL("ALTER TABLE projects ADD COLUMN colorSeed INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("UPDATE projects SET colorSeed = ABS(id * 2246822519 + 1103515245)")
+    }
+}

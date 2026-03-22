@@ -10,5 +10,6 @@ data class ProjectEntity(
     val name: String,
     // null = use server's default setupScript; empty string = run nothing on connect
     val setupScript: String? = null,
+    val colorSeed: Int = (Math.random() * Int.MAX_VALUE).toInt(),
     val createdAt: Long = System.currentTimeMillis()
 )

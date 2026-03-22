@@ -10,6 +10,7 @@ import dagger.hilt.components.SingletonComponent
 import se.joynes.aiterminalhub.data.db.AppDatabase
 import se.joynes.aiterminalhub.data.db.MIGRATION_1_2
 import se.joynes.aiterminalhub.data.db.MIGRATION_2_3
+import se.joynes.aiterminalhub.data.db.MIGRATION_3_4
 import se.joynes.aiterminalhub.data.db.dao.*
 import javax.inject.Singleton
 
@@ -21,7 +22,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "aiterminalhub.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
 
     @Provides fun provideServerDao(db: AppDatabase): ServerDao = db.serverDao()
