@@ -8,10 +8,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.unit.dp
@@ -174,67 +172,43 @@ fun SessionHostScreen(
                         .weight(1f)
                         .fillMaxWidth()
                         .pointerInput(projectTabs, activeId) {
-                            // Custom horizontal-only tab-switch gesture using Initial pass so
-                            // we get first look at events. For vertical gestures we break
-                            // immediately without consuming, letting the Terminal handle them.
-                            awaitEachGesture {
-                                val down = awaitFirstDown(
-                                    requireUnconsumed = false,
-                                    pass = PointerEventPass.Initial
-                                )
-                                var totalX = 0f
-                                var totalY = 0f
-                                var decided = false
-
-                                while (true) {
-                                    val event = awaitPointerEvent(PointerEventPass.Initial)
-                                    val change = event.changes.firstOrNull { it.id == down.id }
-                                        ?: break
-
-                                    val dx = change.position.x - change.previousPosition.x
-                                    val dy = change.position.y - change.previousPosition.y
-                                    totalX += dx
-                                    totalY += dy
-
-                                    if (!decided) {
-                                        val absX = kotlin.math.abs(totalX)
-                                        val absY = kotlin.math.abs(totalY)
-                                        if (absX > 20f || absY > 20f) {
-                                            decided = true
-                                            if (absY >= absX) break // vertical → let Terminal scroll
-                                        }
-                                    }
-
-                                    if (decided) change.consume()
-
-                                    if (!change.pressed) {
-                                        if (kotlin.math.abs(totalX) > 80.dp.toPx()) {
-                                            val connected = projectTabs.filter { it.sessionId != null }
-                                            val curIdx = connected.indexOfFirst { it.sessionId == activeId }
-                                            if (curIdx >= 0) {
-                                                val nextIdx = if (totalX < 0)
-                                                    (curIdx + 1).coerceAtMost(connected.size - 1)
-                                                else
-                                                    (curIdx - 1).coerceAtLeast(0)
-                                                if (nextIdx != curIdx) {
-                                                    connected[nextIdx].sessionId?.let {
-                                                        viewModel.switchToSession(it)
-                                                        focusRequester.requestFocus()
-                                                    }
+                            var totalDragX = 0f
+                            detectHorizontalDragGestures(
+                                onDragStart = { totalDragX = 0f },
+                                onHorizontalDrag = { change, amount ->
+                                    change.consume()
+                                    totalDragX += amount
+                                },
+                                onDragEnd = {
+                                    if (kotlin.math.abs(totalDragX) > 80.dp.toPx()) {
+                                        val connected = projectTabs.filter { it.sessionId != null }
+                                        val curIdx = connected.indexOfFirst { it.sessionId == activeId }
+                                        if (curIdx >= 0) {
+                                            val nextIdx = if (totalDragX < 0)
+                                                (curIdx + 1).coerceAtMost(connected.size - 1)
+                                            else
+                                                (curIdx - 1).coerceAtLeast(0)
+                                            if (nextIdx != curIdx) {
+                                                connected[nextIdx].sessionId?.let {
+                                                    viewModel.switchToSession(it)
+                                                    focusRequester.requestFocus()
                                                 }
                                             }
                                         }
-                                        break
                                     }
-                                }
-                            }
+                                },
+                                onDragCancel = { totalDragX = 0f }
+                            )
                         }
                         .pointerInput(Unit) {
                             detectTapGestures {
-                                // Always show keyboard on tap — handles both explicit hide and
-                                // system-gesture dismiss cases.
-                                keyboardVisible = true
-                                focusRequester.requestFocus()
+                                // Only request focus when keyboard is gone — calling requestFocus
+                                // while the terminal is visible scrolls the cursor into view,
+                                // jumping back to the bottom and interrupting scrollback.
+                                if (!keyboardVisible) {
+                                    keyboardVisible = true
+                                    focusRequester.requestFocus()
+                                }
                             }
                         }
                 ) {
