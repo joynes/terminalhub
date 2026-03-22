@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
-import kotlinx.coroutines.flow.distinctUntilChanged
+
 import org.connectbot.terminal.Terminal
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroTopBar
@@ -116,18 +116,6 @@ fun SessionHostScreen(
     ) { padding ->
         val density = LocalDensity.current
         val imeBottom = WindowInsets.ime.getBottom(density)
-
-        // Sync keyboardVisible with actual IME state.
-        // When the user swipes the keyboard away, imeBottom drops to 0 → we update our flag
-        // so the terminal can expand and tapping brings the keyboard back.
-        val imeBottomState = rememberUpdatedState(imeBottom)
-        LaunchedEffect(Unit) {
-            snapshotFlow { imeBottomState.value }
-                .distinctUntilChanged()
-                .collect { bottom ->
-                    if (bottom == 0) keyboardVisible = false
-                }
-        }
 
         // Use the live IME inset directly — no saved-height tricks.
         // When keyboardVisible is false we want 0 padding regardless.
