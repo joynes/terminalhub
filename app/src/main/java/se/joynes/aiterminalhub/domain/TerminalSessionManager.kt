@@ -104,6 +104,17 @@ class TerminalSessionManager @Inject constructor(
                 }
             }
         )
+        // termlib 0.0.18: maxScrollbackLines defaults to 0 (never set in constructor).
+        // With 0 lines, pushScrollbackLine() keeps at most 0-1 entries → no scroll.
+        // Use reflection to set it to 5000 lines so the Terminal composable can scroll back.
+        try {
+            val field = emulator.javaClass.getDeclaredField("maxScrollbackLines")
+            field.isAccessible = true
+            field.setInt(emulator, 5000)
+        } catch (e: Exception) {
+            logger.log(LogLevel.WARN, TAG, "Could not set maxScrollbackLines: ${e.message}")
+        }
+
         val adapter = TerminalBackendAdapter(conn, emulator, scope)
         adapter.start()
 
