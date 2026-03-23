@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 
+import org.connectbot.terminal.SelectionController
 import org.connectbot.terminal.Terminal
 import org.connectbot.terminal.TerminalEmulator
 import se.joynes.aiterminalhub.ui.components.RetroButton
@@ -240,6 +241,7 @@ fun SessionHostScreen(
                         // maxScroll=0 → scroll is broken. Adding scrollbackExists as a key forces
                         // one extra recreation once scrollback appears, capturing maxScroll > 0.
                         val scrollbackExists = rememberScrollbackExists(em)
+                        var selectionController by remember(em) { mutableStateOf<SelectionController?>(null) }
                         // In alt-screen mode (tmux), intercept vertical swipes and translate
                         // them to tmux scroll commands using the Initial pointer pass.
                         // Direction (natural mobile): finger DOWN = older history, finger UP = newer.
@@ -268,9 +270,6 @@ fun SessionHostScreen(
                                         var lastY = 0f
                                         var accumulated = 0f
                                         val down = awaitPointerEvent(PointerEventPass.Initial)
-                                        // Consume DOWN immediately so the terminal never starts a
-                                        // long-press text-selection gesture while the user is scrolling.
-                                        down.changes.forEach { it.consume() }
                                         down.changes.firstOrNull()?.also { c ->
                                             lastY = c.position.y
                                             velocityTracker.addPosition(c.uptimeMillis, c.position)
@@ -284,6 +283,10 @@ fun SessionHostScreen(
                                             accumulated += delta
                                             // Consume all move events — prevents terminal selection drag
                                             change.consume()
+                                            // Clear any accidental long-press selection the Terminal may have started
+                                            if (abs(accumulated) > 2.dp.toPx()) {
+                                                selectionController?.clearSelection()
+                                            }
                                             // Finger DOWN → see older history (scroll up in copy mode)
                                             while (accumulated >= scrollUnit) {
                                                 accumulated -= scrollUnit
@@ -358,6 +361,7 @@ fun SessionHostScreen(
                                     initialFontSize = 12.sp,
                                     focusRequester = focusRequester,
                                     modifierManager = modifierManager,
+                                    onSelectionControllerAvailable = { selectionController = it },
                                 )
                             }
                         }
