@@ -161,6 +161,4 @@ class SessionHostViewModel @Inject constructor(
     fun moveSession(fromIndex: Int, toIndex: Int) = sessionManager.moveSession(fromIndex, toIndex)
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)
-
-    fun notifyEnteredCopyMode() = sessionManager.notifyEnteredCopyMode()
 }

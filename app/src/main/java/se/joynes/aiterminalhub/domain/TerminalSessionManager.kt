@@ -1,8 +1,11 @@
 package se.joynes.aiterminalhub.domain
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.ui.graphics.Color
 import dagger.hilt.android.qualifiers.ApplicationContext
+import org.connectbot.terminal.ProgressState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -18,8 +21,6 @@ import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.ssh.SshConnection
 import se.joynes.aiterminalhub.data.ssh.SshManager
 import se.joynes.aiterminalhub.data.ssh.TerminalBackendAdapter
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -68,8 +69,6 @@ class TerminalSessionManager @Inject constructor(
     // LinkedHashMap preserves insertion order (tab bar order)
     private val entries = LinkedHashMap<String, SessionEntry>()
 
-    private val copyModeFlags = ConcurrentHashMap<String, AtomicBoolean>()
-
     // Tracks projects explicitly closed by the user. Persisted in SharedPreferences so
     // closed tabs stay closed across app restarts.
     private val closedProjectIds: MutableSet<Long> =
@@ -91,8 +90,6 @@ class TerminalSessionManager @Inject constructor(
     fun register(sessionId: String, conn: SshConnection, projectName: String, projectId: Long = 0L) {
         if (entries.containsKey(sessionId)) return
         val scope = CoroutineScope(SupervisorJob())
-        val inCopyMode = AtomicBoolean(false)
-        copyModeFlags[sessionId] = inCopyMode
         var resizeJob: Job? = null
         val emulator = TerminalEmulatorFactory.create(
             initialRows = 24,
@@ -100,8 +97,10 @@ class TerminalSessionManager @Inject constructor(
             defaultForeground = Color(0xFF00FF41),
             defaultBackground = Color(0xFF0D0D1A),
             onKeyboardInput = { bytes: ByteArray ->
-                if (inCopyMode.getAndSet(false)) conn.sendBytes("q".toByteArray())
                 conn.sendBytes(bytes)
+            },
+            onBell = {
+                logger.log(LogLevel.DEBUG, TAG, "Terminal bell")
             },
             // Debounced PTY resize: short delay to coalesce rapid resize events
             // (e.g. keyboard show/hide) without a perceptible lag.
@@ -111,7 +110,12 @@ class TerminalSessionManager @Inject constructor(
                     delay(150)
                     conn.resizePty(dims.columns, dims.rows)
                 }
-            }
+            },
+            onClipboardCopy = { text ->
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                clipboard?.setPrimaryClip(ClipData.newPlainText("terminal", text))
+            },
+            onProgressChange = { _: ProgressState, _: Int -> /* no-op */ }
         )
         // termlib 0.0.18: maxScrollbackLines defaults to 0 (never set in constructor).
         // With 0 lines, pushScrollbackLine() keeps at most 0-1 entries → no scroll.
@@ -123,6 +127,11 @@ class TerminalSessionManager @Inject constructor(
         } catch (e: Exception) {
             logger.log(LogLevel.WARN, TAG, "Could not set maxScrollbackLines: ${e.message}")
         }
+        // Apply a minimal ANSI color scheme (green-on-black retro palette)
+        val ansiColors = IntArray(16) { 0xFF00FF41.toInt() }.also {
+            it[0] = 0xFF0D0D1A.toInt() // black
+        }
+        emulator.applyColorScheme(ansiColors, 0xFF00FF41.toInt(), 0xFF0D0D1A.toInt())
 
         val adapter = TerminalBackendAdapter(conn, emulator, scope)
         adapter.start()
@@ -157,7 +166,6 @@ class TerminalSessionManager @Inject constructor(
 
     fun close(id: TerminalSessionId) {
         val entry = entries.remove(id.value) ?: return
-        copyModeFlags.remove(id.value)
         // Keep in history (capped at 50) so user can reopen
         val closedMeta = entry.meta.copy(isConnected = false)
         _closedSessions.value = (_closedSessions.value + closedMeta).takeLast(50)
@@ -188,13 +196,7 @@ class TerminalSessionManager @Inject constructor(
 
     fun sendBytesToActive(bytes: ByteArray) {
         val id = _activeId.value?.value ?: return
-        if (copyModeFlags[id]?.getAndSet(false) == true)
-            sshManager.getSession(id)?.sendBytes("q".toByteArray())
         sshManager.getSession(id)?.sendBytes(bytes)
-    }
-
-    fun notifyEnteredCopyMode() {
-        _activeId.value?.value?.let { copyModeFlags[it]?.set(true) }
     }
 
     private fun publishSessions() {
