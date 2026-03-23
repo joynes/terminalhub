@@ -15,11 +15,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.connectbot.terminal.VTermKey
 import se.joynes.aiterminalhub.ui.theme.*
 
 private val KEY_H   = 34.dp
-private val KEY_W   = 48.dp   // regular key (ESC / TAB / : / / / @ / ↑ / ⌨)
+private val KEY_W   = 48.dp   // regular key
 private val MOD_W   = 58.dp   // CTRL / ALT / SHIFT
 private val ARROW_W = 44.dp   // ← ↓ →
 
@@ -27,7 +26,6 @@ private val ARROW_W = 44.dp   // ← ↓ →
 fun SpecialKeyBar(
     modifierManager: MutableModifierManager,
     onKey: (String) -> Unit,
-    onDispatchKey: (modifiers: Int, key: Int) -> Unit = { _, _ -> },
     onPaste: () -> Unit = {},
     onTextInput: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {},
@@ -52,15 +50,18 @@ fun SpecialKeyBar(
         return result
     }
 
-    fun modMask(): Int {
-        val mask = (if (shiftActive) 1 else 0) or
-                   (if (altActive)   2 else 0) or
-                   (if (ctrlActive)  4 else 0)
+    // Produce an arrow escape sequence honouring the current modifiers.
+    // No modifier: \u001B[A  Shift: \u001B[1;2A  Ctrl: \u001B[1;5A  etc.
+    fun arrowKey(letter: Char): String {
+        val modBits = (if (shiftActive) 1 else 0) or
+                      (if (altActive)   2 else 0) or
+                      (if (ctrlActive)  4 else 0)
         modifierManager.clearTransients()
-        return mask
+        return if (modBits == 0) "\u001B[$letter"
+        else "\u001B[1;${modBits + 1}$letter"
     }
 
-    // Row 1:  ESC  TAB  :  /  @  [spacer]  RET  ↑  ⌨
+    // Row 1:  ESC  TAB  :  /  @  [spacer]  PgUp  PgDn  RET  ↑  ⌨
     // Row 2:  CTRL  ALT  SHIFT  [spacer]  TXT  PST  ←  ↓  →
     // Swipe left/right on the bar to switch tabs.
     Column(
@@ -90,16 +91,16 @@ fun SpecialKeyBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            TermKey("ESC", KEY_W, active = false) { onDispatchKey(0, VTermKey.ESCAPE) }
-            TermKey("TAB", KEY_W, active = false) { onDispatchKey(0, VTermKey.TAB) }
+            TermKey("ESC", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\u001B") }
+            TermKey("TAB", KEY_W, active = false) { onKey(modified("\t")) }
             TermKey(":",   KEY_W, active = false) { onKey(modified(":")) }
             TermKey("/",   KEY_W, active = false) { onKey(modified("/")) }
             TermKey("@",   KEY_W, active = false) { onKey(modified("@")) }
             Spacer(Modifier.weight(1f))
-            TermKey("PgUp", KEY_W, active = false) { onDispatchKey(0, VTermKey.PAGEUP) }
-            TermKey("PgDn", KEY_W, active = false) { onDispatchKey(0, VTermKey.PAGEDOWN) }
-            TermKey("RET", KEY_W, active = false) { onDispatchKey(0, VTermKey.ENTER) }
-            TermKey("↑",   KEY_W, active = false) { onDispatchKey(modMask(), VTermKey.UP) }
+            TermKey("PgUp", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\u001B[5~") }
+            TermKey("PgDn", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\u001B[6~") }
+            TermKey("RET", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\r") }
+            TermKey("↑",   KEY_W, active = false) { onKey(arrowKey('A')) }
             TermKey("⌨",   KEY_W, active = false, onClick = onKeyboardToggle)
         }
 
@@ -114,9 +115,9 @@ fun SpecialKeyBar(
             Spacer(Modifier.weight(1f))
             TermKey("TXT", KEY_W, active = false) { onTextInput() }
             TermKey("PST", KEY_W, active = false) { onPaste() }
-            TermKey("←", ARROW_W, active = false) { onDispatchKey(modMask(), VTermKey.LEFT) }
-            TermKey("↓", ARROW_W, active = false) { onDispatchKey(modMask(), VTermKey.DOWN) }
-            TermKey("→", ARROW_W, active = false) { onDispatchKey(modMask(), VTermKey.RIGHT) }
+            TermKey("←", ARROW_W, active = false) { onKey(arrowKey('D')) }
+            TermKey("↓", ARROW_W, active = false) { onKey(arrowKey('B')) }
+            TermKey("→", ARROW_W, active = false) { onKey(arrowKey('C')) }
         }
     }
 }

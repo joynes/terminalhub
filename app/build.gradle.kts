@@ -87,8 +87,9 @@ dependencies {
     // SSH
     implementation(libs.jsch)
 
-    // Terminal emulator (ConnectBot termlib / libvterm)
-    implementation(libs.termlib)
+    // Terminal emulator (Termux terminal-view)
+    implementation(libs.termuxTerminalEmulator)
+    implementation(libs.termuxTerminalView)
 
     // Biometric & Security
     implementation(libs.biometric)

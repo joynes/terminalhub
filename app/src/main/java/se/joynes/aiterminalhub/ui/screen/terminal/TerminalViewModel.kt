@@ -1,9 +1,9 @@
 package se.joynes.aiterminalhub.ui.screen.terminal
 
 import androidx.lifecycle.ViewModel
+import com.termux.terminal.TerminalSession
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
-import org.connectbot.terminal.TerminalEmulator
 import se.joynes.aiterminalhub.domain.TerminalSessionManager
 import javax.inject.Inject
 
@@ -12,7 +12,7 @@ class TerminalViewModel @Inject constructor(
     private val manager: TerminalSessionManager
 ) : ViewModel() {
 
-    val activeEmulator: StateFlow<TerminalEmulator?> = manager.activeEmulator()
+    val activeSession: StateFlow<TerminalSession?> = manager.activeSession()
 
     fun sendBytes(bytes: ByteArray) = manager.sendBytesToActive(bytes)
 }

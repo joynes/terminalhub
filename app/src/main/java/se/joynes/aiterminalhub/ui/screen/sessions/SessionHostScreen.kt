@@ -1,5 +1,6 @@
 package se.joynes.aiterminalhub.ui.screen.sessions
 
+import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
@@ -7,26 +8,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
-
-import org.connectbot.terminal.SelectionController
-import org.connectbot.terminal.Terminal
+import com.termux.view.TerminalView
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroTopBar
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
 import se.joynes.aiterminalhub.ui.screen.terminal.MutableModifierManager
 import se.joynes.aiterminalhub.ui.screen.terminal.SpecialKeyBar
+import se.joynes.aiterminalhub.ui.screen.terminal.TerminalViewClientImpl
 import se.joynes.aiterminalhub.ui.theme.*
 
 
@@ -40,27 +41,43 @@ fun SessionHostScreen(
     val projectTabs by viewModel.projectTabs.collectAsState()
     val sessions by viewModel.sessionManager.sessions.collectAsState()
     val activeId by viewModel.activeId.collectAsState()
-    val emulator by viewModel.activeEmulator.collectAsState()
+    val session by viewModel.activeSession.collectAsState()
     val serverId by viewModel.serverId.collectAsState()
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
 
-    val focusRequester = remember { FocusRequester() }
     var keyboardVisible by remember { mutableStateOf(true) }
     var showSessionHistory by remember { mutableStateOf(false) }
 
-    // Shared modifier manager: toggles in SpecialKeyBar are read by Terminal's KeyboardHandler
+    // Shared modifier manager: toggles in SpecialKeyBar are read by TerminalViewClientImpl
     val modifierManager = remember { MutableModifierManager() }
+
+    // Reference to the live TerminalView for direct IMM calls
+    val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
+
+    fun showKeyboard() {
+        val tv = terminalViewRef.value ?: return
+        tv.requestFocus()
+        context.getSystemService(InputMethodManager::class.java)
+            ?.showSoftInput(tv, InputMethodManager.SHOW_IMPLICIT)
+    }
+
+    fun hideKeyboard() {
+        val tv = terminalViewRef.value ?: return
+        context.getSystemService(InputMethodManager::class.java)
+            ?.hideSoftInputFromWindow(tv.windowToken, 0)
+    }
 
     LaunchedEffect(Unit) { viewModel.init() }
 
-    // Re-request focus when the app comes back from background (Bug: keyboard dead after re-enter)
+    // Re-request focus when the app comes back from background
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && emulator != null) {
-                focusRequester.requestFocus()
+            if (event == Lifecycle.Event.ON_RESUME && session != null) {
                 keyboardVisible = true
+                terminalViewRef.value?.requestFocus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -72,7 +89,7 @@ fun SessionHostScreen(
             sessions = sessions,
             closedSessions = closedSessions,
             activeId = activeId,
-            onSelect = { viewModel.switchToSession(it); focusRequester.requestFocus() },
+            onSelect = { viewModel.switchToSession(it); terminalViewRef.value?.requestFocus() },
             onClose = { id ->
                 val tab = projectTabs.firstOrNull { it.sessionId == id } ?: return@SessionHistorySheet
                 viewModel.closeSession(tab.projectId, id)
@@ -125,9 +142,6 @@ fun SessionHostScreen(
         val density = LocalDensity.current
         val imeBottom = WindowInsets.ime.getBottom(density)
 
-        // Use the live IME inset directly — no saved-height tricks.
-        // When keyboardVisible is false we want 0 padding regardless.
-        // WindowInsets.ime animates smoothly in Compose so this is glitch-free.
         val imeBottomDp = with(density) {
             if (keyboardVisible && imeBottom > 0) imeBottom.toDp() else 0.dp
         }
@@ -140,7 +154,6 @@ fun SessionHostScreen(
                 .background(MegaDriveBg)
         ) {
             if (projectTabs.isEmpty()) {
-                // No projects configured at all
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
@@ -157,7 +170,7 @@ fun SessionHostScreen(
                 SessionTabBar(
                     tabs = projectTabs,
                     activeId = activeId,
-                    onSelect = { viewModel.switchToSession(it); focusRequester.requestFocus() },
+                    onSelect = { viewModel.switchToSession(it); terminalViewRef.value?.requestFocus() },
                     onClose = { projectId, sessionId -> viewModel.closeSession(projectId, sessionId) },
                     onAddProject = onAddProject
                 )
@@ -170,26 +183,33 @@ fun SessionHostScreen(
                         .weight(1f)
                         .fillMaxWidth()
                 ) {
-                    val em = emulator
-                    if (em != null) {
-                        var selectionController by remember(em) { mutableStateOf<SelectionController?>(null) }
-                        // key(em) forces Terminal to fully recreate on tab switch.
-                        key(em) {
-                            LaunchedEffect(em) {
-                                focusRequester.requestFocus()
-                                keyboardVisible = true
+                    val sess = session
+                    if (sess != null) {
+                        // key(sess) forces TerminalView to fully recreate on tab switch
+                        key(sess) {
+                            val terminalViewClient = remember(sess) {
+                                TerminalViewClientImpl(
+                                    modifierManager = modifierManager,
+                                    onSendToSsh = { bytes -> viewModel.sendBytesToActive(bytes) },
+                                    onTerminalTap = {
+                                        keyboardVisible = true
+                                        showKeyboard()
+                                    }
+                                )
                             }
-                            Terminal(
-                                terminalEmulator = em,
-                                modifier = Modifier.fillMaxSize(),
-                                keyboardEnabled = true,
-                                showSoftKeyboard = keyboardVisible,
-                                initialFontSize = 12.sp,
-                                focusRequester = focusRequester,
-                                modifierManager = modifierManager,
-                                onSelectionControllerAvailable = { selectionController = it },
-                                onTerminalTap = { focusRequester.requestFocus() },
-                                onImeVisibilityChanged = { visible -> keyboardVisible = visible },
+                            LaunchedEffect(sess) {
+                                keyboardVisible = true
+                                showKeyboard()
+                            }
+                            AndroidView(
+                                factory = { ctx ->
+                                    TerminalView(ctx, null).apply {
+                                        setTextSize(12)
+                                        setTerminalViewClient(terminalViewClient)
+                                        attachSession(sess)
+                                    }.also { terminalViewRef.value = it }
+                                },
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                     } else {
@@ -208,8 +228,7 @@ fun SessionHostScreen(
                         }
                     }
 
-                    // Floating text input overlay — lives inside the terminal Box so it
-                    // shares the same window as the IME (required for voice/dictation to work).
+                    // Floating text input overlay
                     if (showTextInput) {
                         FloatingTextInputDialog(
                             onSend = { text ->
@@ -217,7 +236,7 @@ fun SessionHostScreen(
                             },
                             onDismiss = {
                                 showTextInput = false
-                                focusRequester.requestFocus()
+                                terminalViewRef.value?.requestFocus()
                             }
                         )
                     }
@@ -228,7 +247,6 @@ fun SessionHostScreen(
                     onKey = {
                         viewModel.sendBytesToActive(it.toByteArray(Charsets.UTF_8))
                     },
-                    onDispatchKey = { mod, key -> emulator?.dispatchKey(mod, key) },
                     onPaste = {
                         val text = clipboardManager.getText()?.text ?: return@SpecialKeyBar
                         viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
@@ -236,7 +254,7 @@ fun SessionHostScreen(
                     onTextInput = { showTextInput = true },
                     onKeyboardToggle = {
                         keyboardVisible = !keyboardVisible
-                        if (keyboardVisible) focusRequester.requestFocus()
+                        if (keyboardVisible) showKeyboard() else hideKeyboard()
                     },
                     onPrevTab = {
                         val connected = projectTabs.filter { it.sessionId != null }
@@ -244,7 +262,7 @@ fun SessionHostScreen(
                         if (curIdx > 0) {
                             connected[curIdx - 1].sessionId?.let {
                                 viewModel.switchToSession(it)
-                                focusRequester.requestFocus()
+                                terminalViewRef.value?.requestFocus()
                             }
                         }
                     },
@@ -254,7 +272,7 @@ fun SessionHostScreen(
                         if (curIdx in 0 until connected.size - 1) {
                             connected[curIdx + 1].sessionId?.let {
                                 viewModel.switchToSession(it)
-                                focusRequester.requestFocus()
+                                terminalViewRef.value?.requestFocus()
                             }
                         }
                     }

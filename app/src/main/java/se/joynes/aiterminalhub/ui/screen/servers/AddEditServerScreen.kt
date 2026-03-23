@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import se.joynes.aiterminalhub.data.db.entity.ServerEntity
 import se.joynes.aiterminalhub.ui.components.*
 import se.joynes.aiterminalhub.ui.theme.*
 
@@ -51,7 +52,17 @@ fun AddEditServerScreen(
             RetroTextField(state.projectsFolder, { viewModel.update { copy(projectsFolder = it) } }, "Projects Folder", Modifier.fillMaxWidth())
 
             Spacer(Modifier.height(4.dp))
-            Text("SETUP SCRIPT", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Text("SETUP SCRIPT", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+                RetroButton(
+                    text = "[ RESET ]",
+                    onClick = { viewModel.update { copy(setupScript = ServerEntity.DEFAULT_SETUP_SCRIPT) } }
+                )
+            }
             Text("Placeholders: {{PROJECT_NAME}}, {{PROJECT_PATH}}, {{SESSION_NAME}}", color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily)
             OutlinedTextField(
                 value = state.setupScript,

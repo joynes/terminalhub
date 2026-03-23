@@ -11,7 +11,7 @@ class ApplySessionScript @Inject constructor(
     private val sshManager: SshManager
 ) {
     operator fun invoke(sessionId: String, server: Server, project: Project) {
-        val rendered = engine.render(server, project)
+        val rendered = engine.renderCustomScript(server, project)
         if (rendered.isNotBlank()) {
             sshManager.getSession(sessionId)?.send("$rendered\n")
         }

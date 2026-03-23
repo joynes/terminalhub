@@ -7,7 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import org.connectbot.terminal.TerminalEmulator
+import com.termux.terminal.TerminalSession
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
@@ -64,7 +64,7 @@ class SessionHostViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val activeId: StateFlow<TerminalSessionId?> = sessionManager.activeId
-    val activeEmulator: StateFlow<TerminalEmulator?> = sessionManager.activeEmulator()
+    val activeSession: StateFlow<TerminalSession?> = sessionManager.activeSession()
 
     private val connectingProjectIds = mutableSetOf<Long>()
     private val connectingJobs = mutableMapOf<Long, Job>()

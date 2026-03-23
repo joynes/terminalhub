@@ -11,8 +11,9 @@ import javax.inject.Inject
 
 data class AddEditProjectState(
     val name: String = "",
-    // null = use server default; empty = no script on connect
-    val setupScript: String? = null,
+    val useTmux: Boolean = true,
+    val customScript: String = "cd {{PROJECT_PATH}}",
+    val aiCommand: String = "",
     val saved: Boolean = false
 )
 
@@ -31,7 +32,12 @@ class AddEditProjectViewModel @Inject constructor(
         viewModelScope.launch {
             val p = repo.getById(id) ?: return@launch
             editingId = id
-            _state.value = AddEditProjectState(name = p.name, setupScript = p.setupScript)
+            _state.value = AddEditProjectState(
+                name = p.name,
+                useTmux = p.useTmux,
+                customScript = p.customScript,
+                aiCommand = p.aiCommand
+            )
         }
     }
 
@@ -42,7 +48,14 @@ class AddEditProjectViewModel @Inject constructor(
     fun save() {
         viewModelScope.launch {
             val s = _state.value
-            val project = Project(id = editingId ?: 0L, serverId = serverId, name = s.name, setupScript = s.setupScript)
+            val project = Project(
+                id = editingId ?: 0L,
+                serverId = serverId,
+                name = s.name,
+                useTmux = s.useTmux,
+                customScript = s.customScript,
+                aiCommand = s.aiCommand
+            )
             if (editingId != null) repo.update(project) else repo.save(project)
             _state.value = s.copy(saved = true)
         }

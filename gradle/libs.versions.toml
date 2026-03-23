@@ -22,7 +22,6 @@ composeFoundation = "1.7.8"
 coroutinesTest = "1.9.0"
 mockitoCore = "5.12.0"
 uiautomator = "2.3.0"
-termlib = "0.0.18"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -65,7 +64,8 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 mockito-core = { group = "org.mockito", name = "mockito-core", version.ref = "mockitoCore" }
 mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version = "5.3.1" }
 uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
-termlib = { group = "org.connectbot", name = "termlib", version.ref = "termlib" }
+termuxTerminalEmulator = { group = "com.github.termux.termux-app", name = "terminal-emulator", version = "v0.118.0" }
+termuxTerminalView     = { group = "com.github.termux.termux-app", name = "terminal-view",     version = "v0.118.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

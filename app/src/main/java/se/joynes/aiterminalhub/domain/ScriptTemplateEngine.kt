@@ -15,17 +15,32 @@ class ScriptTemplateEngine @Inject constructor() {
     fun sessionName(project: Project): String =
         project.name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
-    fun render(server: Server, project: Project): String {
-        val template = project.setupScript ?: server.setupScript
-        return render(template, server, project)
+    /** Silent exec: mkdir + create tmux session if useTmux, otherwise just mkdir. */
+    fun renderSetup(server: Server, project: Project): String {
+        val path = projectPath(server, project)
+        val session = sessionName(project)
+        return if (project.useTmux) {
+            "mkdir -p $path 2>/dev/null; " +
+            "(tmux has-session -t $session 2>/dev/null && " +
+            "tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1 && " +
+            "tmux kill-session -t $session 2>/dev/null); " +
+            "tmux has-session -t $session 2>/dev/null || " +
+            "tmux new-session -d -s $session -c $path"
+        } else {
+            "mkdir -p $path 2>/dev/null"
+        }
     }
 
-    /** Returns the shell command to send after setup (e.g. `tmux attach -t name`).
-     *  Empty string means no attach command (plain shell). */
-    fun renderAttach(server: Server, project: Project): String {
-        if (project.setupScript != null) return "" // custom or empty script — no auto-attach
-        return render(ServerEntity.DEFAULT_ATTACH_COMMAND, server, project)
-    }
+    /** Interactive attach sent to shell after connect. Empty = plain shell. */
+    fun renderAttach(server: Server, project: Project): String =
+        if (project.useTmux) render(ServerEntity.DEFAULT_ATTACH_COMMAND, server, project) else ""
+
+    /** Custom script run inside the session after attach. */
+    fun renderCustomScript(server: Server, project: Project): String =
+        render(project.customScript, server, project)
+
+    /** AI tool command run last. Empty = none. */
+    fun renderAiCommand(project: Project): String = project.aiCommand.trim()
 
     fun render(template: String, server: Server, project: Project): String {
         val path = projectPath(server, project)

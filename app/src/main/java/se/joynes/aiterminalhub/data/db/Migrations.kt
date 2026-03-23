@@ -42,3 +42,30 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         db.execSQL("UPDATE projects SET colorSeed = ABS(id * 2246822519 + 1103515245)")
     }
 }
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Replace old freeform setupScript with structured fields:
+        // useTmux, customScript (default: cd to project dir), aiCommand.
+        // Recreate table since SQLite cannot drop columns.
+        db.execSQL("""
+            CREATE TABLE projects_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                serverId INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                useTmux INTEGER NOT NULL DEFAULT 1,
+                customScript TEXT NOT NULL DEFAULT 'cd {{PROJECT_PATH}}',
+                aiCommand TEXT NOT NULL DEFAULT '',
+                colorSeed INTEGER NOT NULL DEFAULT 0,
+                createdAt INTEGER NOT NULL
+            )
+        """.trimIndent())
+        db.execSQL("""
+            INSERT INTO projects_new (id, serverId, name, useTmux, customScript, aiCommand, colorSeed, createdAt)
+            SELECT id, serverId, name, 1, 'cd {{PROJECT_PATH}}', '', COALESCE(colorSeed, 0), createdAt
+            FROM projects
+        """.trimIndent())
+        db.execSQL("DROP TABLE projects")
+        db.execSQL("ALTER TABLE projects_new RENAME TO projects")
+    }
+}
