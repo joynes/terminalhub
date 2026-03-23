@@ -196,7 +196,8 @@ fun SessionHostScreen(
                                             val delta = change.position.y - lastY
                                             lastY = change.position.y
                                             accumulated += delta
-                                            change.consume()
+                                            // Do NOT consume — termlib must still see events for
+                                            // tap focus and text selection to work.
                                             while (accumulated >= scrollUnit) {
                                                 accumulated -= scrollUnit
                                                 viewModel.sendBytesToActive("\u001B[5~".toByteArray())
@@ -207,7 +208,6 @@ fun SessionHostScreen(
                                             }
                                             if (!change.pressed) break
                                         }
-                                        focusRequester.requestFocus()
                                     }
                                 }
                         ) {
