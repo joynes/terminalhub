@@ -1,7 +1,6 @@
 package se.joynes.aiterminalhub.ui.screen.sessions
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -9,8 +8,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -23,6 +20,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
 
+import org.connectbot.terminal.SelectionController
 import org.connectbot.terminal.Terminal
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroTopBar
@@ -174,45 +172,8 @@ fun SessionHostScreen(
                 ) {
                     val em = emulator
                     if (em != null) {
-                        // Swipe interceptor: sends bare PageUp/PageDown bytes to SSH.
-                        // termlib's own swipe handler only scrolls its visual scrollback buffer
-                        // (TerminalScreenState.scrollBy) and never sends bytes — so in tmux
-                        // (alt-screen, no termlib scrollback) swipe would do nothing without this.
-                        // Bare \u001B[5~ (PageUp): tmux root binding → copy-mode -u (enter + scroll up)
-                        // Bare \u001B[6~ (PageDown): in copy mode → scroll down
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .pointerInput(Unit) {
-                                    val scrollUnit = 80.dp.toPx()
-                                    awaitEachGesture {
-                                        var lastY = 0f
-                                        var accumulated = 0f
-                                        val down = awaitPointerEvent(PointerEventPass.Initial)
-                                        down.changes.firstOrNull()?.let { lastY = it.position.y }
-                                        while (true) {
-                                            val event = awaitPointerEvent(PointerEventPass.Initial)
-                                            val change = event.changes.firstOrNull() ?: break
-                                            val delta = change.position.y - lastY
-                                            lastY = change.position.y
-                                            accumulated += delta
-                                            // Do NOT consume — termlib must still see events for
-                                            // tap focus and text selection to work.
-                                            while (accumulated >= scrollUnit) {
-                                                accumulated -= scrollUnit
-                                                viewModel.sendBytesToActive("\u001B[5~".toByteArray())
-                                            }
-                                            while (accumulated <= -scrollUnit) {
-                                                accumulated += scrollUnit
-                                                viewModel.sendBytesToActive("\u001B[6~".toByteArray())
-                                            }
-                                            if (!change.pressed) break
-                                        }
-                                    }
-                                }
-                        ) {
-                        // key(em) forces Terminal to fully recreate on tab switch, so its
-                        // ImeInputView is always wired to the current emulator's onKeyboardInput.
+                        var selectionController by remember(em) { mutableStateOf<SelectionController?>(null) }
+                        // key(em) forces Terminal to fully recreate on tab switch.
                         key(em) {
                             LaunchedEffect(em) {
                                 focusRequester.requestFocus()
@@ -226,11 +187,11 @@ fun SessionHostScreen(
                                 initialFontSize = 12.sp,
                                 focusRequester = focusRequester,
                                 modifierManager = modifierManager,
+                                onSelectionControllerAvailable = { selectionController = it },
                                 onTerminalTap = { focusRequester.requestFocus() },
                                 onImeVisibilityChanged = { visible -> keyboardVisible = visible },
                             )
                         }
-                        } // swipe interceptor Box
                     } else {
                         Box(
                             modifier = Modifier
