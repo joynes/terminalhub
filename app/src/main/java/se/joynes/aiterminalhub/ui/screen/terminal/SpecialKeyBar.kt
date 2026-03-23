@@ -15,6 +15,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.connectbot.terminal.VTermKey
 import se.joynes.aiterminalhub.ui.theme.*
 
 private val KEY_H   = 34.dp
@@ -26,7 +27,9 @@ private val ARROW_W = 44.dp   // ← ↓ →
 fun SpecialKeyBar(
     modifierManager: MutableModifierManager,
     onKey: (String) -> Unit,
+    onDispatchKey: (modifiers: Int, key: Int) -> Unit = { _, _ -> },
     onPaste: () -> Unit = {},
+    onTextInput: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {},
     onPrevTab: () -> Unit = {},
     onNextTab: () -> Unit = {}
@@ -49,19 +52,16 @@ fun SpecialKeyBar(
         return result
     }
 
-    fun arrow(normal: String, ctrl: String, alt: String, shift: String): String {
-        val result = when {
-            ctrlActive  -> ctrl
-            altActive   -> alt
-            shiftActive -> shift
-            else        -> normal
-        }
+    fun modMask(): Int {
+        val mask = (if (shiftActive) 1 else 0) or
+                   (if (altActive)   2 else 0) or
+                   (if (ctrlActive)  4 else 0)
         modifierManager.clearTransients()
-        return result
+        return mask
     }
 
-    // Row 1:  ESC  TAB  :  /  @  [spacer]  ↑  ⌨
-    // Row 2:  CTRL  ALT  SHIFT  [spacer]  ←  ↓  →
+    // Row 1:  ESC  TAB  :  /  @  [spacer]  RET  ↑  ⌨
+    // Row 2:  CTRL  ALT  SHIFT  [spacer]  TXT  PST  ←  ↓  →
     // Swipe left/right on the bar to switch tabs.
     Column(
         modifier = Modifier
@@ -90,15 +90,16 @@ fun SpecialKeyBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            TermKey("ESC", KEY_W, active = false) { onKey(modified("\u001B")) }
-            TermKey("TAB", KEY_W, active = false) { onKey(modified("\t")) }
+            TermKey("ESC", KEY_W, active = false) { onDispatchKey(0, VTermKey.ESCAPE) }
+            TermKey("TAB", KEY_W, active = false) { onDispatchKey(0, VTermKey.TAB) }
             TermKey(":",   KEY_W, active = false) { onKey(modified(":")) }
             TermKey("/",   KEY_W, active = false) { onKey(modified("/")) }
             TermKey("@",   KEY_W, active = false) { onKey(modified("@")) }
             Spacer(Modifier.weight(1f))
-            TermKey("↑",   KEY_W, active = false) {
-                onKey(arrow("\u001B[A", "\u001B[1;5A", "\u001B[1;3A", "\u001B[1;2A"))
-            }
+            TermKey("PgUp", KEY_W, active = false) { onDispatchKey(0, VTermKey.PAGEUP) }
+            TermKey("PgDn", KEY_W, active = false) { onDispatchKey(0, VTermKey.PAGEDOWN) }
+            TermKey("RET", KEY_W, active = false) { onDispatchKey(0, VTermKey.ENTER) }
+            TermKey("↑",   KEY_W, active = false) { onDispatchKey(modMask(), VTermKey.UP) }
             TermKey("⌨",   KEY_W, active = false, onClick = onKeyboardToggle)
         }
 
@@ -111,15 +112,11 @@ fun SpecialKeyBar(
             TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
             TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
             Spacer(Modifier.weight(1f))
-            TermKey("←", ARROW_W, active = false) {
-                onKey(arrow("\u001B[D", "\u001B[1;5D", "\u001B[1;3D", "\u001B[1;2D"))
-            }
-            TermKey("↓", ARROW_W, active = false) {
-                onKey(arrow("\u001B[B", "\u001B[1;5B", "\u001B[1;3B", "\u001B[1;2B"))
-            }
-            TermKey("→", ARROW_W, active = false) {
-                onKey(arrow("\u001B[C", "\u001B[1;5C", "\u001B[1;3C", "\u001B[1;2C"))
-            }
+            TermKey("TXT", KEY_W, active = false) { onTextInput() }
+            TermKey("PST", KEY_W, active = false) { onPaste() }
+            TermKey("←", ARROW_W, active = false) { onDispatchKey(modMask(), VTermKey.LEFT) }
+            TermKey("↓", ARROW_W, active = false) { onDispatchKey(modMask(), VTermKey.DOWN) }
+            TermKey("→", ARROW_W, active = false) { onDispatchKey(modMask(), VTermKey.RIGHT) }
         }
     }
 }
