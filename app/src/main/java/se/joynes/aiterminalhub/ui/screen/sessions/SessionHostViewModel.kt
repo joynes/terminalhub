@@ -125,7 +125,7 @@ class SessionHostViewModel @Inject constructor(
             // 3. Attach to tmux session (or plain shell if useTmux=false)
             if (attachCmd.isNotBlank()) {
                 conn.send("$attachCmd\n")
-                conn.awaitOutputQuiescence()
+                conn.awaitTransportQuiescence()
             }
             if (!sessionManager.isProjectClosed(project.id)) {
                 sessionManager.register(
@@ -141,15 +141,16 @@ class SessionHostViewModel @Inject constructor(
                 return@launch
             }
 
-            // 4. Wait until attach/plain shell output settles, then run the custom script.
-            conn.awaitOutputQuiescence()
+            // 4. Wait until attach/plain shell traffic settles, then run the custom script.
+            conn.awaitTransportQuiescence()
             if (customScript.isNotBlank()) {
                 conn.send("$customScript\n")
-                conn.awaitOutputQuiescence()
+                conn.awaitTransportQuiescence()
             }
 
             // 5. AI tool last, after prior command output settles.
             if (aiCmd.isNotBlank()) {
+                conn.awaitTransportQuiescence()
                 conn.send("$aiCmd\n")
             }
             connectingJobs.remove(project.id)

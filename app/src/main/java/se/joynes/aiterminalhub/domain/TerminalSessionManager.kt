@@ -20,6 +20,7 @@ import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.ssh.SshConnection
 import se.joynes.aiterminalhub.data.ssh.SshManager
 import se.joynes.aiterminalhub.data.ssh.TerminalSessionClientImpl
+import java.nio.charset.StandardCharsets
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -106,6 +107,10 @@ class TerminalSessionManager @Inject constructor(
         val terminalSession = TerminalSession.createRemoteSession(5000, terminalClient, object : TerminalInputListener {
             override fun onTerminalInput(data: ByteArray, offset: Int, count: Int): Boolean {
                 if (count <= 0) return true
+                if (shouldSuppressTerminalReply(data, offset, count)) {
+                    logger.log(LogLevel.DEBUG, TAG, "Suppressed terminal reply for remote session: ${describeBytes(data, offset, count)}")
+                    return true
+                }
                 conn.sendBytes(data.copyOfRange(offset, offset + count))
                 return true
             }
@@ -200,6 +205,28 @@ class TerminalSessionManager @Inject constructor(
 
     private fun publishSessions() {
         _sessions.value = entries.values.map { it.meta }
+    }
+
+    private fun shouldSuppressTerminalReply(data: ByteArray, offset: Int, count: Int): Boolean {
+        if (count < 2 || data[offset] != 0x1b.toByte()) return false
+        val text = String(data, offset, count, StandardCharsets.UTF_8)
+        return when {
+            text.startsWith("\u001b[8;") && text.endsWith("t") -> true
+            text.startsWith("\u001b[4;") && text.endsWith("t") -> true
+            text.startsWith("\u001b[9;") && text.endsWith("t") -> true
+            text.startsWith("\u001b[>") && text.endsWith("c") -> true
+            text.startsWith("\u001b[?64;") && text.endsWith("c") -> true
+            text.startsWith("\u001b]10;") -> true
+            text.startsWith("\u001b]11;") -> true
+            else -> false
+        }
+    }
+
+    private fun describeBytes(data: ByteArray, offset: Int, count: Int): String {
+        val shown = data.copyOfRange(offset, offset + minOf(count, 24))
+        return shown.joinToString(prefix = "[", postfix = if (count > shown.size) " ...]" else "]") {
+            "%02x".format(it)
+        }
     }
 
     fun debugSnapshot(): String = buildString {

@@ -248,6 +248,25 @@ class SshConnection @Inject constructor(
         false
     } ?: false
 
+    suspend fun awaitTransportQuiescence(
+        quietMs: Long = 600,
+        timeoutMs: Long = 6_000
+    ): Boolean = withTimeoutOrNull(timeoutMs) {
+        var lastOutputEvent = outputEvents.value
+        var lastTx = lastTxAtMs
+
+        while (connected.value) {
+            delay(quietMs)
+            val outputNow = outputEvents.value
+            val txNow = lastTxAtMs
+            if (outputNow == lastOutputEvent && txNow == lastTx) return@withTimeoutOrNull true
+            lastOutputEvent = outputNow
+            lastTx = txNow
+        }
+
+        false
+    } ?: false
+
     fun sendBytes(bytes: ByteArray) {
         scope.launch {
             synchronized(writeLock) {
