@@ -78,9 +78,6 @@ public final class TerminalView extends View {
     private int mMouseScrollStartX = -1, mMouseScrollStartY = -1;
     /** Keep track of the time when a touch event leading to sending mouse scroll events started. */
     private long mMouseStartDownTime = -1;
-    /** Direction lock for a touch-scroll gesture while mouse tracking is active. */
-    private long mTouchScrollDownTime = -1;
-    private int mTouchScrollButton = -1;
 
     final Scroller mScroller;
 
@@ -581,11 +578,12 @@ public final class TerminalView extends View {
     void doScroll(MotionEvent event, int rowsDown) {
         boolean up = rowsDown < 0;
         int amount = Math.abs(rowsDown);
-        boolean touchScroll = event != null && !event.isFromSource(InputDevice.SOURCE_MOUSE);
-
         for (int i = 0; i < amount; i++) {
-            if (!touchScroll && mEmulator.isMouseTrackingActive()) {
+            if (mEmulator.isMouseTrackingActive()) {
                 sendMouseEventCode(event, up ? TerminalEmulator.MOUSE_WHEELUP_BUTTON : TerminalEmulator.MOUSE_WHEELDOWN_BUTTON, true);
+            } else if (mEmulator.isAlternateBufferActive()) {
+                // Match upstream Termux behaviour for full-screen apps when mouse tracking is off.
+                handleKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
             } else {
                 mTopRow = Math.min(0, Math.max(-(mEmulator.getScreen().getActiveTranscriptRows()), mTopRow + (up ? -1 : 1)));
                 if (!awakenScrollBars()) invalidate();

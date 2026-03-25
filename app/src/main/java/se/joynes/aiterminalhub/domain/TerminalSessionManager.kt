@@ -198,29 +198,6 @@ class TerminalSessionManager @Inject constructor(
         entries[id]?.conn?.resizePty(cols, rows)
     }
 
-    fun isTmuxSession(session: TerminalSession?): Boolean =
-        entries.values.firstOrNull { it.terminalSession === session }?.meta?.isTmux == true
-
-    fun handleTouchScroll(session: TerminalSession?, rowsDown: Int): Boolean {
-        if (session == null || rowsDown == 0) return false
-        val entry = entries.values.firstOrNull { it.terminalSession === session } ?: return false
-        val tmuxSessionName = entry.tmuxSessionName ?: return false
-        if (!entry.meta.isTmux) return false
-
-        val direction = if (rowsDown < 0) "scroll-down" else "scroll-up"
-        val amount = kotlin.math.abs(rowsDown).coerceIn(1, 8)
-        val command =
-            "pane_id=\$(tmux display-message -p -t '${tmuxSessionName.replace("'", "'\\''")}' '#{pane_id}' 2>/dev/null) || exit 0; " +
-            "[ -n \"\$pane_id\" ] || exit 0; " +
-            "tmux copy-mode -t \"\$pane_id\" 2>/dev/null || true; " +
-            "tmux send-keys -t \"\$pane_id\" -X -N $amount $direction"
-
-        entry.scope.launch(Dispatchers.IO) {
-            entry.conn.runSilent(command)
-        }
-        return true
-    }
-
     private fun publishSessions() {
         _sessions.value = entries.values.map { it.meta }
     }

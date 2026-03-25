@@ -175,6 +175,4 @@ class SessionHostViewModel @Inject constructor(
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)
     fun resizeActivePty(cols: Int, rows: Int) = sessionManager.resizeActivePty(cols, rows)
-    fun isTmuxSession(session: TerminalSession?) = sessionManager.isTmuxSession(session)
-    fun handleTouchScroll(session: TerminalSession?, rowsDown: Int) = sessionManager.handleTouchScroll(session, rowsDown)
 }

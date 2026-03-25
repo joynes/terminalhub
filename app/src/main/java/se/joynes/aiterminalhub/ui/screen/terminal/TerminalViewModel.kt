@@ -18,6 +18,4 @@ class TerminalViewModel @Inject constructor(
 
     fun sendBytes(bytes: ByteArray) = manager.sendBytesToActive(bytes)
     fun resizeActivePty(cols: Int, rows: Int) = manager.resizeActivePty(cols, rows)
-    fun isTmuxSession(session: TerminalSession?) = manager.isTmuxSession(session)
-    fun handleTouchScroll(session: TerminalSession?, rowsDown: Int) = manager.handleTouchScroll(session, rowsDown)
 }
