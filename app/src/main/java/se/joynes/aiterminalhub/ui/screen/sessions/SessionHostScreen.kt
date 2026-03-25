@@ -24,6 +24,9 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.termux.view.TerminalView
+import se.joynes.aiterminalhub.data.logging.AppLogger
+import se.joynes.aiterminalhub.data.logging.LogEvent
+import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroTopBar
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
@@ -48,6 +51,10 @@ fun SessionHostScreen(
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val logger = remember { dagger.hilt.android.EntryPointAccessors.fromApplication(
+        context.applicationContext,
+        SessionHostScreenLoggerEntryPoint::class.java
+    ).appLogger() }
 
     var keyboardVisible by remember { mutableStateOf(true) }
     var showSessionHistory by remember { mutableStateOf(false) }
@@ -101,6 +108,7 @@ fun SessionHostScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
+            logger.log(LogLevel.INFO, "SessionHostScreen", "Lifecycle event: $event", LogEvent.AppEvent("session_host_$event"))
             if (event == Lifecycle.Event.ON_RESUME && session != null) {
                 keyboardVisible = true
                 terminalViewRef.value?.requestFocus()
@@ -335,4 +343,10 @@ fun SessionHostScreen(
             }
         }
     }
+}
+
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface SessionHostScreenLoggerEntryPoint {
+    fun appLogger(): AppLogger
 }

@@ -68,6 +68,7 @@ class SshConnection @Inject constructor(
 
                 val conn = Connection(server.host, server.port)
                 conn.connect(permissiveHostKeyVerifier)
+                logger.log(LogLevel.DEBUG, TAG, "SSH transport connected: connection=${System.identityHashCode(conn)}")
 
                 val authenticated = when {
                     !privateKeyPem.isNullOrBlank() -> {
@@ -85,6 +86,7 @@ class SshConnection @Inject constructor(
                 logger.log(LogLevel.INFO, TAG, "SSH session established to ${server.host}")
 
                 val sess = conn.openSession()
+                logger.log(LogLevel.DEBUG, TAG, "Shell session opened: session=${System.identityHashCode(sess)}")
                 sess.requestPTY("xterm-256color", 80, 24, 0, 0, null)
                 sess.startShell()
                 shellSession = sess
@@ -140,7 +142,13 @@ class SshConnection @Inject constructor(
         }
         scope.launch {
             try {
-                shellSession?.resizePTY(cols, rows, 0, 0)
+                val sess = shellSession
+                if (sess == null) {
+                    logger.log(LogLevel.WARN, TAG, "PTY resize skipped: no shell session cols=${cols} rows=${rows}")
+                    return@launch
+                }
+                logger.log(LogLevel.DEBUG, TAG, "PTY resize requested: cols=${cols} rows=${rows} session=${System.identityHashCode(sess)} connected=${_connected.value}")
+                sess.resizePTY(cols, rows, 0, 0)
                 logger.log(LogLevel.DEBUG, TAG, "PTY resize: ${cols}x${rows}")
             } catch (e: Exception) {
                 logger.log(LogLevel.WARN, TAG, "PTY resize failed: ${e.javaClass.simpleName}: ${e.message}")
@@ -175,7 +183,12 @@ class SshConnection @Inject constructor(
                     }
 
                     if ((conditions and ChannelCondition.EOF) != 0) {
-                        logger.log(LogLevel.WARN, TAG, "SSH read loop: EOF, connected=${_connected.value}")
+                        val exitStatus = try { session.exitStatus } catch (_: Exception) { null }
+                        logger.log(
+                            LogLevel.WARN,
+                            TAG,
+                            "SSH read loop: EOF, connected=${_connected.value}, exitStatus=${exitStatus}, session=${System.identityHashCode(session)}, conditions=${describeConditions(conditions)}"
+                        )
                         break
                     }
                 }
@@ -184,7 +197,8 @@ class SshConnection @Inject constructor(
             }
             val reason = if (!_connected.value) "connected=false" else "loop-exit"
             _connected.value = false
-            logger.log(LogLevel.INFO, TAG, "SSH read loop ended (reason=$reason)")
+            val exitStatus = try { session.exitStatus } catch (_: Exception) { null }
+            logger.log(LogLevel.INFO, TAG, "SSH read loop ended (reason=$reason, exitStatus=${exitStatus}, session=${System.identityHashCode(session)})")
         }
     }
 
@@ -229,6 +243,11 @@ class SshConnection @Inject constructor(
     fun disconnect() {
         _connected.value = false
         scope.launch {
+            logger.log(
+                LogLevel.INFO,
+                TAG,
+                "Disconnect requested: session=${shellSession?.let { System.identityHashCode(it) }}, connection=${connection?.let { System.identityHashCode(it) }}"
+            )
             try {
                 outputStream?.close()
             } catch (_: Exception) {}
@@ -254,6 +273,17 @@ class SshConnection @Inject constructor(
         return shown.joinToString(prefix = "[", postfix = if (bytes.size > shown.size) " ...]" else "]") {
             "%02x".format(it)
         }
+    }
+
+    private fun describeConditions(conditions: Int): String {
+        val labels = mutableListOf<String>()
+        if ((conditions and ChannelCondition.STDOUT_DATA) != 0) labels += "STDOUT_DATA"
+        if ((conditions and ChannelCondition.STDERR_DATA) != 0) labels += "STDERR_DATA"
+        if ((conditions and ChannelCondition.EOF) != 0) labels += "EOF"
+        if ((conditions and ChannelCondition.EXIT_STATUS) != 0) labels += "EXIT_STATUS"
+        if ((conditions and ChannelCondition.CLOSED) != 0) labels += "CLOSED"
+        if ((conditions and ChannelCondition.TIMEOUT) != 0) labels += "TIMEOUT"
+        return labels.joinToString("|")
     }
 
     companion object { private const val TAG = "SshConnection" }

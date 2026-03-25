@@ -13,16 +13,16 @@ class AppLogRepository @Inject constructor(
 ) {
     fun recentLogs(limit: Int = 500): Flow<List<AppLogEntry>> =
         dao.getRecent(limit).map { list ->
-            list.map { AppLogEntry(it.id, it.timestamp, it.level, it.tag, it.message, it.eventType) }
+            list.asReversed().map { AppLogEntry(it.id, it.timestamp, it.level, it.tag, it.message, it.eventType) }
         }
 
     fun logsByLevel(level: String, limit: Int = 500): Flow<List<AppLogEntry>> =
         dao.getByLevel(level, limit).map { list ->
-            list.map { AppLogEntry(it.id, it.timestamp, it.level, it.tag, it.message, it.eventType) }
+            list.asReversed().map { AppLogEntry(it.id, it.timestamp, it.level, it.tag, it.message, it.eventType) }
         }
 
     fun search(query: String, limit: Int = 500): Flow<List<AppLogEntry>> =
         dao.search(query, limit).map { list ->
-            list.map { AppLogEntry(it.id, it.timestamp, it.level, it.tag, it.message, it.eventType) }
+            list.asReversed().map { AppLogEntry(it.id, it.timestamp, it.level, it.tag, it.message, it.eventType) }
         }
 }
