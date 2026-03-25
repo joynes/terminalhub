@@ -105,12 +105,21 @@ fun SessionHostScreen(
 
     // Re-request focus when the app comes back from background
     val lifecycleOwner = LocalLifecycleOwner.current
+    val currentSession by rememberUpdatedState(session)
+    val currentActiveId by rememberUpdatedState(activeId)
+    val currentViewModel by rememberUpdatedState(viewModel)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            logger.log(LogLevel.INFO, "SessionHostScreen", "Lifecycle event: $event", LogEvent.AppEvent("session_host_$event"))
-            if (event == Lifecycle.Event.ON_RESUME && session != null) {
+            val tv = terminalViewRef.value
+            logger.log(
+                LogLevel.INFO,
+                "SessionHostScreen",
+                "Lifecycle event: $event screen=${System.identityHashCode(lifecycleOwner)} activeId=${currentActiveId?.value} terminalView=${tv?.let { System.identityHashCode(it) }} terminalSession=${currentSession?.let { System.identityHashCode(it) }} vm={${currentViewModel.debugSnapshot()}}",
+                LogEvent.AppEvent("session_host_$event")
+            )
+            if (event == Lifecycle.Event.ON_RESUME && currentSession != null) {
                 keyboardVisible = true
-                terminalViewRef.value?.requestFocus()
+                tv?.requestFocus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

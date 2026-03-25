@@ -8,6 +8,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import com.termux.terminal.TerminalSession
+import se.joynes.aiterminalhub.data.logging.AppLogger
+import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
@@ -33,6 +35,7 @@ data class ProjectTabState(
 
 @HiltViewModel
 class SessionHostViewModel @Inject constructor(
+    private val logger: AppLogger,
     private val serverRepo: ServerRepository,
     private val projectRepo: ProjectRepository,
     private val connectToServer: ConnectToServer,
@@ -40,6 +43,8 @@ class SessionHostViewModel @Inject constructor(
     private val engine: ScriptTemplateEngine,
     val sessionManager: TerminalSessionManager
 ) : ViewModel() {
+
+    private val instanceId = System.identityHashCode(this)
 
     // All projects from DB (shown immediately, even while connecting)
     private val _dbProjects = MutableStateFlow<List<Project>>(emptyList())
@@ -78,6 +83,7 @@ class SessionHostViewModel @Inject constructor(
     fun init() {
         if (initialized) return
         initialized = true
+        logger.log(LogLevel.INFO, "SessionHostViewModel", "init snapshot=${debugSnapshot()}")
         viewModelScope.launch {
             serverRepo.getAll().collect { servers ->
                 val sId = servers.firstOrNull()?.id ?: return@collect
@@ -175,4 +181,16 @@ class SessionHostViewModel @Inject constructor(
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)
     fun resizeActivePty(cols: Int, rows: Int) = sessionManager.resizeActivePty(cols, rows)
+
+    fun debugSnapshot(): String = buildString {
+        append("vm=").append(instanceId)
+        append(",initialized=").append(initialized)
+        append(",serverId=").append(_serverId.value)
+        append(",activeId=").append(activeId.value?.value)
+        append(",activeTerminal=").append(activeSession.value?.let { System.identityHashCode(it) })
+        append(",dbProjects=").append(_dbProjects.value.size)
+        append(",connecting=").append(connectingProjectIds.joinToString(prefix = "[", postfix = "]"))
+        append(",ssh={").append(sshManager.debugSnapshot()).append("}")
+        append(",terminals={").append(sessionManager.debugSnapshot()).append("}")
+    }
 }

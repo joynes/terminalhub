@@ -22,17 +22,23 @@ class SshManager @Inject constructor(
         val conn = connectionFactory.create()
         conn.connect(server, password, privateKeyPem)
         _sessions.value = _sessions.value + (conn.sessionId to conn)
-        logger.log(LogLevel.INFO, TAG, "Session created: ${conn.sessionId} for ${server.host}")
+        logger.log(LogLevel.INFO, TAG, "Session created: ${conn.sessionId} for ${server.host}; snapshot=${debugSnapshot()}")
         return conn
     }
 
     fun destroySession(sessionId: String) {
         _sessions.value[sessionId]?.disconnect()
         _sessions.value = _sessions.value - sessionId
-        logger.log(LogLevel.INFO, TAG, "Session destroyed: $sessionId")
+        logger.log(LogLevel.INFO, TAG, "Session destroyed: $sessionId; snapshot=${debugSnapshot()}")
     }
 
     fun getSession(sessionId: String): SshConnection? = _sessions.value[sessionId]
+
+    fun debugSnapshot(): String = buildString {
+        append("count=").append(_sessions.value.size)
+        append(",ids=")
+        append(_sessions.value.keys.joinToString(prefix = "[", postfix = "]"))
+    }
 
     companion object { private const val TAG = "SshManager" }
 }

@@ -143,7 +143,7 @@ class TerminalSessionManager @Inject constructor(
         )
         entries[sessionId] = SessionEntry(meta, conn, terminalSession, scope, tmuxSessionName)
         publishSessions()
-        logger.log(LogLevel.DEBUG, TAG, "Session registered: $sessionId ($projectName)")
+        logger.log(LogLevel.DEBUG, TAG, "Session registered: $sessionId ($projectName); snapshot=${debugSnapshot()}")
 
         if (_activeId.value == null) switchTo(TerminalSessionId(sessionId))
     }
@@ -155,7 +155,7 @@ class TerminalSessionManager @Inject constructor(
         _activeId.value = id
         _activeSession.value = updated.terminalSession
         publishSessions()
-        logger.log(LogLevel.DEBUG, TAG, "Switched to session: ${id.value}")
+        logger.log(LogLevel.DEBUG, TAG, "Switched to session: ${id.value}; snapshot=${debugSnapshot()}")
     }
 
     fun close(id: TerminalSessionId) {
@@ -171,7 +171,7 @@ class TerminalSessionManager @Inject constructor(
             _activeId.value = next?.let { TerminalSessionId(it) }
             _activeSession.value = next?.let { entries[it]?.terminalSession }
         }
-        logger.log(LogLevel.DEBUG, TAG, "Session closed: ${id.value}")
+        logger.log(LogLevel.DEBUG, TAG, "Session closed: ${id.value}; snapshot=${debugSnapshot()}")
     }
 
     /** Move session at [fromIndex] to [toIndex] in tab bar order. */
@@ -200,6 +200,14 @@ class TerminalSessionManager @Inject constructor(
 
     private fun publishSessions() {
         _sessions.value = entries.values.map { it.meta }
+    }
+
+    fun debugSnapshot(): String = buildString {
+        append("entries=").append(entries.size)
+        append(",active=").append(_activeId.value?.value)
+        append(",terminal=").append(_activeSession.value?.let { System.identityHashCode(it) })
+        append(",ids=")
+        append(entries.keys.joinToString(prefix = "[", postfix = "]"))
     }
 
     companion object { private const val TAG = "TerminalSessionManager" }
