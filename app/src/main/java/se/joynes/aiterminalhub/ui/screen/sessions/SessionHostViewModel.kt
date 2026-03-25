@@ -65,6 +65,7 @@ class SessionHostViewModel @Inject constructor(
 
     val activeId: StateFlow<TerminalSessionId?> = sessionManager.activeId
     val activeSession: StateFlow<TerminalSession?> = sessionManager.activeSession()
+    val screenUpdates: SharedFlow<TerminalSession> = sessionManager.screenUpdates
 
     private val connectingProjectIds = mutableSetOf<Long>()
     private val connectingJobs = mutableMapOf<Long, Job>()
@@ -112,25 +113,37 @@ class SessionHostViewModel @Inject constructor(
             }
             // 1. Silent exec: mkdir + create tmux session if needed
             if (setupCmd.isNotBlank()) conn.runSilent(setupCmd)
-            // 2. Attach to tmux session (or plain shell if useTmux=false)
+            // 2. Wait for the interactive shell banner/prompt to settle before sending commands.
+            conn.awaitOutputQuiescence(requireNewOutput = true)
+
+            // 3. Attach to tmux session (or plain shell if useTmux=false)
             if (attachCmd.isNotBlank()) {
-                delay(1000)
                 conn.send("$attachCmd\n")
+                conn.awaitOutputQuiescence()
             }
             if (!sessionManager.isProjectClosed(project.id)) {
-                sessionManager.register(conn.sessionId, conn, project.name, project.id)
+                sessionManager.register(
+                    conn.sessionId,
+                    conn,
+                    project.name,
+                    project.id,
+                    isTmux = project.useTmux,
+                    tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null
+                )
             } else {
                 sshManager.destroySession(conn.sessionId)
                 return@launch
             }
-            // 3. Custom script (e.g. cd to project dir)
+
+            // 4. Wait until attach/plain shell output settles, then run the custom script.
+            conn.awaitOutputQuiescence()
             if (customScript.isNotBlank()) {
-                delay(800)
                 conn.send("$customScript\n")
+                conn.awaitOutputQuiescence()
             }
-            // 4. AI tool last
+
+            // 5. AI tool last, after prior command output settles.
             if (aiCmd.isNotBlank()) {
-                delay(500)
                 conn.send("$aiCmd\n")
             }
             connectingJobs.remove(project.id)
@@ -161,4 +174,7 @@ class SessionHostViewModel @Inject constructor(
     fun moveSession(fromIndex: Int, toIndex: Int) = sessionManager.moveSession(fromIndex, toIndex)
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)
+    fun resizeActivePty(cols: Int, rows: Int) = sessionManager.resizeActivePty(cols, rows)
+    fun isTmuxSession(session: TerminalSession?) = sessionManager.isTmuxSession(session)
+    fun handleTouchScroll(session: TerminalSession?, rowsDown: Int) = sessionManager.handleTouchScroll(session, rowsDown)
 }

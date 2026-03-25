@@ -15,6 +15,7 @@ hiltNavigationCompose = "1.2.0"
 room = "2.7.1"
 navigationCompose = "2.9.7"
 jsch = "0.2.21"
+sshlib = "2.2.43"
 biometric = "1.1.0"
 securityCrypto = "1.1.0"
 coroutines = "1.9.0"
@@ -52,6 +53,7 @@ room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 # SSH
 jsch = { group = "com.github.mwiede", name = "jsch", version.ref = "jsch" }
+sshlib = { group = "org.connectbot", name = "sshlib", version.ref = "sshlib" }
 # Biometric & Security
 biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }

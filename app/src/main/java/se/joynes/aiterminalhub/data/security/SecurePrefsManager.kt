@@ -38,7 +38,10 @@ class SecurePrefsManager @Inject constructor(
         logger.log(LogLevel.DEBUG, TAG, "Password stored for server $serverId")
     }
 
-    fun getPassword(serverId: Long): String? = prefs.getString("pwd_$serverId", null)
+    fun getPassword(serverId: Long): String? =
+        prefs.getString("pwd_$serverId", null)
+            ?: context.getSharedPreferences(TEST_PREFS, Context.MODE_PRIVATE)
+                .getString("pwd_$serverId", null)
 
     fun deletePassword(serverId: Long) {
         prefs.edit().remove("pwd_$serverId").apply()

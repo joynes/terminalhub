@@ -25,7 +25,8 @@ class ScriptTemplateEngine @Inject constructor() {
             "tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1 && " +
             "tmux kill-session -t $session 2>/dev/null); " +
             "tmux has-session -t $session 2>/dev/null || " +
-            "tmux new-session -d -s $session -c $path"
+            "tmux new-session -d -s $session -c $path; " +
+            renderTmuxTouchScrollSetup(session)
         } else {
             "mkdir -p $path 2>/dev/null"
         }
@@ -33,7 +34,12 @@ class ScriptTemplateEngine @Inject constructor() {
 
     /** Interactive attach sent to shell after connect. Empty = plain shell. */
     fun renderAttach(server: Server, project: Project): String =
-        if (project.useTmux) render(ServerEntity.DEFAULT_ATTACH_COMMAND, server, project) else ""
+        if (project.useTmux) {
+            val session = sessionName(project)
+            "${renderTmuxTouchScrollSetup(session)}; ${render(ServerEntity.DEFAULT_ATTACH_COMMAND, server, project)}"
+        } else {
+            ""
+        }
 
     /** Custom script run inside the session after attach. */
     fun renderCustomScript(server: Server, project: Project): String =
@@ -50,4 +56,7 @@ class ScriptTemplateEngine @Inject constructor() {
             .replace("{{PROJECT_PATH}}", path)
             .replace("{{SESSION_NAME}}", session)
     }
+
+    private fun renderTmuxTouchScrollSetup(session: String): String =
+        "tmux set-option -t $session mouse on 2>/dev/null || true"
 }

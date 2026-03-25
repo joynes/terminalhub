@@ -18,9 +18,9 @@ import androidx.compose.ui.unit.sp
 import se.joynes.aiterminalhub.ui.theme.*
 
 private val KEY_H   = 34.dp
-private val KEY_W   = 48.dp   // regular key
-private val MOD_W   = 58.dp   // CTRL / ALT / SHIFT
-private val ARROW_W = 44.dp   // ← ↓ →
+private val KEY_W   = 34.dp   // regular key (reduced to fit 10 keys per row)
+private val MOD_W   = 52.dp   // CTRL / ALT / SHIFT
+private val ARROW_W = 38.dp   // ← ↓ →
 
 @Composable
 fun SpecialKeyBar(

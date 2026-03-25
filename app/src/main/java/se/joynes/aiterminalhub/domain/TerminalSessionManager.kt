@@ -1,16 +1,20 @@
 package se.joynes.aiterminalhub.domain
 
 import android.content.Context
+import com.termux.terminal.TerminalInputListener
 import com.termux.terminal.TerminalSession
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.ssh.SshConnection
@@ -25,6 +29,7 @@ data class TerminalSessionMeta(
     val id: TerminalSessionId,
     val projectName: String,
     val projectId: Long = 0L,
+    val isTmux: Boolean = false,
     val isConnected: Boolean,
     val hasUnreadOutput: Boolean,
     val previewLines: List<String>,
@@ -36,7 +41,8 @@ private data class SessionEntry(
     val meta: TerminalSessionMeta,
     val conn: SshConnection,
     val terminalSession: TerminalSession,
-    val scope: CoroutineScope
+    val scope: CoroutineScope,
+    val tmuxSessionName: String? = null
 )
 
 @Singleton
@@ -59,6 +65,8 @@ class TerminalSessionManager @Inject constructor(
     val activeId: StateFlow<TerminalSessionId?> = _activeId.asStateFlow()
 
     private val _activeSession = MutableStateFlow<TerminalSession?>(null)
+    private val _screenUpdates = MutableSharedFlow<TerminalSession>(extraBufferCapacity = 64)
+    val screenUpdates: SharedFlow<TerminalSession> = _screenUpdates.asSharedFlow()
 
     // LinkedHashMap preserves insertion order (tab bar order)
     private val entries = LinkedHashMap<String, SessionEntry>()
@@ -81,36 +89,43 @@ class TerminalSessionManager @Inject constructor(
 
     fun activeSession(): StateFlow<TerminalSession?> = _activeSession.asStateFlow()
 
-    fun register(sessionId: String, conn: SshConnection, projectName: String, projectId: Long = 0L) {
+    fun register(
+        sessionId: String,
+        conn: SshConnection,
+        projectName: String,
+        projectId: Long = 0L,
+        isTmux: Boolean = false,
+        tmuxSessionName: String? = null
+    ) {
         if (entries.containsKey(sessionId)) return
-        val scope = CoroutineScope(SupervisorJob())
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-        // TerminalSession uses /system/bin/cat as a silent dummy subprocess.
-        // cat never produces output (we intercept all user input in TerminalViewClientImpl
-        // before it reaches the session), so the display stays clean for SSH output.
-        val terminalSession = TerminalSession(
-            "/system/bin/cat",
-            "/",
-            arrayOf(),
-            arrayOf(),
-            5000,
-            TerminalSessionClientImpl(context)
-        )
-
-        // Forward SSH output to the terminal emulator once it is initialized
-        // by TerminalView (on first layout). SSH connections take several seconds,
-        // so the emulator is ready before significant data arrives.
-        scope.launch {
-            // Wait for TerminalView to call updateSize() and initialize the emulator
-            var waited = 0
-            while (terminalSession.emulator == null && waited < 200) {
-                delay(50)
-                waited++
+        val terminalClient = TerminalSessionClientImpl(context) { changedSession ->
+            _screenUpdates.tryEmit(changedSession)
+        }
+        val terminalSession = TerminalSession.createRemoteSession(5000, terminalClient, object : TerminalInputListener {
+            override fun onTerminalInput(data: ByteArray, offset: Int, count: Int): Boolean {
+                if (count <= 0) return true
+                conn.sendBytes(data.copyOfRange(offset, offset + count))
+                return true
             }
+        })
+
+        scope.launch {
             conn.output.collect { bytes ->
                 try {
-                    terminalSession.emulator?.append(bytes, bytes.size)
+                    terminalSession.appendRemoteOutput(bytes, 0, bytes.size)
                 } catch (_: Exception) {}
+            }
+        }
+        scope.launch {
+            var wasConnected = false
+            conn.connected.collect { connected ->
+                if (connected) {
+                    wasConnected = true
+                } else if (wasConnected && terminalSession.isRunning) {
+                    terminalSession.notifyRemoteProcessExit(0)
+                }
             }
         }
 
@@ -119,13 +134,14 @@ class TerminalSessionManager @Inject constructor(
             id = TerminalSessionId(sessionId),
             projectName = projectName,
             projectId = projectId,
+            isTmux = isTmux,
             isConnected = conn.connected.value,
             hasUnreadOutput = false,
             previewLines = emptyList(),
             lastOpenedAt = now,
             createdAt = now
         )
-        entries[sessionId] = SessionEntry(meta, conn, terminalSession, scope)
+        entries[sessionId] = SessionEntry(meta, conn, terminalSession, scope, tmuxSessionName)
         publishSessions()
         logger.log(LogLevel.DEBUG, TAG, "Session registered: $sessionId ($projectName)")
 
@@ -175,6 +191,34 @@ class TerminalSessionManager @Inject constructor(
     fun sendBytesToActive(bytes: ByteArray) {
         val id = _activeId.value?.value ?: return
         entries[id]?.conn?.sendBytes(bytes)
+    }
+
+    fun resizeActivePty(cols: Int, rows: Int) {
+        val id = _activeId.value?.value ?: return
+        entries[id]?.conn?.resizePty(cols, rows)
+    }
+
+    fun isTmuxSession(session: TerminalSession?): Boolean =
+        entries.values.firstOrNull { it.terminalSession === session }?.meta?.isTmux == true
+
+    fun handleTouchScroll(session: TerminalSession?, rowsDown: Int): Boolean {
+        if (session == null || rowsDown == 0) return false
+        val entry = entries.values.firstOrNull { it.terminalSession === session } ?: return false
+        val tmuxSessionName = entry.tmuxSessionName ?: return false
+        if (!entry.meta.isTmux) return false
+
+        val direction = if (rowsDown < 0) "scroll-down" else "scroll-up"
+        val amount = kotlin.math.abs(rowsDown).coerceIn(1, 8)
+        val command =
+            "pane_id=\$(tmux display-message -p -t '${tmuxSessionName.replace("'", "'\\''")}' '#{pane_id}' 2>/dev/null) || exit 0; " +
+            "[ -n \"\$pane_id\" ] || exit 0; " +
+            "tmux copy-mode -t \"\$pane_id\" 2>/dev/null || true; " +
+            "tmux send-keys -t \"\$pane_id\" -X -N $amount $direction"
+
+        entry.scope.launch(Dispatchers.IO) {
+            entry.conn.runSilent(command)
+        }
+        return true
     }
 
     private fun publishSessions() {

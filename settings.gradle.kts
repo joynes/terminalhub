@@ -22,3 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "AITerminalHub"
 include(":app")
+include(":terminal-emulator")
+include(":terminal-view")

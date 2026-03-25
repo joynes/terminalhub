@@ -85,11 +85,14 @@ dependencies {
     ksp(libs.room.compiler)
 
     // SSH
+    implementation(libs.sshlib) {
+        exclude(group = "com.google.crypto.tink", module = "tink")
+    }
     implementation(libs.jsch)
 
-    // Terminal emulator (Termux terminal-view)
-    implementation(libs.termuxTerminalEmulator)
-    implementation(libs.termuxTerminalView)
+    // Terminal emulator (local Termux modules, patched for SSH-backed embedded sessions)
+    implementation(project(":terminal-emulator"))
+    implementation(project(":terminal-view"))
 
     // Biometric & Security
     implementation(libs.biometric)

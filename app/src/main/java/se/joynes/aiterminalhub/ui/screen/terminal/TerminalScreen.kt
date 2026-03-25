@@ -1,5 +1,7 @@
 package se.joynes.aiterminalhub.ui.screen.terminal
 
+import android.os.Build
+import android.view.WindowInsets as AndroidWindowInsets
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -29,9 +31,29 @@ fun TerminalScreen(
 
     fun showKeyboard() {
         val tv = terminalViewRef.value ?: return
+        tv.requestFocusFromTouch()
         tv.requestFocus()
-        context.getSystemService(InputMethodManager::class.java)
-            ?.showSoftInput(tv, InputMethodManager.SHOW_IMPLICIT)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            tv.windowInsetsController?.show(AndroidWindowInsets.Type.ime())
+        } else {
+            context.getSystemService(InputMethodManager::class.java)
+                ?.showSoftInput(tv, InputMethodManager.SHOW_FORCED)
+        }
+    }
+
+    fun syncRemotePty(tv: TerminalView) {
+        tv.updateSize()
+        val emulator = tv.mEmulator ?: return
+        viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.screenUpdates.collect { changedSession ->
+            val tv = terminalViewRef.value ?: return@collect
+            if (tv.mTermSession === changedSession) {
+                tv.onScreenUpdated()
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize().background(MegaDriveBg)) {
@@ -48,18 +70,41 @@ fun TerminalScreen(
                         }
                     )
                 }
-                LaunchedEffect(sess) {
-                    keyboardVisible = true
-                    showKeyboard()
-                }
+                LaunchedEffect(sess) { keyboardVisible = true }
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     AndroidView(
                         factory = { ctx ->
+                            val textSizePx = (14 * ctx.resources.displayMetrics.scaledDensity + 0.5f).toInt()
                             TerminalView(ctx, null).apply {
-                                setTextSize(12)
+                                isFocusable = true
+                                isFocusableInTouchMode = true
+                                setTextSize(textSizePx)
                                 setTerminalViewClient(terminalViewClient)
                                 attachSession(sess)
-                            }.also { terminalViewRef.value = it }
+                                addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                                    syncRemotePty(view as TerminalView)
+                                }
+                            }.also { tv ->
+                                terminalViewRef.value = tv
+                                tv.post {
+                                    syncRemotePty(tv)
+                                    tv.requestFocusFromTouch()
+                                    tv.requestFocus()
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                        tv.windowInsetsController?.show(AndroidWindowInsets.Type.ime())
+                                    } else {
+                                        ctx.getSystemService(InputMethodManager::class.java)
+                                            ?.showSoftInput(tv, InputMethodManager.SHOW_FORCED)
+                                    }
+                                }
+                            }
+                        },
+                        update = { tv ->
+                            if (tv.mTermSession !== sess) {
+                                tv.attachSession(sess)
+                            }
+                            terminalViewRef.value = tv
+                            syncRemotePty(tv)
                         },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -88,8 +133,12 @@ fun TerminalScreen(
                 keyboardVisible = !keyboardVisible
                 if (keyboardVisible) showKeyboard() else {
                     val tv = terminalViewRef.value ?: return@SpecialKeyBar
-                    context.getSystemService(InputMethodManager::class.java)
-                        ?.hideSoftInputFromWindow(tv.windowToken, 0)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        tv.windowInsetsController?.hide(AndroidWindowInsets.Type.ime())
+                    } else {
+                        context.getSystemService(InputMethodManager::class.java)
+                            ?.hideSoftInputFromWindow(tv.windowToken, 0)
+                    }
                 }
             }
         )

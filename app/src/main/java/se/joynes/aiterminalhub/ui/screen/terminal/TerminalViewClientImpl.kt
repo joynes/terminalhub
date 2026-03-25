@@ -6,11 +6,12 @@ import com.termux.terminal.TerminalSession
 import com.termux.view.TerminalViewClient
 
 /**
- * Routes terminal keyboard input to SSH and modifier state to the SpecialKeyBar.
+ * Routes terminal keyboard input through the attached [TerminalSession] and modifier state
+ * to the SpecialKeyBar.
  *
- * All character input is intercepted in [onCodePoint] and [onKeyDown] and sent
- * to SSH via [onSendToSsh]. Returning true prevents TerminalView from forwarding
- * the input to the dummy subprocess (cat).
+ * We still intercept input here so Compose-managed modifiers and custom key mappings apply,
+ * but the bytes now go through [TerminalSession.write] so terminal-generated replies and user
+ * input share the same transport path.
  */
 class TerminalViewClientImpl(
     private val modifierManager: MutableModifierManager,
@@ -35,7 +36,7 @@ class TerminalViewClientImpl(
             else -> String(Character.toChars(codePoint)).toByteArray(Charsets.UTF_8)
         }
         modifierManager.clearTransients()
-        onSendToSsh(bytes)
+        session?.write(bytes, 0, bytes.size) ?: onSendToSsh(bytes)
         return true
     }
 
@@ -43,8 +44,9 @@ class TerminalViewClientImpl(
     // printable characters so TerminalView calls onCodePoint for them.
     override fun onKeyDown(keyCode: Int, e: KeyEvent?, currentSession: TerminalSession?): Boolean {
         val seq = specialKeySequence(keyCode) ?: return false
+        val bytes = seq.toByteArray(Charsets.UTF_8)
         modifierManager.clearTransients()
-        onSendToSsh(seq.toByteArray(Charsets.UTF_8))
+        currentSession?.write(bytes, 0, bytes.size) ?: onSendToSsh(bytes)
         return true
     }
 
@@ -57,7 +59,9 @@ class TerminalViewClientImpl(
 
     // ── Flags ─────────────────────────────────────────────────────────────────
     override fun shouldBackButtonBeMappedToEscape() = false
-    override fun shouldEnforceCharBasedInput()       = false
+    // Match upstream Termux default so soft keyboards use commitText()/character-based
+    // input instead of relying on TYPE_NULL key events, which is unreliable on Android IMEs.
+    override fun shouldEnforceCharBasedInput()       = true
     override fun shouldUseCtrlSpaceWorkaround()      = false
     override fun isTerminalViewSelected()             = true
     override fun copyModeChanged(copyMode: Boolean)  {}
@@ -74,6 +78,7 @@ class TerminalViewClientImpl(
 
     // ── Key → escape sequence ─────────────────────────────────────────────────
     private fun specialKeySequence(keyCode: Int): String? = when (keyCode) {
+        KeyEvent.KEYCODE_ENTER         -> "\r"
         KeyEvent.KEYCODE_DPAD_UP       -> "\u001B[A"
         KeyEvent.KEYCODE_DPAD_DOWN     -> "\u001B[B"
         KeyEvent.KEYCODE_DPAD_RIGHT    -> "\u001B[C"
@@ -85,6 +90,7 @@ class TerminalViewClientImpl(
         KeyEvent.KEYCODE_DEL           -> "\u007F"
         KeyEvent.KEYCODE_FORWARD_DEL   -> "\u001B[3~"
         KeyEvent.KEYCODE_ESCAPE        -> "\u001B"
+        KeyEvent.KEYCODE_TAB           -> "\t"
         KeyEvent.KEYCODE_F1            -> "\u001BOP"
         KeyEvent.KEYCODE_F2            -> "\u001BOQ"
         KeyEvent.KEYCODE_F3            -> "\u001BOR"
