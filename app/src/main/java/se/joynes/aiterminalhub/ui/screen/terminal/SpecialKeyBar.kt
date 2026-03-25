@@ -19,6 +19,7 @@ import se.joynes.aiterminalhub.ui.theme.*
 
 private val KEY_H   = 34.dp
 private val KEY_W   = 34.dp   // regular key (reduced to fit 10 keys per row)
+private val KEYBOARD_W = 48.dp
 private val MOD_W   = 52.dp   // CTRL / ALT / SHIFT
 private val ARROW_W = 38.dp   // ← ↓ →
 
@@ -101,7 +102,7 @@ fun SpecialKeyBar(
             TermKey("PgDn", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\u001B[6~") }
             TermKey("RET", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\r") }
             TermKey("↑",   KEY_W, active = false) { onKey(arrowKey('A')) }
-            TermKey("⌨",   KEY_W, active = false, onClick = onKeyboardToggle)
+            TermKey("⌨",   KEYBOARD_W, active = false, fontSize = 15.sp, onClick = onKeyboardToggle)
         }
 
         Row(
@@ -127,6 +128,7 @@ private fun TermKey(
     label: String,
     width: Dp,
     active: Boolean,
+    fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
     onClick: () -> Unit
 ) {
     Box(
@@ -141,7 +143,7 @@ private fun TermKey(
         Text(
             text = label,
             color = if (active) MegaDriveBg else MegaDrivePrimary,
-            fontSize = 11.sp,
+            fontSize = fontSize,
             fontFamily = MonoFontFamily,
             textAlign = TextAlign.Center
         )

@@ -40,7 +40,6 @@ import se.joynes.aiterminalhub.ui.theme.*
 fun SessionHostScreen(
     onEditServer: () -> Unit,
     onAddProject: () -> Unit,
-    onOpenLogs: () -> Unit = {},
     viewModel: SessionHostViewModel = hiltViewModel()
 ) {
     val projectTabs by viewModel.projectTabs.collectAsState()
@@ -139,36 +138,14 @@ fun SessionHostScreen(
         topBar = {
             RetroTopBar(title = "TERMINAL", onBack = null, actions = {
                 Text(
-                    "✦",
-                    color = MegaDriveDim,
-                    fontSize = 14.sp,
+                    "SET",
+                    color = if (serverId != null) MegaDrivePrimary else MegaDriveDim,
+                    fontSize = 10.sp,
                     fontFamily = MonoFontFamily,
-                    modifier = androidx.compose.ui.Modifier
-                        .padding(end = 12.dp)
-                        .clickable { onOpenLogs() }
+                    modifier = Modifier
+                        .padding(end = 10.dp)
+                        .clickable(enabled = serverId != null) { onEditServer() }
                 )
-                if (serverId != null) {
-                    Text(
-                        "✎",
-                        color = MegaDriveDim,
-                        fontSize = 16.sp,
-                        fontFamily = MonoFontFamily,
-                        modifier = androidx.compose.ui.Modifier
-                            .padding(end = 12.dp)
-                            .clickable { onEditServer() }
-                    )
-                }
-                if (sessions.isNotEmpty()) {
-                    Text(
-                        "≡",
-                        color = MegaDrivePrimary,
-                        fontSize = 20.sp,
-                        fontFamily = MonoFontFamily,
-                        modifier = androidx.compose.ui.Modifier
-                            .padding(end = 8.dp)
-                            .clickable { showSessionHistory = true }
-                    )
-                }
             })
         },
         containerColor = MegaDriveBg

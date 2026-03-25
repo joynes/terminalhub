@@ -1,7 +1,0 @@
-com.termux.emulator.terminal-emulator-pngs-0 /Users/joka/AndroidStudioProjects/AITerminalHub/terminal-emulator/build/generated/res/pngs/release
-com.termux.emulator.terminal-emulator-updated_navigation_xml-1 /Users/joka/AndroidStudioProjects/AITerminalHub/terminal-emulator/build/generated/updated_navigation_xml/release
-com.termux.emulator.terminal-emulator-mergeReleaseResources-2 /Users/joka/AndroidStudioProjects/AITerminalHub/terminal-emulator/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
-com.termux.emulator.terminal-emulator-mergeReleaseResources-3 /Users/joka/AndroidStudioProjects/AITerminalHub/terminal-emulator/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
-com.termux.emulator.terminal-emulator-release-4 /Users/joka/AndroidStudioProjects/AITerminalHub/terminal-emulator/build/intermediates/merged_res/release/mergeReleaseResources
-com.termux.emulator.terminal-emulator-main-5 /Users/joka/AndroidStudioProjects/AITerminalHub/terminal-emulator/src/main/res
-com.termux.emulator.terminal-emulator-release-6 /Users/joka/AndroidStudioProjects/AITerminalHub/terminal-emulator/src/release/res

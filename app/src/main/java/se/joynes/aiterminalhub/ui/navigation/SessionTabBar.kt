@@ -17,7 +17,7 @@ import se.joynes.aiterminalhub.domain.TerminalSessionId
 import se.joynes.aiterminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.aiterminalhub.ui.theme.*
 
-private const val TAB_WIDTH_DP = 80
+private const val TAB_WIDTH_DP = 76
 
 /** Deterministic hue from seed → dark background colour that reads well against light text. */
 private fun tabColor(seed: Int, active: Boolean): Color {
@@ -41,7 +41,7 @@ fun SessionTabBar(
         modifier = modifier
             .fillMaxWidth()
             .background(MegaDriveSurface)
-            .height(36.dp),
+            .height(28.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         items(tabs) { tab ->
@@ -58,14 +58,14 @@ fun SessionTabBar(
                     .fillMaxHeight()
                     .background(bg)
                     .clickable { tab.sessionId?.let { onSelect(it) } }
-                    .padding(start = 8.dp, end = 5.dp),
+                    .padding(start = 7.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Text(
                     text = tab.projectName.uppercase(),
                     color = textColor,
-                    fontSize = 10.sp,
+                    fontSize = 9.sp,
                     fontFamily = MonoFontFamily,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -74,7 +74,7 @@ fun SessionTabBar(
                 Text(
                     text = "×",
                     color = Color.White.copy(alpha = 0.40f),
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontFamily = MonoFontFamily,
                     modifier = Modifier.clickable { onClose(tab.projectId, tab.sessionId) }
                 )
@@ -85,10 +85,10 @@ fun SessionTabBar(
                 modifier = Modifier
                     .fillMaxHeight()
                     .clickable { onAddProject() }
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("+", color = MegaDriveAccent, fontSize = 16.sp)
+                Text("+", color = MegaDriveAccent, fontSize = 14.sp)
             }
         }
     }
