@@ -39,7 +39,6 @@ fun SessionTabBar(
 ) {
     LazyRow(
         modifier = modifier
-            .fillMaxWidth()
             .background(MegaDriveSurface)
             .height(28.dp),
         verticalAlignment = Alignment.CenterVertically

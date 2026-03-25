@@ -4,12 +4,15 @@ import android.os.Build
 import android.view.WindowInsets as AndroidWindowInsets
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -28,7 +31,6 @@ import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogEvent
 import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.ui.components.RetroButton
-import se.joynes.aiterminalhub.ui.components.RetroTopBar
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
 import se.joynes.aiterminalhub.ui.screen.terminal.MutableModifierManager
 import se.joynes.aiterminalhub.ui.screen.terminal.SpecialKeyBar
@@ -40,6 +42,7 @@ import se.joynes.aiterminalhub.ui.theme.*
 fun SessionHostScreen(
     onEditServer: () -> Unit,
     onAddProject: () -> Unit,
+    onOpenLogs: () -> Unit,
     viewModel: SessionHostViewModel = hiltViewModel()
 ) {
     val projectTabs by viewModel.projectTabs.collectAsState()
@@ -57,6 +60,7 @@ fun SessionHostScreen(
 
     var keyboardVisible by remember { mutableStateOf(true) }
     var showSessionHistory by remember { mutableStateOf(false) }
+    var showSettingsMenu by remember { mutableStateOf(false) }
 
     // Shared modifier manager: toggles in SpecialKeyBar are read by TerminalViewClientImpl
     val modifierManager = remember { MutableModifierManager() }
@@ -143,36 +147,108 @@ fun SessionHostScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            RetroTopBar(title = "TERMINAL", onBack = null, actions = {
-                Text(
-                    "SET",
-                    color = if (serverId != null) MegaDrivePrimary else MegaDriveDim,
-                    fontSize = 10.sp,
-                    fontFamily = MonoFontFamily,
+    val density = LocalDensity.current
+    val imeBottom = WindowInsets.ime.getBottom(density)
+
+    val imeBottomDp = with(density) {
+        if (keyboardVisible && imeBottom > 0) imeBottom.toDp() else 0.dp
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(bottom = imeBottomDp)
+            .background(MegaDriveBg)
+    ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp)
+                    .background(MegaDriveSurface),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (projectTabs.isNotEmpty()) {
+                    SessionTabBar(
+                        tabs = projectTabs,
+                        activeId = activeId,
+                        onSelect = { viewModel.switchToSession(it); terminalViewRef.value?.requestFocus() },
+                        onClose = { projectId, sessionId -> viewModel.closeSession(projectId, sessionId) },
+                        onAddProject = onAddProject,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    Spacer(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                    )
+                }
+
+                Box(
                     modifier = Modifier
-                        .padding(end = 10.dp)
-                        .clickable(enabled = serverId != null) { onEditServer() }
-                )
-            })
-        },
-        containerColor = MegaDriveBg
-    ) { padding ->
-        val density = LocalDensity.current
-        val imeBottom = WindowInsets.ime.getBottom(density)
+                        .fillMaxHeight()
+                        .width(32.dp)
+                        .background(MegaDriveSurface)
+                        .border(1.dp, MegaDriveBg.copy(alpha = 0.35f))
+                        .clickable { showSettingsMenu = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "⚙",
+                        color = MegaDrivePrimary,
+                        fontSize = 13.sp,
+                        fontFamily = MonoFontFamily
+                    )
+                    DropdownMenu(
+                        expanded = showSettingsMenu,
+                        onDismissRequest = { showSettingsMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "Edit Server",
+                                    color = if (serverId != null) Color.White else MegaDriveDim,
+                                    fontFamily = MonoFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            onClick = {
+                                showSettingsMenu = false
+                                if (serverId != null) onEditServer()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "See Logs",
+                                    color = Color.White,
+                                    fontFamily = MonoFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            onClick = {
+                                showSettingsMenu = false
+                                onOpenLogs()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "Recent Projects",
+                                    color = Color.White,
+                                    fontFamily = MonoFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            onClick = {
+                                showSettingsMenu = false
+                                showSessionHistory = true
+                            }
+                        )
+                    }
+                }
+            }
 
-        val imeBottomDp = with(density) {
-            if (keyboardVisible && imeBottom > 0) imeBottom.toDp() else 0.dp
-        }
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(bottom = imeBottomDp)
-                .background(MegaDriveBg)
-        ) {
             if (projectTabs.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -187,14 +263,6 @@ fun SessionHostScreen(
                     }
                 }
             } else {
-                SessionTabBar(
-                    tabs = projectTabs,
-                    activeId = activeId,
-                    onSelect = { viewModel.switchToSession(it); terminalViewRef.value?.requestFocus() },
-                    onClose = { projectId, sessionId -> viewModel.closeSession(projectId, sessionId) },
-                    onAddProject = onAddProject
-                )
-
                 var showTextInput by remember { mutableStateOf(false) }
 
                 // Single active terminal pane
@@ -327,7 +395,6 @@ fun SessionHostScreen(
                     }
                 )
             }
-        }
     }
 }
 
