@@ -19,7 +19,8 @@ import se.joynes.aiterminalhub.ui.theme.*
 
 private val KEY_H   = 34.dp
 private val KEY_W   = 34.dp   // regular key (reduced to fit 10 keys per row)
-private val KEYBOARD_W = 48.dp
+private val KEYBOARD_W = 64.dp
+private val TEXT_INPUT_W = 64.dp
 private val MOD_W   = 52.dp   // CTRL / ALT / SHIFT
 private val ARROW_W = 38.dp   // ← ↓ →
 
@@ -62,8 +63,8 @@ fun SpecialKeyBar(
         else "\u001B[1;${modBits + 1}$letter"
     }
 
-    // Row 1:  ESC  TAB  :  /  @  [spacer]  PgUp  PgDn  RET  ↑  ⌨
-    // Row 2:  CTRL  ALT  SHIFT  [spacer]  TXT  PST  ←  ↓  →
+    // Row 1:  ESC  TAB  :  /  @  [spacer]  RET  ↑  ⌨
+    // Row 2:  CTRL  ALT  SHIFT  [spacer]  ←  ↓  →  TXT
     // Swipe left/right on the bar to switch tabs.
     Column(
         modifier = Modifier
@@ -98,11 +99,9 @@ fun SpecialKeyBar(
             TermKey("/",   KEY_W, active = false) { onKey(modified("/")) }
             TermKey("@",   KEY_W, active = false) { onKey(modified("@")) }
             Spacer(Modifier.weight(1f))
-            TermKey("PgUp", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\u001B[5~") }
-            TermKey("PgDn", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\u001B[6~") }
             TermKey("RET", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\r") }
             TermKey("↑",   KEY_W, active = false) { onKey(arrowKey('A')) }
-            TermKey("⌨",   KEYBOARD_W, active = false, fontSize = 15.sp, onClick = onKeyboardToggle)
+            TermKey("⌨",   KEYBOARD_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
         }
 
         Row(
@@ -114,11 +113,10 @@ fun SpecialKeyBar(
             TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
             TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
             Spacer(Modifier.weight(1f))
-            TermKey("TXT", KEY_W, active = false) { onTextInput() }
-            TermKey("PST", KEY_W, active = false) { onPaste() }
             TermKey("←", ARROW_W, active = false) { onKey(arrowKey('D')) }
             TermKey("↓", ARROW_W, active = false) { onKey(arrowKey('B')) }
             TermKey("→", ARROW_W, active = false) { onKey(arrowKey('C')) }
+            TermKey("TXT", TEXT_INPUT_W, active = false, fontSize = 13.sp) { onTextInput() }
         }
     }
 }
