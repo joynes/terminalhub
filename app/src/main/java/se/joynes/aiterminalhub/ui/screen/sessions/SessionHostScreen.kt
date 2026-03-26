@@ -137,13 +137,7 @@ fun SessionHostScreen(
             closedSessions = closedSessions,
             activeId = activeId,
             onSelect = { viewModel.switchToSession(it); terminalViewRef.value?.requestFocus() },
-            onClose = { id ->
-                val tab = projectTabs.firstOrNull { it.sessionId == id } ?: return@SessionHistorySheet
-                viewModel.closeSession(tab.projectId, id)
-            },
             onReopen = { projectId -> viewModel.reopenSession(projectId) },
-            onMoveUp = { idx -> viewModel.moveSession(idx, idx - 1) },
-            onMoveDown = { idx -> viewModel.moveSession(idx, idx + 1) },
             onDismiss = { showSessionHistory = false }
         )
     }

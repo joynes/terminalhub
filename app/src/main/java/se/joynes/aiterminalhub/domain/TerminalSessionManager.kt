@@ -184,6 +184,11 @@ class TerminalSessionManager @Inject constructor(
         val closedMeta = entry.meta.copy(isConnected = false)
         _closedSessions.value = (_closedSessions.value + closedMeta).takeLast(50)
         entry.scope.coroutineContext[Job]?.cancel()
+        if (entry.meta.isTmux && !entry.tmuxSessionName.isNullOrBlank()) {
+            val tmuxSession = entry.tmuxSessionName
+            entry.conn.send("tmux kill-session -t '${tmuxSession.replace("'", "'\\''")}'\n")
+            logger.log(LogLevel.INFO, TAG, "Requested tmux kill for close: sessionId=${id.value} tmuxSession=$tmuxSession")
+        }
         sshManager.destroySession(id.value)
         publishSessions()
 

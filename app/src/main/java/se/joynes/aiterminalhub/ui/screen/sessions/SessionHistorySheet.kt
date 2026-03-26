@@ -28,10 +28,7 @@ fun SessionHistorySheet(
     closedSessions: List<TerminalSessionMeta>,
     activeId: TerminalSessionId?,
     onSelect: (TerminalSessionId) -> Unit,
-    onClose: (TerminalSessionId) -> Unit,
     onReopen: (Long) -> Unit,
-    onMoveUp: (Int) -> Unit,
-    onMoveDown: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
     var tick by remember { mutableLongStateOf(0L) }
@@ -47,7 +44,7 @@ fun SessionHistorySheet(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                "SESSIONS",
+                "RECENT PROJECTS",
                 fontFamily = MonoFontFamily,
                 color = MegaDrivePrimary,
                 fontSize = 13.sp,
@@ -74,16 +71,10 @@ fun SessionHistorySheet(
                 // Active sessions
                 if (sorted.isNotEmpty()) {
                     itemsIndexed(sorted) { _, meta ->
-                        val tabIndex = sessions.indexOf(meta)
                         SessionHistoryItem(
                             meta = meta,
                             isActive = meta.id == activeId,
-                            tabIndex = tabIndex,
-                            tabCount = sessions.size,
-                            onSelect = { onSelect(meta.id); onDismiss() },
-                            onClose = { onClose(meta.id) },
-                            onMoveUp = { if (tabIndex > 0) onMoveUp(tabIndex) },
-                            onMoveDown = { if (tabIndex < sessions.size - 1) onMoveDown(tabIndex) }
+                            onSelect = { onSelect(meta.id); onDismiss() }
                         )
                         HorizontalDivider(color = MegaDriveDim.copy(alpha = 0.4f))
                     }
@@ -119,12 +110,7 @@ fun SessionHistorySheet(
 private fun SessionHistoryItem(
     meta: TerminalSessionMeta,
     isActive: Boolean,
-    tabIndex: Int,
-    tabCount: Int,
-    onSelect: () -> Unit,
-    onClose: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit
+    onSelect: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -152,16 +138,6 @@ private fun SessionHistoryItem(
                 fontSize = 9.sp
             )
         }
-        Spacer(Modifier.width(8.dp))
-        Column {
-            Text("▲", color = if (tabIndex > 0) MegaDrivePrimary else MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily,
-                modifier = Modifier.clickable(enabled = tabIndex > 0, onClick = onMoveUp))
-            Text("▼", color = if (tabIndex < tabCount - 1) MegaDrivePrimary else MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily,
-                modifier = Modifier.clickable(enabled = tabIndex < tabCount - 1, onClick = onMoveDown))
-        }
-        Spacer(Modifier.width(12.dp))
-        Text("✕", color = MegaDriveAccent, fontSize = 12.sp, fontFamily = MonoFontFamily,
-            modifier = Modifier.clickable(onClick = onClose))
     }
 }
 
@@ -189,7 +165,7 @@ private fun ClosedSessionItem(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                "closed ${formatRelativeTime(meta.lastOpenedAt)}",
+                "last opened ${formatRelativeTime(meta.lastOpenedAt)}",
                 fontFamily = MonoFontFamily,
                 color = MegaDriveDim.copy(alpha = 0.6f),
                 fontSize = 9.sp
