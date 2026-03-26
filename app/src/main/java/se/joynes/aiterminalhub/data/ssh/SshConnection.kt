@@ -53,6 +53,7 @@ class SshConnection @Inject constructor(
     @Volatile private var lastRxAtMs: Long? = null
     @Volatile private var lastTxAtMs: Long? = null
     @Volatile private var lastResizeAtMs: Long? = null
+    @Volatile private var disconnectReason: String? = null
 
     private val permissiveHostKeyVerifier = object : ExtendedServerHostKeyVerifier() {
         override fun verifyServerHostKey(
@@ -111,11 +112,13 @@ class SshConnection @Inject constructor(
                 sess.startShell()
                 shellSession = sess
                 outputStream = sess.stdin
+                disconnectReason = null
                 _connected.value = true
                 logger.log(LogLevel.INFO, TAG, "Shell channel opened snapshot=${debugSnapshot()}")
                 readOutput(sess)
             } catch (e: Exception) {
                 logger.log(LogLevel.ERROR, TAG, "Connection failed: ${e.message} snapshot=${debugSnapshot()}")
+                disconnectReason = "connect-failed:${e.javaClass.simpleName}"
                 _connected.value = false
             }
         }
@@ -207,6 +210,7 @@ class SshConnection @Inject constructor(
 
                     if ((conditions and ChannelCondition.EOF) != 0) {
                         val exitStatus = try { session.exitStatus } catch (_: Exception) { null }
+                        disconnectReason = "read-loop-eof:${describeConditions(conditions)}:exit=$exitStatus"
                         logger.log(
                             LogLevel.WARN,
                             TAG,
@@ -216,12 +220,14 @@ class SshConnection @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                disconnectReason = "read-loop-exception:${e.javaClass.simpleName}"
                 logger.log(LogLevel.WARN, TAG, "SSH read loop exception: ${e.javaClass.simpleName}: ${e.message} snapshot=${debugSnapshot()}\n${e.stackTraceToString()}")
             }
             val reason = if (!_connected.value) "connected=false" else "loop-exit"
+            if (disconnectReason == null) disconnectReason = "read-loop-ended:$reason"
             _connected.value = false
             val exitStatus = try { session.exitStatus } catch (_: Exception) { null }
-            logger.log(LogLevel.INFO, TAG, "SSH read loop ended (reason=$reason, exitStatus=${exitStatus}, session=${System.identityHashCode(session)}, snapshot=${debugSnapshot()})")
+            logger.log(LogLevel.INFO, TAG, "SSH read loop ended (reason=$reason, disconnectReason=$disconnectReason, exitStatus=${exitStatus}, session=${System.identityHashCode(session)}, snapshot=${debugSnapshot()})")
         }
     }
 
@@ -284,6 +290,7 @@ class SshConnection @Inject constructor(
     }
 
     fun disconnect() {
+        disconnectReason = "disconnect()"
         _connected.value = false
         scope.launch {
             logger.log(
@@ -325,6 +332,7 @@ class SshConnection @Inject constructor(
             append(",lastRxAgoMs=").append(lastRxAtMs?.let { now - it })
             append(",lastTxAgoMs=").append(lastTxAtMs?.let { now - it })
             append(",lastResizeAgoMs=").append(lastResizeAtMs?.let { now - it })
+            append(",disconnectReason=").append(disconnectReason)
         }
     }
 

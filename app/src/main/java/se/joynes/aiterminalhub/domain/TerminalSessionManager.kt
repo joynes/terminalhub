@@ -126,10 +126,26 @@ class TerminalSessionManager @Inject constructor(
         scope.launch {
             var wasConnected = false
             conn.connected.collect { connected ->
+                logger.log(
+                    LogLevel.INFO,
+                    TAG,
+                    "conn.connected update: sessionId=$sessionId project=$projectName connected=$connected wasConnected=$wasConnected terminalRunning=${terminalSession.isRunning} conn=${conn.debugSnapshot()} manager=${debugSnapshot()}"
+                )
                 if (connected) {
                     wasConnected = true
                 } else if (wasConnected && terminalSession.isRunning) {
+                    logger.log(
+                        LogLevel.WARN,
+                        TAG,
+                        "notifyRemoteProcessExit(0): sessionId=$sessionId project=$projectName tmux=$isTmux tmuxSession=$tmuxSessionName conn=${conn.debugSnapshot()} manager=${debugSnapshot()}"
+                    )
                     terminalSession.notifyRemoteProcessExit(0)
+                } else if (!connected) {
+                    logger.log(
+                        LogLevel.INFO,
+                        TAG,
+                        "connected=false ignored: sessionId=$sessionId project=$projectName wasConnected=$wasConnected terminalRunning=${terminalSession.isRunning}"
+                    )
                 }
             }
         }
