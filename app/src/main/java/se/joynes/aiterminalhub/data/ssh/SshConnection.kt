@@ -125,10 +125,11 @@ class SshConnection @Inject constructor(
     }
 
     /** Run a command silently via a non-PTY exec channel and wait for it to finish. */
-    suspend fun runSilent(command: String) {
-        val conn = connection ?: return
-        withContext(Dispatchers.IO) {
+    suspend fun runSilent(command: String): String {
+        val conn = connection ?: return ""
+        return withContext(Dispatchers.IO) {
             var session: Session? = null
+            val stdoutText = StringBuilder()
             try {
                 session = conn.openSession()
                 session.execCommand("bash -lc '${command.replace("'", "'\\''")}'")
@@ -136,7 +137,10 @@ class SshConnection @Inject constructor(
                 val stderr = session.stderr
                 val buf = ByteArray(1024)
                 while (true) {
-                    while ((stdout?.available() ?: 0) > 0) stdout?.read(buf)
+                    while ((stdout?.available() ?: 0) > 0) {
+                        val n = stdout?.read(buf) ?: 0
+                        if (n > 0) stdoutText.append(String(buf, 0, n))
+                    }
                     while ((stderr?.available() ?: 0) > 0) {
                         val n = stderr?.read(buf) ?: 0
                         if (n > 0) logger.log(LogLevel.WARN, TAG, "Setup stderr: ${String(buf, 0, n)}")
@@ -154,6 +158,7 @@ class SshConnection @Inject constructor(
             } finally {
                 session?.close()
             }
+            stdoutText.toString()
         }
     }
 

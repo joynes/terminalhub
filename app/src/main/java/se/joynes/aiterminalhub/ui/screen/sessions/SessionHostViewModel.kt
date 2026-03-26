@@ -118,7 +118,12 @@ class SessionHostViewModel @Inject constructor(
                 return@launch
             }
             // 1. Silent exec: mkdir + create tmux session if needed
-            if (setupCmd.isNotBlank()) conn.runSilent(setupCmd)
+            val setupOutput = if (setupCmd.isNotBlank()) conn.runSilent(setupCmd) else ""
+            val shouldRunStartupCommands = if (project.useTmux) {
+                setupOutput.contains("TMUX_SESSION_CREATED")
+            } else {
+                true
+            }
             // 2. Wait for the interactive shell banner/prompt to settle before sending commands.
             conn.awaitOutputQuiescence(requireNewOutput = true)
 
@@ -143,13 +148,13 @@ class SessionHostViewModel @Inject constructor(
 
             // 4. Wait until attach/plain shell traffic settles, then run the custom script.
             conn.awaitTransportQuiescence()
-            if (customScript.isNotBlank()) {
+            if (shouldRunStartupCommands && customScript.isNotBlank()) {
                 conn.send("$customScript\n")
                 conn.awaitTransportQuiescence()
             }
 
             // 5. AI tool last, after prior command output settles.
-            if (aiCmd.isNotBlank()) {
+            if (shouldRunStartupCommands && aiCmd.isNotBlank()) {
                 conn.awaitTransportQuiescence()
                 conn.send("$aiCmd\n")
             }

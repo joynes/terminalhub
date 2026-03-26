@@ -21,11 +21,16 @@ class ScriptTemplateEngine @Inject constructor() {
         val session = sessionName(project)
         return if (project.useTmux) {
             "mkdir -p $path 2>/dev/null; " +
-            "(tmux has-session -t $session 2>/dev/null && " +
-            "tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1 && " +
-            "tmux kill-session -t $session 2>/dev/null); " +
-            "tmux has-session -t $session 2>/dev/null || " +
-            "tmux new-session -d -s $session -c $path; " +
+            "if tmux has-session -t $session 2>/dev/null; then " +
+            "if tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1; then " +
+            "tmux kill-session -t $session 2>/dev/null; " +
+            "tmux new-session -d -s $session -c $path && echo TMUX_SESSION_CREATED; " +
+            "else " +
+            "echo TMUX_SESSION_EXISTS; " +
+            "fi; " +
+            "else " +
+            "tmux new-session -d -s $session -c $path && echo TMUX_SESSION_CREATED; " +
+            "fi; " +
             renderTmuxTouchScrollSetup(session)
         } else {
             "mkdir -p $path 2>/dev/null"
