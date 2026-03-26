@@ -175,6 +175,7 @@ fun SessionHostScreen(
                         activeId = activeId,
                         onSelect = { viewModel.switchToSession(it); terminalViewRef.value?.requestFocus() },
                         onClose = { projectId, sessionId -> viewModel.closeSession(projectId, sessionId) },
+                        onMove = { fromIndex, toIndex -> viewModel.moveSession(fromIndex, toIndex) },
                         onAddProject = onAddProject,
                         modifier = Modifier.weight(1f)
                     )

@@ -2,11 +2,15 @@ package se.joynes.aiterminalhub.ui.navigation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,22 +32,26 @@ private fun tabColor(seed: Int, active: Boolean): Color {
         Color.hsl(hue, saturation = 0.30f, lightness = 0.12f)
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SessionTabBar(
     tabs: List<ProjectTabState>,
     activeId: TerminalSessionId?,
     onSelect: (TerminalSessionId) -> Unit,
     onClose: (Long, TerminalSessionId?) -> Unit,
+    onMove: (Int, Int) -> Unit,
     onAddProject: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var menuTabIndex by remember { mutableStateOf<Int?>(null) }
+
     LazyRow(
         modifier = modifier
             .background(MegaDriveSurface)
             .height(28.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        items(tabs) { tab ->
+        itemsIndexed(tabs) { index, tab ->
             val isSelected = tab.sessionId != null && tab.sessionId == activeId
             val bg = tabColor(tab.colorSeed, isSelected)
             val textColor = when {
@@ -51,32 +59,71 @@ fun SessionTabBar(
                 tab.isConnected -> Color.White.copy(alpha = 0.65f)
                 else            -> Color.White.copy(alpha = 0.28f)
             }
-            Row(
-                modifier = Modifier
-                    .width(TAB_WIDTH_DP.dp)
-                    .fillMaxHeight()
-                    .background(bg)
-                    .clickable { tab.sessionId?.let { onSelect(it) } }
-                    .padding(start = 7.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text(
-                    text = tab.projectName.uppercase(),
-                    color = textColor,
-                    fontSize = 9.sp,
-                    fontFamily = MonoFontFamily,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "×",
-                    color = Color.White.copy(alpha = 0.40f),
-                    fontSize = 11.sp,
-                    fontFamily = MonoFontFamily,
-                    modifier = Modifier.clickable { onClose(tab.projectId, tab.sessionId) }
-                )
+            Box {
+                Row(
+                    modifier = Modifier
+                        .width(TAB_WIDTH_DP.dp)
+                        .fillMaxHeight()
+                        .background(bg)
+                        .combinedClickable(
+                            onClick = { tab.sessionId?.let { onSelect(it) } },
+                            onLongClick = { menuTabIndex = index }
+                        )
+                        .padding(start = 7.dp, end = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = tab.projectName.uppercase(),
+                        color = textColor,
+                        fontSize = 9.sp,
+                        fontFamily = MonoFontFamily,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuTabIndex == index,
+                    onDismissRequest = { menuTabIndex = null }
+                ) {
+                    DropdownMenuItem(
+                        text = {
+                            Text("Close", color = Color.White, fontFamily = MonoFontFamily, fontSize = 12.sp)
+                        },
+                        onClick = {
+                            menuTabIndex = null
+                            onClose(tab.projectId, tab.sessionId)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Move Left",
+                                color = if (index > 0) Color.White else MegaDriveDim,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 12.sp
+                            )
+                        },
+                        onClick = {
+                            menuTabIndex = null
+                            if (index > 0) onMove(index, index - 1)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Move Right",
+                                color = if (index < tabs.lastIndex) Color.White else MegaDriveDim,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 12.sp
+                            )
+                        },
+                        onClick = {
+                            menuTabIndex = null
+                            if (index < tabs.lastIndex) onMove(index, index + 1)
+                        }
+                    )
+                }
             }
         }
         item {
