@@ -351,7 +351,8 @@ fun SessionHostScreen(
                     if (showTextInput) {
                         FloatingTextInputDialog(
                             onSend = { text ->
-                                viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
+                                val payload = if (text.endsWith("\n") || text.endsWith("\r")) text else "$text\r"
+                                viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
                             },
                             onDismiss = {
                                 showTextInput = false

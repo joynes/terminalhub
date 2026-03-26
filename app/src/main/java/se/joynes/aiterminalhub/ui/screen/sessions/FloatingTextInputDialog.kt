@@ -45,7 +45,7 @@ fun FloatingTextInputDialog(
     val panelWidthPx   = with(density) { panelWidthDp.toPx() }
 
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
-    var offsetY by remember { mutableFloatStateOf(screenHeightPx * 0.15f) }
+    var offsetY by remember { mutableFloatStateOf(screenHeightPx * 0.62f) }
     var text    by remember { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
 
