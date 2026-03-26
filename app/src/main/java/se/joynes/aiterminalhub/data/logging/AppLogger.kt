@@ -40,6 +40,7 @@ class AppLogger @Inject constructor(
                 LogLevel.ERROR -> Log.e(tag, msg)
             }
         } catch (_: RuntimeException) { /* Android stub not available in unit tests */ }
+        if (level == LogLevel.TRACE) return
         scope.launch {
             _logFlow.emit(entity)
             try { appLogDao.insert(entity) } catch (_: Exception) {}

@@ -168,9 +168,9 @@ class SshConnection @Inject constructor(
                     return@launch
                 }
                 lastResizeAtMs = System.currentTimeMillis()
-                logger.log(LogLevel.DEBUG, TAG, "PTY resize requested: cols=${cols} rows=${rows} session=${System.identityHashCode(sess)} connected=${_connected.value} snapshot=${debugSnapshot()}")
+                logger.log(LogLevel.TRACE, TAG, "PTY resize requested: cols=${cols} rows=${rows} session=${System.identityHashCode(sess)} connected=${_connected.value} snapshot=${debugSnapshot()}")
                 sess.resizePTY(cols, rows, 0, 0)
-                logger.log(LogLevel.DEBUG, TAG, "PTY resize: ${cols}x${rows}")
+                logger.log(LogLevel.TRACE, TAG, "PTY resize: ${cols}x${rows}")
             } catch (e: Exception) {
                 logger.log(LogLevel.WARN, TAG, "PTY resize failed: ${e.javaClass.simpleName}: ${e.message} snapshot=${debugSnapshot()}")
             }

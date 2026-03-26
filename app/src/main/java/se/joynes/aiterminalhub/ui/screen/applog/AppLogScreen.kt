@@ -5,10 +5,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -39,6 +40,7 @@ fun AppLogScreen(
     val selectedLevel by viewModel.selectedLevel.collectAsState()
     val autoScroll by viewModel.autoScroll.collectAsState()
     val listState = rememberLazyListState()
+    val clipboardManager = LocalClipboardManager.current
 
     LaunchedEffect(logs.size, autoScroll) {
         if (autoScroll && logs.isNotEmpty()) {
@@ -52,6 +54,11 @@ fun AppLogScreen(
                 title = "APP LOG",
                 onBack = onBack,
                 actions = {
+                    IconButton(onClick = {
+                        clipboardManager.setText(AnnotatedString(formatLogsForClipboard(logs)))
+                    }) {
+                        Text("COPY", color = MegaDrivePrimary, fontSize = 9.sp, fontFamily = MonoFontFamily)
+                    }
                     IconButton(onClick = { viewModel.export() }) {
                         Text("EXP", color = MegaDriveWarning, fontSize = 10.sp, fontFamily = MonoFontFamily)
                     }
@@ -106,16 +113,14 @@ fun AppLogScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            SelectionContainer(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    items(logs, key = { it.id }) { entry ->
-                        LogEntryRow(entry)
-                    }
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                items(logs, key = { it.id }) { entry ->
+                    LogEntryRow(entry)
                 }
             }
         }
@@ -138,4 +143,28 @@ private fun LogEntryRow(entry: AppLogEntry) {
         Text("[${entry.tag}]", color = MegaDriveDim, fontSize = 9.sp, fontFamily = MonoFontFamily)
         Text(entry.message, color = MegaDriveOnSurface, fontSize = 9.sp, fontFamily = MonoFontFamily, modifier = Modifier.weight(1f))
     }
+}
+
+private fun formatLogsForClipboard(logs: List<AppLogEntry>, maxChars: Int = 200_000): String {
+    val builder = StringBuilder()
+    var truncated = false
+    for (entry in logs) {
+        val line = buildString {
+            append(TIME_FMT.format(Date(entry.timestamp)))
+            append(' ')
+            append(entry.level)
+            append(" [")
+            append(entry.tag)
+            append("] ")
+            append(entry.message)
+            append('\n')
+        }
+        if (builder.length + line.length > maxChars) {
+            truncated = true
+            break
+        }
+        builder.append(line)
+    }
+    if (truncated) builder.append("\n[truncated to ").append(maxChars).append(" chars]\n")
+    return builder.toString()
 }

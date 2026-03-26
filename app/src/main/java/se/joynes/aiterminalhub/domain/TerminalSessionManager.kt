@@ -108,7 +108,7 @@ class TerminalSessionManager @Inject constructor(
             override fun onTerminalInput(data: ByteArray, offset: Int, count: Int): Boolean {
                 if (count <= 0) return true
                 if (shouldSuppressTerminalReply(data, offset, count)) {
-                    logger.log(LogLevel.DEBUG, TAG, "Suppressed terminal reply for remote session: ${describeBytes(data, offset, count)}")
+                    logger.log(LogLevel.TRACE, TAG, "Suppressed terminal reply for remote session: ${describeBytes(data, offset, count)}")
                     return true
                 }
                 conn.sendBytes(data.copyOfRange(offset, offset + count))
