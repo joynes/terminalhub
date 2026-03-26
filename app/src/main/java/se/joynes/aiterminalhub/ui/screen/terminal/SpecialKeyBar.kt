@@ -19,6 +19,7 @@ import se.joynes.aiterminalhub.ui.theme.*
 
 private val KEY_H   = 34.dp
 private val KEY_W   = 34.dp   // regular key (reduced to fit 10 keys per row)
+private val ESC_W   = 46.dp
 private val KEYBOARD_W = 64.dp
 private val TEXT_INPUT_W = 64.dp
 private val MOD_W   = 52.dp   // CTRL / ALT / SHIFT
@@ -93,7 +94,7 @@ fun SpecialKeyBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            TermKey("ESC", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\u001B") }
+            TermKey("ESC", ESC_W, active = false) { modifierManager.clearTransients(); onKey("\u001B") }
             TermKey("TAB", KEY_W, active = false) { onKey(modified("\t")) }
             TermKey(":",   KEY_W, active = false) { onKey(modified(":")) }
             TermKey("/",   KEY_W, active = false) { onKey(modified("/")) }
