@@ -16,3 +16,7 @@ local.properties
 **/build/
 **/.externalNativeBuild/
 **/.cxx/
+
+# APKs and app bundles
+*.apk
+*.aab
