@@ -64,8 +64,8 @@ fun SpecialKeyBar(
         else "\u001B[1;${modBits + 1}$letter"
     }
 
-    // Row 1:  ESC  TAB  :  /  @  [spacer]  RET  ↑  ⌨
-    // Row 2:  CTRL  ALT  SHIFT  [spacer]  ←  ↓  →  TXT
+    // Row 1:  ESC  TAB  :  /  @  [spacer]  RET  ↑
+    // Row 2:  CTRL  ALT  SHIFT  [spacer]  ⌨  ✎  [spacer]  ←  ↓  →
     // Swipe left/right on the bar to switch tabs.
     Column(
         modifier = Modifier
@@ -102,7 +102,6 @@ fun SpecialKeyBar(
             Spacer(Modifier.weight(1f))
             TermKey("RET", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\r") }
             TermKey("↑",   KEY_W, active = false) { onKey(arrowKey('A')) }
-            TermKey("⌨",   KEYBOARD_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
         }
 
         Row(
@@ -114,10 +113,12 @@ fun SpecialKeyBar(
             TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
             TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
             Spacer(Modifier.weight(1f))
+            TermKey("⌨", KEYBOARD_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
+            TermKey("✎", TEXT_INPUT_W, active = false, fontSize = 18.sp) { onTextInput() }
+            Spacer(Modifier.weight(1f))
             TermKey("←", ARROW_W, active = false) { onKey(arrowKey('D')) }
             TermKey("↓", ARROW_W, active = false) { onKey(arrowKey('B')) }
             TermKey("→", ARROW_W, active = false) { onKey(arrowKey('C')) }
-            TermKey("TXT", TEXT_INPUT_W, active = false, fontSize = 13.sp) { onTextInput() }
         }
     }
 }
