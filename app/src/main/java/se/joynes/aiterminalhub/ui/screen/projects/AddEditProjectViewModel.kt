@@ -14,6 +14,7 @@ data class AddEditProjectState(
     val useTmux: Boolean = true,
     val customScript: String = "cd {{PROJECT_PATH}}",
     val aiCommand: String = "",
+    val gitUrl: String = "",
     val saved: Boolean = false
 )
 
@@ -36,7 +37,8 @@ class AddEditProjectViewModel @Inject constructor(
                 name = p.name,
                 useTmux = p.useTmux,
                 customScript = p.customScript,
-                aiCommand = p.aiCommand
+                aiCommand = p.aiCommand,
+                gitUrl = p.gitUrl
             )
         }
     }
@@ -54,7 +56,8 @@ class AddEditProjectViewModel @Inject constructor(
                 name = s.name,
                 useTmux = s.useTmux,
                 customScript = s.customScript,
-                aiCommand = s.aiCommand
+                aiCommand = s.aiCommand,
+                gitUrl = s.gitUrl
             )
             if (editingId != null) repo.update(project) else repo.save(project)
             _state.value = s.copy(saved = true)

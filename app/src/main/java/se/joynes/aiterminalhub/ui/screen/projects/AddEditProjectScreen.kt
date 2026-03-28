@@ -62,6 +62,18 @@ fun AddEditProjectScreen(
                 color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
             )
 
+            // ── GIT REPO URL ──────────────────────────────────────────────
+            RetroTextField(
+                state.gitUrl,
+                { viewModel.update { copy(gitUrl = it) } },
+                "Git Repo URL (optional)",
+                Modifier.fillMaxWidth()
+            )
+            Text(
+                "If set, the repo will be cloned into the project folder on first connect.",
+                color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
+            )
+
             // ── USE TMUX ──────────────────────────────────────────────────
             Spacer(Modifier.height(4.dp))
             Row(

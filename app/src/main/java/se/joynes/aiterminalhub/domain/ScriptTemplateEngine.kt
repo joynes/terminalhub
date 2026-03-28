@@ -15,12 +15,17 @@ class ScriptTemplateEngine @Inject constructor() {
     fun sessionName(project: Project): String =
         project.name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
-    /** Silent exec: mkdir + create tmux session if useTmux, otherwise just mkdir. */
+    /** Silent exec: mkdir + optional git clone + create tmux session if useTmux. */
     fun renderSetup(server: Server, project: Project): String {
         val path = projectPath(server, project)
         val session = sessionName(project)
+        val gitClone = if (project.gitUrl.isNotBlank()) {
+            val safeUrl = project.gitUrl.replace("'", "'\\''")
+            "if [ ! -d '$path/.git' ]; then git clone '$safeUrl' '$path' 2>/dev/null || true; fi; "
+        } else ""
         return if (project.useTmux) {
             "mkdir -p $path 2>/dev/null; " +
+            gitClone +
             "if tmux has-session -t $session 2>/dev/null; then " +
             "if tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1; then " +
             "tmux kill-session -t $session 2>/dev/null; " +
@@ -33,7 +38,7 @@ class ScriptTemplateEngine @Inject constructor() {
             "fi; " +
             renderTmuxTouchScrollSetup(session)
         } else {
-            "mkdir -p $path 2>/dev/null"
+            "mkdir -p $path 2>/dev/null; " + gitClone.trimEnd()
         }
     }
 

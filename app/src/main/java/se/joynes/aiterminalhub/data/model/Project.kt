@@ -7,5 +7,6 @@ data class Project(
     val useTmux: Boolean = true,
     val customScript: String = "cd {{PROJECT_PATH}}",
     val aiCommand: String = "",
-    val colorSeed: Int = 0
+    val colorSeed: Int = 0,
+    val gitUrl: String = ""
 )

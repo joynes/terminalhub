@@ -25,6 +25,6 @@ class ProjectRepository @Inject constructor(
 
     suspend fun delete(project: Project) = dao.delete(project.toEntity())
 
-    private fun ProjectEntity.toModel() = Project(id, serverId, name, useTmux, customScript, aiCommand, colorSeed)
-    private fun Project.toEntity() = ProjectEntity(id, serverId, name, useTmux, customScript, aiCommand, colorSeed)
+    private fun ProjectEntity.toModel() = Project(id, serverId, name, useTmux, customScript, aiCommand, colorSeed, gitUrl)
+    private fun Project.toEntity() = ProjectEntity(id, serverId, name, useTmux, customScript, aiCommand, colorSeed, gitUrl = gitUrl)
 }

@@ -13,7 +13,7 @@ import se.joynes.aiterminalhub.data.db.entity.*
         AppLogEntity::class,
         TextInputHistoryEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

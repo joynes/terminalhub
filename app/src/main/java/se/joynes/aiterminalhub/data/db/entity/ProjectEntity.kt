@@ -12,5 +12,6 @@ data class ProjectEntity(
     val customScript: String = "cd {{PROJECT_PATH}}",
     val aiCommand: String = "",
     val colorSeed: Int = (Math.random() * Int.MAX_VALUE).toInt(),
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val gitUrl: String = ""
 )
