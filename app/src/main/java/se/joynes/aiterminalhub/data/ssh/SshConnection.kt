@@ -254,8 +254,9 @@ class SshConnection @Inject constructor(
             var sess: Session? = null
             try {
                 sess = conn.openSession()
-                // Start remote scp in sink mode inside the target directory
-                sess.execCommand("scp -t \"$remoteDir\"")
+                // Wrap in bash -lc so that ~ is expanded (raw execCommand has no shell)
+                val sanitized = remoteDir.replace("'", "'\\''")
+                sess.execCommand("bash -lc 'scp -t \"$sanitized\"'")
                 val toRemote   = sess.stdin   // we write SCP frames here
                 val fromRemote = sess.stdout  // we read acknowledgements here
 
