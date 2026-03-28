@@ -30,9 +30,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.aiterminalhub.ui.screen.upload.FileUploadViewModel
 import se.joynes.aiterminalhub.ui.screen.upload.FloatingFileUploadDialog
 import com.termux.view.TerminalView
-import se.joynes.aiterminalhub.data.logging.AppLogger
-import se.joynes.aiterminalhub.data.logging.LogEvent
-import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
 import se.joynes.aiterminalhub.ui.screen.terminal.MutableModifierManager
@@ -56,10 +53,6 @@ fun SessionHostScreen(
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
-    val logger = remember { dagger.hilt.android.EntryPointAccessors.fromApplication(
-        context.applicationContext,
-        SessionHostScreenLoggerEntryPoint::class.java
-    ).appLogger() }
 
     var keyboardVisible by remember { mutableStateOf(true) }
     var showSessionHistory by remember { mutableStateOf(false) }
@@ -128,12 +121,6 @@ fun SessionHostScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             val tv = terminalViewRef.value
-            logger.log(
-                LogLevel.INFO,
-                "SessionHostScreen",
-                "Lifecycle event: $event screen=${System.identityHashCode(lifecycleOwner)} activeId=${currentActiveId?.value} terminalView=${tv?.let { System.identityHashCode(it) }} terminalSession=${currentSession?.let { System.identityHashCode(it) }} vm={${currentViewModel.debugSnapshot()}}",
-                LogEvent.AppEvent("session_host_$event")
-            )
             if (event == Lifecycle.Event.ON_RESUME && currentSession != null) {
                 keyboardVisible = true
                 tv?.requestFocus()
@@ -424,8 +411,3 @@ fun SessionHostScreen(
     }
 }
 
-@dagger.hilt.EntryPoint
-@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
-interface SessionHostScreenLoggerEntryPoint {
-    fun appLogger(): AppLogger
-}

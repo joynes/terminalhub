@@ -17,9 +17,7 @@ class ServerStatusPoller @Inject constructor(
     fun pollStatus(session: Session, serverId: Long, intervalMs: Long = 5000L): Flow<ServerStatus> = flow {
         while (true) {
             try {
-                val status = fetchStatus(session, serverId)
-                emit(status)
-                logger.log(LogLevel.DEBUG, TAG, "Status: cpu=${status.cpuPercent}% ram=${status.ramPercent}% disk=${status.diskPercent}%")
+                emit(fetchStatus(session, serverId))
             } catch (e: Exception) {
                 logger.log(LogLevel.WARN, TAG, "Poll failed: ${e.message}")
             }

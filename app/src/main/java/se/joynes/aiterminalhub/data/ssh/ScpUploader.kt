@@ -55,8 +55,11 @@ class ScpUploader @Inject constructor(private val logger: AppLogger) {
 
                 val sess = conn.openSession()
                 try {
-                    val sanitized = remoteDir.replace("'", "'\\''")
-                    sess.execCommand("bash -lc 'scp -t \"$sanitized\"'")
+                    // Expand leading ~ via $HOME (tilde is NOT expanded inside double-quotes in bash,
+                    // but $HOME is). Use bash -c (not -lc) to avoid login profile output on stdout.
+                    val expandedDir = if (remoteDir.startsWith("~/")) "\$HOME${remoteDir.substring(1)}" else remoteDir
+                    val sanitized = expandedDir.replace("'", "'\\''")
+                    sess.execCommand("bash -c 'scp -t \"$sanitized\"'")
 
                     val toRemote   = sess.stdin
                     val fromRemote = sess.stdout

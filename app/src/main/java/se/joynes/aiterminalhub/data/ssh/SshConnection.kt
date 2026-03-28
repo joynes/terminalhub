@@ -79,23 +79,17 @@ class SshConnection @Inject constructor(
                 connectAttempt += 1
                 serverLabel = "${server.username}@${server.host}:${server.port}"
                 logger.log(
-                    LogLevel.DEBUG,
+                    LogLevel.INFO,
                     TAG,
-                    "Connecting to ${server.host}:${server.port} instance=$instanceId sessionId=$sessionId attempt=$connectAttempt ageMs=${System.currentTimeMillis() - createdAtMs}",
+                    "Connecting to $serverLabel",
                     LogEvent.SshConnect(server.host, server.port)
                 )
 
                 val conn = Connection(server.host, server.port)
                 conn.connect(permissiveHostKeyVerifier)
-                logger.log(
-                    LogLevel.DEBUG,
-                    TAG,
-                    "SSH transport connected: connection=${System.identityHashCode(conn)} instance=$instanceId sessionId=$sessionId server=$serverLabel"
-                )
 
                 val authenticated = when {
                     !privateKeyPem.isNullOrBlank() -> {
-                        logger.log(LogLevel.DEBUG, TAG, "Using SSH key auth")
                         val keyPair = PEMDecoder.decode(privateKeyPem.toCharArray(), null)
                         conn.authenticateWithPublicKey(server.username, keyPair)
                     }
@@ -107,20 +101,18 @@ class SshConnection @Inject constructor(
 
                 connection = conn
                 connectedAtMs = System.currentTimeMillis()
-                logger.log(LogLevel.INFO, TAG, "SSH session established to ${server.host} snapshot=${debugSnapshot()}")
 
                 val sess = conn.openSession()
-                logger.log(LogLevel.DEBUG, TAG, "Shell session opened: session=${System.identityHashCode(sess)}")
                 sess.requestPTY("xterm-256color", 80, 24, 0, 0, null)
                 sess.startShell()
                 shellSession = sess
                 outputStream = sess.stdin
                 disconnectReason = null
                 _connected.value = true
-                logger.log(LogLevel.INFO, TAG, "Shell channel opened snapshot=${debugSnapshot()}")
+                logger.log(LogLevel.INFO, TAG, "Connected to $serverLabel")
                 readOutput(sess)
             } catch (e: Exception) {
-                logger.log(LogLevel.ERROR, TAG, "Connection failed: ${e.message} snapshot=${debugSnapshot()}")
+                logger.log(LogLevel.ERROR, TAG, "Connection failed to $serverLabel: ${e.message}")
                 disconnectReason = "connect-failed:${e.javaClass.simpleName}"
                 _connected.value = false
             }
@@ -155,7 +147,7 @@ class SshConnection @Inject constructor(
                     if ((conditions and (ChannelCondition.EOF or ChannelCondition.CLOSED)) != 0) break
                     delay(50)
                 }
-                logger.log(LogLevel.DEBUG, TAG, "Silent exec done (exit=${session.exitStatus}): $command")
+                if (session.exitStatus != 0) logger.log(LogLevel.WARN, TAG, "Silent exec exit ${session.exitStatus}: $command")
             } catch (e: Exception) {
                 logger.log(LogLevel.WARN, TAG, "Silent exec failed: ${e.message}")
             } finally {
@@ -167,23 +159,13 @@ class SshConnection @Inject constructor(
 
     /** Notify the server that the terminal has been resized. */
     fun resizePty(cols: Int, rows: Int) {
-        if (cols <= 0 || rows <= 0) {
-            logger.log(LogLevel.WARN, TAG, "PTY resize ignored: invalid ${cols}x${rows}")
-            return
-        }
+        if (cols <= 0 || rows <= 0) return
         scope.launch {
             try {
-                val sess = shellSession
-                if (sess == null) {
-                    logger.log(LogLevel.WARN, TAG, "PTY resize skipped: no shell session cols=${cols} rows=${rows} snapshot=${debugSnapshot()}")
-                    return@launch
-                }
+                val sess = shellSession ?: return@launch
                 lastResizeAtMs = System.currentTimeMillis()
-                logger.log(LogLevel.TRACE, TAG, "PTY resize requested: cols=${cols} rows=${rows} session=${System.identityHashCode(sess)} connected=${_connected.value} snapshot=${debugSnapshot()}")
                 sess.resizePTY(cols, rows, 0, 0)
-                logger.log(LogLevel.TRACE, TAG, "PTY resize: ${cols}x${rows}")
-            } catch (e: Exception) {
-                logger.log(LogLevel.WARN, TAG, "PTY resize failed: ${e.javaClass.simpleName}: ${e.message} snapshot=${debugSnapshot()}")
+            } catch (_: Exception) {
             }
         }
     }
@@ -192,7 +174,6 @@ class SshConnection @Inject constructor(
         scope.launch {
             val buffer = ByteArray(4096)
             try {
-                logger.log(LogLevel.DEBUG, TAG, "SSH read loop started snapshot=${debugSnapshot()}")
                 while (_connected.value) {
                     val conditions = session.waitForCondition(
                         ChannelCondition.STDOUT_DATA or ChannelCondition.STDERR_DATA or ChannelCondition.EOF,
@@ -203,7 +184,6 @@ class SshConnection @Inject constructor(
                         val n = session.stdout?.read(buffer) ?: 0
                         if (n > 0) {
                             lastRxAtMs = System.currentTimeMillis()
-                            logger.log(LogLevel.TRACE, TAG, "RX $n bytes", LogEvent.SshReceive(sessionId, n))
                             _output.emit(buffer.copyOf(n))
                             _outputEvents.value += 1
                         }
@@ -219,23 +199,18 @@ class SshConnection @Inject constructor(
                     if ((conditions and ChannelCondition.EOF) != 0) {
                         val exitStatus = try { session.exitStatus } catch (_: Exception) { null }
                         disconnectReason = "read-loop-eof:${describeConditions(conditions)}:exit=$exitStatus"
-                        logger.log(
-                            LogLevel.WARN,
-                            TAG,
-                            "SSH read loop: EOF, connected=${_connected.value}, exitStatus=${exitStatus}, session=${System.identityHashCode(session)}, conditions=${describeConditions(conditions)}, snapshot=${debugSnapshot()}"
-                        )
+                        logger.log(LogLevel.WARN, TAG, "SSH disconnected: exitStatus=$exitStatus")
                         break
                     }
                 }
             } catch (e: Exception) {
                 disconnectReason = "read-loop-exception:${e.javaClass.simpleName}"
-                logger.log(LogLevel.WARN, TAG, "SSH read loop exception: ${e.javaClass.simpleName}: ${e.message} snapshot=${debugSnapshot()}\n${e.stackTraceToString()}")
+                logger.log(LogLevel.WARN, TAG, "SSH read loop error: ${e.javaClass.simpleName}: ${e.message}")
             }
             val reason = if (!_connected.value) "connected=false" else "loop-exit"
             if (disconnectReason == null) disconnectReason = "read-loop-ended:$reason"
             _connected.value = false
             val exitStatus = try { session.exitStatus } catch (_: Exception) { null }
-            logger.log(LogLevel.INFO, TAG, "SSH read loop ended (reason=$reason, disconnectReason=$disconnectReason, exitStatus=${exitStatus}, session=${System.identityHashCode(session)}, snapshot=${debugSnapshot()})")
         }
     }
 
@@ -350,7 +325,6 @@ class SshConnection @Inject constructor(
                     os.write(bytes)
                     os.flush()
                     lastTxAtMs = System.currentTimeMillis()
-                    logger.log(LogLevel.TRACE, TAG, "TX ${bytes.size} bytes ${describeBytes(bytes)}", LogEvent.SshSend(sessionId, bytes.size))
                 } catch (e: Exception) {
                     logger.log(LogLevel.WARN, TAG, "Send failed: ${e.javaClass.simpleName}: ${e.message} snapshot=${debugSnapshot()}")
                 }
@@ -362,11 +336,7 @@ class SshConnection @Inject constructor(
         disconnectReason = "disconnect()"
         _connected.value = false
         scope.launch {
-            logger.log(
-                LogLevel.INFO,
-                TAG,
-                "Disconnect requested: snapshot=${debugSnapshot()}"
-            )
+            logger.log(LogLevel.INFO, TAG, "Disconnecting from $serverLabel")
             try {
                 outputStream?.close()
             } catch (_: Exception) {}
@@ -383,7 +353,7 @@ class SshConnection @Inject constructor(
             shellSession = null
             connection = null
             outputStream = null
-            logger.log(LogLevel.INFO, TAG, "Disconnected snapshot=${debugSnapshot()}")
+            logger.log(LogLevel.INFO, TAG, "Disconnected from $serverLabel")
         }
     }
 

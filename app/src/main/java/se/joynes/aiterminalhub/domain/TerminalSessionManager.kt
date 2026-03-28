@@ -107,10 +107,7 @@ class TerminalSessionManager @Inject constructor(
         val terminalSession = TerminalSession.createRemoteSession(5000, terminalClient, object : TerminalInputListener {
             override fun onTerminalInput(data: ByteArray, offset: Int, count: Int): Boolean {
                 if (count <= 0) return true
-                if (shouldSuppressTerminalReply(data, offset, count)) {
-                    logger.log(LogLevel.TRACE, TAG, "Suppressed terminal reply for remote session: ${describeBytes(data, offset, count)}")
-                    return true
-                }
+                if (shouldSuppressTerminalReply(data, offset, count)) return true
                 conn.sendBytes(data.copyOfRange(offset, offset + count))
                 return true
             }
@@ -126,26 +123,11 @@ class TerminalSessionManager @Inject constructor(
         scope.launch {
             var wasConnected = false
             conn.connected.collect { connected ->
-                logger.log(
-                    LogLevel.INFO,
-                    TAG,
-                    "conn.connected update: sessionId=$sessionId project=$projectName connected=$connected wasConnected=$wasConnected terminalRunning=${terminalSession.isRunning} conn=${conn.debugSnapshot()} manager=${debugSnapshot()}"
-                )
                 if (connected) {
                     wasConnected = true
                 } else if (wasConnected && terminalSession.isRunning) {
-                    logger.log(
-                        LogLevel.WARN,
-                        TAG,
-                        "notifyRemoteProcessExit(0): sessionId=$sessionId project=$projectName tmux=$isTmux tmuxSession=$tmuxSessionName conn=${conn.debugSnapshot()} manager=${debugSnapshot()}"
-                    )
+                    logger.log(LogLevel.WARN, TAG, "SSH lost: $projectName — notifying terminal")
                     terminalSession.notifyRemoteProcessExit(0)
-                } else if (!connected) {
-                    logger.log(
-                        LogLevel.INFO,
-                        TAG,
-                        "connected=false ignored: sessionId=$sessionId project=$projectName wasConnected=$wasConnected terminalRunning=${terminalSession.isRunning}"
-                    )
                 }
             }
         }
@@ -164,7 +146,7 @@ class TerminalSessionManager @Inject constructor(
         )
         entries[sessionId] = SessionEntry(meta, conn, terminalSession, scope, tmuxSessionName)
         publishSessions()
-        logger.log(LogLevel.DEBUG, TAG, "Session registered: $sessionId ($projectName); snapshot=${debugSnapshot()}")
+        logger.log(LogLevel.INFO, TAG, "Session registered: $projectName")
 
         if (_activeId.value == null) switchTo(TerminalSessionId(sessionId))
     }
@@ -176,11 +158,11 @@ class TerminalSessionManager @Inject constructor(
         _activeId.value = id
         _activeSession.value = updated.terminalSession
         publishSessions()
-        logger.log(LogLevel.DEBUG, TAG, "Switched to session: ${id.value}; snapshot=${debugSnapshot()}")
     }
 
     fun close(id: TerminalSessionId) {
         val entry = entries.remove(id.value) ?: return
+        val closedProjectName = entry.meta.projectName
         val closedMeta = entry.meta.copy(isConnected = false)
         _closedSessions.value = (_closedSessions.value + closedMeta).takeLast(50)
         entry.scope.coroutineContext[Job]?.cancel()
@@ -197,7 +179,7 @@ class TerminalSessionManager @Inject constructor(
             _activeId.value = next?.let { TerminalSessionId(it) }
             _activeSession.value = next?.let { entries[it]?.terminalSession }
         }
-        logger.log(LogLevel.DEBUG, TAG, "Session closed: ${id.value}; snapshot=${debugSnapshot()}")
+        logger.log(LogLevel.INFO, TAG, "Session closed: $closedProjectName")
     }
 
     /** Move session at [fromIndex] to [toIndex] in tab bar order. */
