@@ -5,11 +5,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -18,10 +22,8 @@ import androidx.compose.ui.unit.sp
 import se.joynes.aiterminalhub.ui.theme.*
 
 private val KEY_H   = 34.dp
-private val KEY_W   = 34.dp   // regular key (reduced to fit 10 keys per row)
+private val KEY_W   = 34.dp   // regular key
 private val ESC_W   = 46.dp
-private val KEYBOARD_W = 64.dp
-private val TEXT_INPUT_W = 64.dp
 private val MOD_W   = 52.dp   // CTRL / ALT / SHIFT
 private val ARROW_W = 38.dp   // ← ↓ →
 
@@ -104,21 +106,39 @@ fun SpecialKeyBar(
             TermKey("↑",   KEY_W, active = false) { onKey(arrowKey('A')) }
         }
 
-        Row(
+        Box(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
+            contentAlignment = Alignment.Center
         ) {
-            TermKey("CTRL",  MOD_W, active = ctrlActive)  { modifierManager.toggleCtrl() }
-            TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
-            TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
-            Spacer(Modifier.weight(1f))
-            TermKey("⌨", KEYBOARD_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
-            TermKey("✎", TEXT_INPUT_W, active = false, fontSize = 18.sp) { onTextInput() }
-            Spacer(Modifier.weight(1f))
-            TermKey("←", ARROW_W, active = false) { onKey(arrowKey('D')) }
-            TermKey("↓", ARROW_W, active = false) { onKey(arrowKey('B')) }
-            TermKey("→", ARROW_W, active = false) { onKey(arrowKey('C')) }
+            // Left: modifier keys
+            Row(
+                modifier = Modifier.align(Alignment.CenterStart),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TermKey("CTRL",  MOD_W, active = ctrlActive)  { modifierManager.toggleCtrl() }
+                TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
+                TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
+            }
+            // Center: keyboard + text-input icons
+            Row(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TermKey("⌨", KEY_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
+                IconTermKey(Icons.Default.Edit, "text input", KEY_W, onClick = onTextInput)
+            }
+            // Right: arrow keys
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TermKey("←", ARROW_W, active = false) { onKey(arrowKey('D')) }
+                TermKey("↓", ARROW_W, active = false) { onKey(arrowKey('B')) }
+                TermKey("→", ARROW_W, active = false) { onKey(arrowKey('C')) }
+            }
         }
     }
 }
@@ -146,6 +166,31 @@ private fun TermKey(
             fontSize = fontSize,
             fontFamily = MonoFontFamily,
             textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun IconTermKey(
+    icon: ImageVector,
+    contentDescription: String,
+    width: Dp,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .height(KEY_H)
+            .width(width)
+            .clip(RoundedCornerShape(4.dp))
+            .background(MegaDriveBg)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = MegaDrivePrimary,
+            modifier = Modifier.size(18.dp)
         )
     }
 }
