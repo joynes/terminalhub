@@ -6,8 +6,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import com.termux.terminal.TerminalSession
+import se.joynes.aiterminalhub.data.db.dao.TextInputHistoryDao
+import se.joynes.aiterminalhub.data.db.entity.TextInputHistoryEntity
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.model.Project
@@ -41,7 +44,8 @@ class SessionHostViewModel @Inject constructor(
     private val connectToServer: ConnectToServer,
     private val sshManager: SshManager,
     private val engine: ScriptTemplateEngine,
-    val sessionManager: TerminalSessionManager
+    val sessionManager: TerminalSessionManager,
+    private val textInputHistoryDao: TextInputHistoryDao
 ) : ViewModel() {
 
     private val instanceId = System.identityHashCode(this)
@@ -187,6 +191,18 @@ class SessionHostViewModel @Inject constructor(
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)
     fun resizeActivePty(cols: Int, rows: Int) = sessionManager.resizeActivePty(cols, rows)
+
+    /** Returns the last 10 text-input history entries for a given project. */
+    fun textInputHistory(projectId: Long): Flow<List<String>> =
+        textInputHistoryDao.getRecentForProject(projectId)
+            .map { list -> list.map { it.text } }
+
+    fun saveTextInput(projectId: Long, text: String) {
+        viewModelScope.launch {
+            textInputHistoryDao.insert(TextInputHistoryEntity(projectId = projectId, text = text))
+            textInputHistoryDao.pruneOldest(projectId)
+        }
+    }
 
     fun debugSnapshot(): String = buildString {
         append("vm=").append(instanceId)

@@ -62,6 +62,14 @@ fun SessionHostScreen(
     var keyboardVisible by remember { mutableStateOf(true) }
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
+    var showTextInput by remember { mutableStateOf(false) }
+
+    val activeProjectId = remember(activeId, projectTabs) {
+        projectTabs.firstOrNull { it.sessionId == activeId }?.projectId
+    }
+    val textInputHistory by remember(activeProjectId) {
+        activeProjectId?.let { viewModel.textInputHistory(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(initial = emptyList())
 
     // Shared modifier manager: toggles in SpecialKeyBar are read by TerminalViewClientImpl
     val modifierManager = remember { MutableModifierManager() }
@@ -260,8 +268,6 @@ fun SessionHostScreen(
                     }
                 }
             } else {
-                var showTextInput by remember { mutableStateOf(false) }
-
                 // Single active terminal pane
                 Box(
                     modifier = Modifier
@@ -352,6 +358,10 @@ fun SessionHostScreen(
                             onDismiss = {
                                 showTextInput = false
                                 terminalViewRef.value?.requestFocus()
+                            },
+                            history = textInputHistory,
+                            onSaveHistory = { text ->
+                                activeProjectId?.let { viewModel.saveTextInput(it, text) }
                             }
                         )
                     }

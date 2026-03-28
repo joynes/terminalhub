@@ -10,9 +10,10 @@ import se.joynes.aiterminalhub.data.db.entity.*
         ServerEntity::class,
         ProjectEntity::class,
         SessionLogEntity::class,
-        AppLogEntity::class
+        AppLogEntity::class,
+        TextInputHistoryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -20,4 +21,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
     abstract fun sessionLogDao(): SessionLogDao
     abstract fun appLogDao(): AppLogDao
+    abstract fun textInputHistoryDao(): TextInputHistoryDao
 }

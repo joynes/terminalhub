@@ -3,10 +3,13 @@ package se.joynes.aiterminalhub.ui.screen.sessions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -34,7 +37,9 @@ import kotlin.math.roundToInt
 @Composable
 fun FloatingTextInputDialog(
     onSend: (String) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    history: List<String> = emptyList(),
+    onSaveHistory: (String) -> Unit = {}
 ) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
@@ -47,12 +52,14 @@ fun FloatingTextInputDialog(
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(screenHeightPx * 0.62f) }
     var text    by remember { mutableStateOf("") }
+    var showHistory by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     fun send() {
         if (text.isNotEmpty()) {
+            onSaveHistory(text)
             onSend(text)
             onDismiss()
         }
@@ -63,10 +70,8 @@ fun FloatingTextInputDialog(
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    awaitPointerEvent() // first touch outside the panel = dismiss
-                    onDismiss()
-                }
+                // detectTapGestures respects consumed events — won't fire if the panel consumed the tap
+                detectTapGestures { onDismiss() }
             }
     ) {
         Column(
@@ -74,8 +79,15 @@ fun FloatingTextInputDialog(
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .width(panelWidthDp)
                 .background(MegaDriveSurface, RoundedCornerShape(4.dp))
-                // Stop dismiss-on-outside-tap from propagating through the panel
-                .pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } }
+                // Consume all pointer events so they don't reach the dismiss handler above
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
         ) {
             // Draggable title bar
             Row(
@@ -95,10 +107,56 @@ fun FloatingTextInputDialog(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text("TEXT INPUT", color = MegaDriveBg, fontSize = 11.sp, fontFamily = MonoFontFamily)
-                Text(
-                    "✕", color = MegaDriveBg, fontSize = 13.sp, fontFamily = MonoFontFamily,
-                    modifier = Modifier.clickable { onDismiss() }
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (history.isNotEmpty()) {
+                        Text(
+                            "▾ HISTORY",
+                            color = MegaDriveBg,
+                            fontSize = 10.sp,
+                            fontFamily = MonoFontFamily,
+                            modifier = Modifier.clickable { showHistory = !showHistory }
+                        )
+                    }
+                    Text(
+                        "✕", color = MegaDriveBg, fontSize = 13.sp, fontFamily = MonoFontFamily,
+                        modifier = Modifier.clickable { onDismiss() }
+                    )
+                }
+            }
+
+            // History dropdown
+            if (history.isNotEmpty()) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    DropdownMenu(
+                        expanded = showHistory,
+                        onDismissRequest = { showHistory = false },
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .background(MegaDriveSurface)
+                    ) {
+                        history.forEach { entry ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        text = entry,
+                                        color = MegaDrivePrimary,
+                                        fontSize = 12.sp,
+                                        fontFamily = MonoFontFamily,
+                                        maxLines = 2
+                                    )
+                                },
+                                onClick = {
+                                    text = entry
+                                    showHistory = false
+                                },
+                                modifier = Modifier.background(MegaDriveSurface)
+                            )
+                        }
+                    }
+                }
             }
 
             Row(
