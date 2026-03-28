@@ -380,8 +380,8 @@ fun SessionHostScreen(
                         val text = clipboardManager.getText()?.text ?: return@SpecialKeyBar
                         viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
                     },
-                    onTextInput = { showTextInput = true },
-                    onFileUpload = { showFileUpload = true },
+                    onTextInput = { showFileUpload = false; showTextInput = true },
+                    onFileUpload = { showTextInput = false; showFileUpload = true },
                     onKeyboardToggle = {
                         keyboardVisible = !keyboardVisible
                         if (keyboardVisible) showKeyboard() else hideKeyboard()
