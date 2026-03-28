@@ -11,7 +11,7 @@ import kotlinx.coroutines.launch
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
 import se.joynes.aiterminalhub.data.security.SecurePrefsManager
-import se.joynes.aiterminalhub.data.ssh.SshConnectionFactory
+import se.joynes.aiterminalhub.data.ssh.ScpUploader
 import se.joynes.aiterminalhub.domain.ScriptTemplateEngine
 import javax.inject.Inject
 
@@ -27,7 +27,7 @@ class FileUploadViewModel @Inject constructor(
     private val serverRepo: ServerRepository,
     private val projectRepo: ProjectRepository,
     private val engine: ScriptTemplateEngine,
-    private val connectionFactory: SshConnectionFactory,
+    private val scpUploader: ScpUploader,
     private val securePrefs: SecurePrefsManager
 ) : ViewModel() {
 
@@ -39,38 +39,30 @@ class FileUploadViewModel @Inject constructor(
     fun startUpload(serverId: Long, projectId: Long, uri: Uri, context: Context) {
         if (_uploadState.value is UploadState.Uploading) return
         viewModelScope.launch {
-            val uploadConn = connectionFactory.create()
             try {
-                val server = serverRepo.getById(serverId) ?: error("Server not found")
+                val server  = serverRepo.getById(serverId)  ?: error("Server not found")
                 val project = projectRepo.getById(projectId) ?: error("Project not found")
                 val remotePath = engine.projectPath(server, project)
-
-                // Open a dedicated SCP connection (can't reuse PTY connection for concurrent channels)
-                uploadConn.connect(
-                    server,
-                    securePrefs.getPassword(server.id),
-                    securePrefs.getPrivateKey(server.id)
-                )
-                uploadConn.connected.first { it }
-
                 val (fileName, fileSize) = resolveFileInfo(context, uri)
-                val stream = context.contentResolver.openInputStream(uri)
-                    ?: error("Cannot open file")
+                val stream = context.contentResolver.openInputStream(uri) ?: error("Cannot open file")
 
                 _uploadState.value = UploadState.Uploading(fileName, 0f)
 
-                uploadConn.scpUpload(fileName, fileSize, stream, remotePath).collect { progress ->
-                    _uploadState.value = UploadState.Uploading(
-                        fileName = progress.fileName,
-                        progress = progress.percent / 100f
-                    )
+                scpUploader.upload(
+                    server       = server,
+                    password     = securePrefs.getPassword(server.id),
+                    privateKeyPem = securePrefs.getPrivateKey(server.id),
+                    fileName     = fileName,
+                    fileSize     = fileSize,
+                    inputStream  = stream,
+                    remoteDir    = remotePath
+                ).collect { progress ->
+                    _uploadState.value = UploadState.Uploading(progress.fileName, progress.percent / 100f)
                 }
 
                 _uploadState.value = UploadState.Done(fileName)
             } catch (e: Exception) {
                 _uploadState.value = UploadState.Error(e.message ?: "Upload failed")
-            } finally {
-                uploadConn.disconnect()
             }
         }
     }
