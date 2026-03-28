@@ -71,6 +71,9 @@ class ScpUploader @Inject constructor(private val logger: AppLogger) {
                         }
                     }
 
+                    // Read initial ready-ack from scp -t server
+                    readAck()
+
                     // Send file header and wait for ack
                     toRemote.write("C0644 $fileSize $fileName\n".toByteArray(Charsets.UTF_8))
                     toRemote.flush()
