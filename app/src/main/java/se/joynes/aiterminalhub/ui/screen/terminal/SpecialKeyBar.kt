@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -34,6 +35,7 @@ fun SpecialKeyBar(
     onKey: (String) -> Unit,
     onPaste: () -> Unit = {},
     onTextInput: () -> Unit = {},
+    onFileUpload: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {},
     onPrevTab: () -> Unit = {},
     onNextTab: () -> Unit = {}
@@ -129,6 +131,7 @@ fun SpecialKeyBar(
             ) {
                 TermKey("⌨", CENTER_KEY_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
                 IconTermKey(Icons.Default.Edit, "text input", CENTER_KEY_W, onClick = onTextInput)
+                IconTermKey(Icons.Default.Add,  "file upload", CENTER_KEY_W, onClick = onFileUpload)
             }
             // Right: arrow keys
             Row(

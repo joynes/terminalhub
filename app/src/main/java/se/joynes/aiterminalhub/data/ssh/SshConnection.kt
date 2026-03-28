@@ -9,16 +9,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.InputStream
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogEvent
 import se.joynes.aiterminalhub.data.logging.LogLevel
@@ -233,6 +236,66 @@ class SshConnection @Inject constructor(
             _connected.value = false
             val exitStatus = try { session.exitStatus } catch (_: Exception) { null }
             logger.log(LogLevel.INFO, TAG, "SSH read loop ended (reason=$reason, disconnectReason=$disconnectReason, exitStatus=${exitStatus}, session=${System.identityHashCode(session)}, snapshot=${debugSnapshot()})")
+        }
+    }
+
+    /**
+     * Upload a file via SCP (raw protocol over an exec channel), emitting progress after each chunk.
+     * Uses the existing SSH connection — no second auth needed.
+     */
+    fun scpUpload(
+        fileName: String,
+        fileSize: Long,
+        inputStream: InputStream,
+        remoteDir: String
+    ): Flow<ScpUploadProgress> = channelFlow {
+        withContext(Dispatchers.IO) {
+            val conn = connection ?: error("SSH not connected")
+            var sess: Session? = null
+            try {
+                sess = conn.openSession()
+                // Start remote scp in sink mode inside the target directory
+                sess.execCommand("scp -t \"$remoteDir\"")
+                val toRemote   = sess.stdin   // we write SCP frames here
+                val fromRemote = sess.stdout  // we read acknowledgements here
+
+                fun readAck() {
+                    val code = fromRemote.read()
+                    if (code != 0) {
+                        val msg = StringBuilder()
+                        var c: Int
+                        while (fromRemote.read().also { c = it } != '\n'.code && c != -1) msg.append(c.toChar())
+                        throw IOException("SCP remote error ($code): $msg")
+                    }
+                }
+
+                // Send file header: "C0644 <size> <filename>\n", wait for ack
+                val header = "C0644 $fileSize $fileName\n"
+                toRemote.write(header.toByteArray(Charsets.UTF_8))
+                toRemote.flush()
+                readAck()
+
+                // Stream file bytes in 8 KiB chunks, emit progress after each
+                val buf = ByteArray(8192)
+                var sent = 0L
+                var n: Int
+                while (inputStream.read(buf).also { n = it } != -1) {
+                    toRemote.write(buf, 0, n)
+                    sent += n
+                    trySend(ScpUploadProgress(fileName, sent, fileSize))
+                }
+                toRemote.flush()
+
+                // Send null-byte end-of-file marker, wait for ack
+                toRemote.write(0)
+                toRemote.flush()
+                readAck()
+
+                trySend(ScpUploadProgress(fileName, fileSize, fileSize))
+            } finally {
+                inputStream.close()
+                sess?.close()
+            }
         }
     }
 

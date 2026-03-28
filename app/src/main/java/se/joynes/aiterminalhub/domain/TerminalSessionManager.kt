@@ -213,6 +213,10 @@ class TerminalSessionManager @Inject constructor(
         publishSessions()
     }
 
+    /** Returns the live SSH connection for the given project, or null if not connected. */
+    fun getConnectionForProject(projectId: Long): SshConnection? =
+        entries.values.firstOrNull { it.meta.projectId == projectId }?.conn
+
     /** Send bytes to the active SSH connection (not the dummy subprocess). */
     fun sendBytesToActive(bytes: ByteArray) {
         val id = _activeId.value?.value ?: return

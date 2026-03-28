@@ -27,6 +27,8 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
+import se.joynes.aiterminalhub.ui.screen.upload.FileUploadViewModel
+import se.joynes.aiterminalhub.ui.screen.upload.FloatingFileUploadDialog
 import com.termux.view.TerminalView
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogEvent
@@ -63,6 +65,8 @@ fun SessionHostScreen(
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showTextInput by remember { mutableStateOf(false) }
+    var showFileUpload by remember { mutableStateOf(false) }
+    val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
 
     val activeProjectId = remember(activeId, projectTabs) {
         projectTabs.firstOrNull { it.sessionId == activeId }?.projectId
@@ -366,6 +370,18 @@ fun SessionHostScreen(
                             }
                         )
                     }
+
+                    if (showFileUpload) {
+                        FloatingFileUploadDialog(
+                            viewModel = fileUploadViewModel,
+                            projectId = activeProjectId ?: 0L,
+                            serverId = serverId ?: 0L,
+                            onDismiss = {
+                                showFileUpload = false
+                                terminalViewRef.value?.requestFocus()
+                            }
+                        )
+                    }
                 }
 
                 SpecialKeyBar(
@@ -378,6 +394,7 @@ fun SessionHostScreen(
                         viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
                     },
                     onTextInput = { showTextInput = true },
+                    onFileUpload = { showFileUpload = true },
                     onKeyboardToggle = {
                         keyboardVisible = !keyboardVisible
                         if (keyboardVisible) showKeyboard() else hideKeyboard()
