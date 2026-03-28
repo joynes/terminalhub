@@ -21,11 +21,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.aiterminalhub.ui.theme.*
 
-private val KEY_H   = 34.dp
-private val KEY_W   = 34.dp   // regular key
-private val ESC_W   = 46.dp
-private val MOD_W   = 52.dp   // CTRL / ALT / SHIFT
-private val ARROW_W = 38.dp   // ← ↓ →
+private val KEY_H        = 34.dp
+private val KEY_W        = 34.dp   // regular key
+private val ESC_W        = 46.dp
+private val MOD_W        = 52.dp   // CTRL / ALT / SHIFT
+private val ARROW_W      = 38.dp   // ← ↓ →
+private val CENTER_KEY_W = 54.dp   // keyboard / pen stacked buttons
 
 @Composable
 fun SpecialKeyBar(
@@ -120,14 +121,14 @@ fun SpecialKeyBar(
                 TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
                 TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
             }
-            // Center: keyboard + text-input icons
-            Row(
+            // Center: keyboard on top, pen below — stacked vertically
+            Column(
                 modifier = Modifier.align(Alignment.Center),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                TermKey("⌨", KEY_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
-                IconTermKey(Icons.Default.Edit, "text input", KEY_W, onClick = onTextInput)
+                TermKey("⌨", CENTER_KEY_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
+                IconTermKey(Icons.Default.Edit, "text input", CENTER_KEY_W, onClick = onTextInput)
             }
             // Right: arrow keys
             Row(

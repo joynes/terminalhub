@@ -161,6 +161,7 @@ fun SessionHostScreen(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
+            .navigationBarsPadding()
             .padding(bottom = imeBottomDp)
             .background(MegaDriveBg)
     ) {
