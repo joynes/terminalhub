@@ -44,9 +44,6 @@ class FileUploadViewModel @Inject constructor(
                 val conn = sessionManager.getConnectionForProject(projectId)
                     ?: error("No active connection for project")
 
-                // Ensure the project folder exists (handles ~ expansion via bash -lc)
-                conn.runSilent("mkdir -p \"$remotePath\"")
-
                 val (fileName, fileSize) = resolveFileInfo(context, uri)
                 val stream = context.contentResolver.openInputStream(uri)
                     ?: error("Cannot open file")
