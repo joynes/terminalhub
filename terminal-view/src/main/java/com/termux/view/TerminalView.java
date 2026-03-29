@@ -70,6 +70,7 @@ public final class TerminalView extends View {
     /** The top row of text to display. Ranges from -activeTranscriptRows to 0. */
     int mTopRow;
     int[] mDefaultSelectors = new int[]{-1,-1,-1,-1};
+    private int mCanvasBackgroundColor = 0xFF0D0D1A;
 
     float mScaleFactor = 1.f;
     final GestureAndScaleRecognizer mGestureRecognizer;
@@ -280,6 +281,16 @@ public final class TerminalView extends View {
      */
     public void setIsTerminalViewKeyLoggingEnabled(boolean value) {
         TERMINAL_VIEW_KEY_LOGGING_ENABLED = value;
+    }
+
+    /**
+     * Sets the solid color used to clear the canvas before each render pass.
+     * Keep this stable so shells emitting OSC background changes do not repaint the host UI chrome.
+     */
+    public void setCanvasBackgroundColor(int color) {
+        if (mCanvasBackgroundColor == color) return;
+        mCanvasBackgroundColor = color;
+        invalidate();
     }
 
 
@@ -1011,11 +1022,11 @@ public final class TerminalView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         if (mEmulator == null) {
-            canvas.drawColor(0XFF000000);
+            canvas.drawColor(mCanvasBackgroundColor);
         } else {
-            // Always clear with the terminal's default background color so hardware-accelerated
-            // rendering doesn't leave stale pixels from previous frames.
-            canvas.drawColor(mEmulator.mColors.mCurrentColors[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]);
+            // Clear with the host app's terminal surface color before each frame so hardware-
+            // accelerated redraws don't leave stale pixels or let OSC background changes repaint UI chrome.
+            canvas.drawColor(mCanvasBackgroundColor);
 
             // render the terminal view and highlight any selected text
             int[] sel = mDefaultSelectors;

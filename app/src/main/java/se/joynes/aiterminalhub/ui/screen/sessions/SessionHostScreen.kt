@@ -20,6 +20,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
@@ -212,7 +214,8 @@ fun SessionHostScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(28.dp)
-                    .background(MegaDriveSurface),
+                    .background(MegaDriveSurface)
+                    .zIndex(1f),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (projectTabs.isNotEmpty()) {
@@ -357,6 +360,8 @@ fun SessionHostScreen(
                         .weight(1f)
                         .fillMaxWidth()
                         .background(MegaDriveBg)
+                        .graphicsLayer { clip = true }
+                        .zIndex(0f)
                 ) {
                     val sess = session
                     if (sess != null) {
@@ -384,6 +389,7 @@ fun SessionHostScreen(
                                         isFocusable = true
                                         isFocusableInTouchMode = true
                                         setBackgroundColor(0xFF0D0D1A.toInt())
+                                        setCanvasBackgroundColor(0xFF0D0D1A.toInt())
                                         setTextSize(textSizePx)
                                         setTerminalViewClient(terminalViewClient)
                                         attachSession(sess)
@@ -411,10 +417,13 @@ fun SessionHostScreen(
                                     if (tv.mTermSession !== sess) {
                                         tv.attachSession(sess)
                                     }
+                                    tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
                                     terminalViewRef.value = tv
                                     syncRemotePty(tv)
                                 },
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer { clip = true }
                             )
                         }
                     } else {
@@ -506,4 +515,3 @@ fun SessionHostScreen(
             }
     }
 }
-
