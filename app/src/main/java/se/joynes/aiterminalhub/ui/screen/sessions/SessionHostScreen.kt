@@ -349,7 +349,8 @@ fun SessionHostScreen(
                             },
                             onDismiss = {
                                 showTextInput = false
-                                terminalViewRef.value?.requestFocus()
+                                keyboardVisible = true
+                                showKeyboard()
                             },
                             history = textInputHistory,
                             onSaveHistory = { text ->

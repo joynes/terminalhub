@@ -22,12 +22,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.aiterminalhub.ui.theme.*
 
-private val KEY_H        = 34.dp
-private val KEY_W        = 34.dp   // regular key
-private val ESC_W        = 46.dp
-private val MOD_W        = 52.dp   // CTRL / ALT / SHIFT
-private val ARROW_W      = 38.dp   // ← ↓ →
-private val CENTER_KEY_W = 54.dp   // keyboard / pen stacked buttons
+private val KEY_H   = 34.dp
+private val ESC_W   = 42.dp  // ESC slightly wider
+private val KEY_W   = 28.dp  // TAB : / @ 1 2 3 ↑
+private val RET_W   = 34.dp  // RET
+private val MOD_W   = 40.dp  // CTRL ALT SHIFT
+private val ACT_W   = 32.dp  // ⌨ pen + (action keys, row 2 center)
+private val ARROW_W = 30.dp  // ← ↓ →
 
 @Composable
 fun SpecialKeyBar(
@@ -58,8 +59,6 @@ fun SpecialKeyBar(
         return result
     }
 
-    // Produce an arrow escape sequence honouring the current modifiers.
-    // No modifier: \u001B[A  Shift: \u001B[1;2A  Ctrl: \u001B[1;5A  etc.
     fun arrowKey(letter: Char): String {
         val modBits = (if (shiftActive) 1 else 0) or
                       (if (altActive)   2 else 0) or
@@ -69,9 +68,6 @@ fun SpecialKeyBar(
         else "\u001B[1;${modBits + 1}$letter"
     }
 
-    // Row 1:  ESC  TAB  :  /  @  [spacer]  RET  ↑
-    // Row 2:  CTRL  ALT  SHIFT  [spacer]  ⌨  ✎  [spacer]  ←  ↓  →
-    // Swipe left/right on the bar to switch tabs.
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -80,69 +76,53 @@ fun SpecialKeyBar(
             .pointerInput(onPrevTab, onNextTab) {
                 var totalDragX = 0f
                 detectHorizontalDragGestures(
-                    onDragStart  = { totalDragX = 0f },
-                    onHorizontalDrag = { change, amount ->
-                        change.consume()
-                        totalDragX += amount
-                    },
-                    onDragEnd    = {
+                    onDragStart      = { totalDragX = 0f },
+                    onHorizontalDrag = { change, amount -> change.consume(); totalDragX += amount },
+                    onDragEnd        = {
                         if (totalDragX < -80.dp.toPx()) onNextTab()
                         else if (totalDragX > 80.dp.toPx()) onPrevTab()
                     },
-                    onDragCancel = { totalDragX = 0f }
+                    onDragCancel     = { totalDragX = 0f }
                 )
             },
         verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
+        // Row 1: ESC  TAB  :  /  @  1  2  3  [spacer]  RET  ↑
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            TermKey("ESC", ESC_W, active = false) { modifierManager.clearTransients(); onKey("\u001B") }
-            TermKey("TAB", KEY_W, active = false) { onKey(modified("\t")) }
-            TermKey(":",   KEY_W, active = false) { onKey(modified(":")) }
-            TermKey("/",   KEY_W, active = false) { onKey(modified("/")) }
-            TermKey("@",   KEY_W, active = false) { onKey(modified("@")) }
+            TermKey("ESC", ESC_W) { modifierManager.clearTransients(); onKey("\u001B") }
+            TermKey("TAB", KEY_W) { onKey(modified("\t")) }
+            TermKey(":",   KEY_W) { onKey(modified(":")) }
+            TermKey("/",   KEY_W) { onKey(modified("/")) }
+            TermKey("@",   KEY_W) { onKey(modified("@")) }
+            TermKey("1",   KEY_W) { onKey(modified("1")) }
+            TermKey("2",   KEY_W) { onKey(modified("2")) }
+            TermKey("3",   KEY_W) { onKey(modified("3")) }
             Spacer(Modifier.weight(1f))
-            TermKey("RET", KEY_W, active = false) { modifierManager.clearTransients(); onKey("\r") }
-            TermKey("↑",   KEY_W, active = false) { onKey(arrowKey('A')) }
+            TermKey("RET", RET_W) { modifierManager.clearTransients(); onKey("\r") }
+            TermKey("↑",   KEY_W) { onKey(arrowKey('A')) }
         }
 
-        Box(
+        // Row 2: CTRL  ALT  SHIFT  [spacer]  ⌨  ✎  +  [spacer]  ←  ↓  →
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.Center
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
-            // Left: modifier keys
-            Row(
-                modifier = Modifier.align(Alignment.CenterStart),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TermKey("CTRL",  MOD_W, active = ctrlActive)  { modifierManager.toggleCtrl() }
-                TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
-                TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
-            }
-            // Center: keyboard on top, pen below — stacked vertically
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                TermKey("⌨", CENTER_KEY_W, active = false, fontSize = 18.sp, onClick = onKeyboardToggle)
-                IconTermKey(Icons.Default.Edit, "text input", CENTER_KEY_W, onClick = onTextInput)
-                IconTermKey(Icons.Default.Add,  "file upload", CENTER_KEY_W, onClick = onFileUpload)
-            }
-            // Right: arrow keys
-            Row(
-                modifier = Modifier.align(Alignment.CenterEnd),
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TermKey("←", ARROW_W, active = false) { onKey(arrowKey('D')) }
-                TermKey("↓", ARROW_W, active = false) { onKey(arrowKey('B')) }
-                TermKey("→", ARROW_W, active = false) { onKey(arrowKey('C')) }
-            }
+            TermKey("CTRL",  MOD_W, active = ctrlActive)  { modifierManager.toggleCtrl() }
+            TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
+            TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
+            Spacer(Modifier.weight(1f))
+            TermKey("⌨", ACT_W, fontSize = 18.sp) { onKeyboardToggle() }
+            IconTermKey(Icons.Default.Edit, "text input",  ACT_W, onClick = onTextInput)
+            IconTermKey(Icons.Default.Add,  "file upload", ACT_W, onClick = onFileUpload)
+            Spacer(Modifier.weight(1f))
+            TermKey("←", ARROW_W) { onKey(arrowKey('D')) }
+            TermKey("↓", ARROW_W) { onKey(arrowKey('B')) }
+            TermKey("→", ARROW_W) { onKey(arrowKey('C')) }
         }
     }
 }
@@ -151,7 +131,7 @@ fun SpecialKeyBar(
 private fun TermKey(
     label: String,
     width: Dp,
-    active: Boolean,
+    active: Boolean = false,
     fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
     onClick: () -> Unit
 ) {
