@@ -27,7 +27,7 @@ private val ESC_W   = 42.dp  // ESC slightly wider
 private val KEY_W   = 28.dp  // ⇥ : / @ 1 2 3 ↑
 private val RET_W   = 34.dp  // ↵
 private val MOD_W   = 40.dp  // CTRL ALT ⇧
-private val ACT_W   = 38.dp  // ⌨ pen + (action keys, row 2 center)
+private val ACT_W   = 50.dp  // ⌨ pen + (action keys, row 2 center)
 private val ARROW_W = 30.dp  // ← ↓ →
 
 @Composable
