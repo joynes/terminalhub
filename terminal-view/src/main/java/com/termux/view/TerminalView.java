@@ -1013,6 +1013,10 @@ public final class TerminalView extends View {
         if (mEmulator == null) {
             canvas.drawColor(0XFF000000);
         } else {
+            // Always clear with the terminal's default background color so hardware-accelerated
+            // rendering doesn't leave stale pixels from previous frames.
+            canvas.drawColor(mEmulator.mColors.mCurrentColors[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]);
+
             // render the terminal view and highlight any selected text
             int[] sel = mDefaultSelectors;
             if (mTextSelectionCursorController != null) {
