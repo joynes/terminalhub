@@ -53,17 +53,21 @@ fun FloatingTextInputDialog(
     val panelWidthDp   = (configuration.screenWidthDp * 0.92f).dp
     val panelWidthPx   = with(density) { panelWidthDp.toPx() }
     val minPanelTopPx  = with(density) { 80.dp.toPx() }
+    val keyBarHeightPx = with(density) { 74.dp.toPx() }
+    val panelBottomGapPx = with(density) { 8.dp.toPx() }
     val panelHeightPx  = with(density) { 160.dp.toPx() }
     val maxPanelTopPx  = (visibleHeightPx - panelHeightPx).coerceAtLeast(minPanelTopPx)
+    val anchoredPanelTopPx = (visibleHeightPx - keyBarHeightPx - panelHeightPx - panelBottomGapPx)
+        .coerceIn(minPanelTopPx, maxPanelTopPx)
 
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
-    var offsetY by remember { mutableFloatStateOf(minPanelTopPx) }
+    var offsetY by remember { mutableFloatStateOf(anchoredPanelTopPx) }
     var text    by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    LaunchedEffect(maxPanelTopPx) {
+    LaunchedEffect(anchoredPanelTopPx, maxPanelTopPx) {
         offsetY = offsetY.coerceIn(minPanelTopPx, maxPanelTopPx)
     }
 

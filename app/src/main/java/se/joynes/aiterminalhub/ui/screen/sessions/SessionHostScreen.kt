@@ -141,6 +141,7 @@ fun SessionHostScreen(
 
     fun syncRemotePty(tv: TerminalView) {
         tv.updateSize()
+        tv.onScreenUpdated(true)
         val emulator = tv.mEmulator ?: return
         viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
     }
