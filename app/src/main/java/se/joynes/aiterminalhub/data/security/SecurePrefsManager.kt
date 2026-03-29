@@ -2,16 +2,19 @@ package se.joynes.aiterminalhub.data.security
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.security.keystore.KeyProperties
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogLevel
+import java.security.KeyStore
 import javax.inject.Inject
 import javax.inject.Singleton
 
 // Plain (unencrypted) prefs used only for injecting test credentials via adb run-as
 private const val TEST_PREFS = "test_ssh_prefs"
+private const val MASTER_KEY_ALIAS = "_androidx_security_master_key"
 
 @Singleton
 class SecurePrefsManager @Inject constructor(
@@ -22,32 +25,35 @@ class SecurePrefsManager @Inject constructor(
 
     private val prefs: SharedPreferences by lazy { openOrReset() }
 
+    private fun buildMasterKey() = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
+
+    private fun createPrefs(masterKey: MasterKey) = EncryptedSharedPreferences.create(
+        context,
+        "ssh_secure_prefs",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+
     private fun openOrReset(): SharedPreferences {
         return try {
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            EncryptedSharedPreferences.create(
-                context,
-                "ssh_secure_prefs",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
+            createPrefs(buildMasterKey())
         } catch (e: Exception) {
-            // Keystore key invalidated (reinstall, fingerprint change, etc.) — wipe and retry
+            // Keystore key or prefs file is corrupted — wipe both and start fresh
             logger.log(LogLevel.WARN, TAG, "Encrypted prefs corrupted, resetting: ${e.message}")
             context.deleteSharedPreferences("ssh_secure_prefs")
-            val masterKey = MasterKey.Builder(context)
-                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-                .build()
-            EncryptedSharedPreferences.create(
-                context,
-                "ssh_secure_prefs",
-                masterKey,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
+            try {
+                val ks = KeyStore.getInstance("AndroidKeyStore").also { it.load(null) }
+                if (ks.containsAlias(MASTER_KEY_ALIAS)) {
+                    ks.deleteEntry(MASTER_KEY_ALIAS)
+                    logger.log(LogLevel.WARN, TAG, "Deleted corrupted Keystore master key")
+                }
+            } catch (ksEx: Exception) {
+                logger.log(LogLevel.WARN, TAG, "Could not clear Keystore entry: ${ksEx.message}")
+            }
+            createPrefs(buildMasterKey())
         }
     }
 

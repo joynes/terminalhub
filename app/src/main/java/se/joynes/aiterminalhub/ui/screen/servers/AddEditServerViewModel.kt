@@ -67,12 +67,19 @@ class AddEditServerViewModel @Inject constructor(
                 projectsFolder = s.projectsFolder,
                 setupScript = s.setupScript
             )
+            // For edits: save credentials before DB update so the Room flow never
+            // sees the server without credentials already in place.
+            if (editingId != null && s.password.isNotBlank()) {
+                securePrefs.savePassword(editingId!!, s.password)
+            }
             val savedId = if (editingId != null) {
                 repo.update(server); editingId!!
             } else {
-                repo.save(server)
+                // New server: DB generates the ID, save credentials immediately after.
+                val id = repo.save(server)
+                if (s.password.isNotBlank()) securePrefs.savePassword(id, s.password)
+                id
             }
-            if (s.password.isNotBlank()) securePrefs.savePassword(savedId, s.password)
             _state.value = _state.value.copy(saved = true)
         }
     }
