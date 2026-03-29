@@ -98,6 +98,9 @@ dependencies {
     implementation(libs.biometric)
     implementation(libs.security.crypto)
 
+    // YAML
+    implementation(libs.snakeyaml)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 

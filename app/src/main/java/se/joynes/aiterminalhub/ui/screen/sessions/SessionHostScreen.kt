@@ -3,6 +3,9 @@ package se.joynes.aiterminalhub.ui.screen.sessions
 import android.os.Build
 import android.view.WindowInsets as AndroidWindowInsets
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -27,6 +30,8 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
+import se.joynes.aiterminalhub.ui.screen.export.ExportImportState
+import se.joynes.aiterminalhub.ui.screen.export.ExportImportViewModel
 import se.joynes.aiterminalhub.ui.screen.upload.FileUploadViewModel
 import se.joynes.aiterminalhub.ui.screen.upload.FloatingFileUploadDialog
 import com.termux.view.TerminalView
@@ -61,6 +66,38 @@ fun SessionHostScreen(
     var showTextInput by remember { mutableStateOf(false) }
     var showFileUpload by remember { mutableStateOf(false) }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
+    val exportImportViewModel: ExportImportViewModel = hiltViewModel()
+    val exportImportState by exportImportViewModel.state.collectAsState()
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/plain")
+    ) { uri -> uri?.let { exportImportViewModel.export(context, it) } }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { exportImportViewModel.import(context, it) } }
+
+    LaunchedEffect(exportImportState) {
+        when (val s = exportImportState) {
+            is ExportImportState.ExportDone -> {
+                Toast.makeText(context, "Config exported", Toast.LENGTH_SHORT).show()
+                exportImportViewModel.resetState()
+            }
+            is ExportImportState.ImportDone -> {
+                Toast.makeText(
+                    context,
+                    "Imported ${s.result.servers} server(s), ${s.result.projects} project(s)",
+                    Toast.LENGTH_LONG
+                ).show()
+                exportImportViewModel.resetState()
+            }
+            is ExportImportState.Error -> {
+                Toast.makeText(context, "Error: ${s.message}", Toast.LENGTH_LONG).show()
+                exportImportViewModel.resetState()
+            }
+            else -> {}
+        }
+    }
 
     val activeProjectId = remember(activeId, projectTabs) {
         projectTabs.firstOrNull { it.sessionId == activeId }?.projectId
@@ -241,6 +278,34 @@ fun SessionHostScreen(
                             onClick = {
                                 showSettingsMenu = false
                                 showSessionHistory = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "Export Config",
+                                    color = Color.White,
+                                    fontFamily = MonoFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            onClick = {
+                                showSettingsMenu = false
+                                exportLauncher.launch("aiterminalhub_backup.yaml")
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "Import Config",
+                                    color = Color.White,
+                                    fontFamily = MonoFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            onClick = {
+                                showSettingsMenu = false
+                                importLauncher.launch(arrayOf("text/plain", "application/yaml", "*/*"))
                             }
                         )
                     }

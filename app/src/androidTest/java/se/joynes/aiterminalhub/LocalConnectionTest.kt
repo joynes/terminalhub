@@ -11,6 +11,7 @@ import androidx.test.uiautomator.Until
 import android.view.KeyEvent
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import org.junit.Assume
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -119,6 +120,9 @@ class LocalConnectionTest {
 
     @Test
     fun connectToLocalMacAndSeeTerminal() {
+        // Skip when SSH_PASS is not provided (e.g. routine CI / debug-APK runs)
+        Assume.assumeTrue("SSH_PASS not set — skipping live connection test", password.isNotBlank())
+
         // ── 1. Wait for server list screen ───────────────────────────────────
         waitFor("SERVERS", 15_000)
         screenshot("01_server_list")
