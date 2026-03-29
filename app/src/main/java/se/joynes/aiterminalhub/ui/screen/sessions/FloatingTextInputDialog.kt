@@ -178,13 +178,16 @@ fun FloatingTextInputDialog(
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(onSend = { send() }),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor   = MegaDriveBg,
-                        unfocusedContainerColor = MegaDriveBg,
-                        focusedTextColor        = MegaDrivePrimary,
-                        unfocusedTextColor      = MegaDrivePrimary,
-                        focusedIndicatorColor   = MegaDrivePrimary,
-                        unfocusedIndicatorColor = MegaDriveDim,
-                        cursorColor             = MegaDrivePrimary,
+                        focusedContainerColor    = MegaDriveBg,
+                        unfocusedContainerColor  = MegaDriveBg,
+                        disabledContainerColor   = MegaDriveBg,
+                        focusedTextColor         = MegaDrivePrimary,
+                        unfocusedTextColor       = MegaDrivePrimary,
+                        disabledTextColor        = MegaDriveDim,
+                        focusedIndicatorColor    = MegaDrivePrimary,
+                        unfocusedIndicatorColor  = MegaDriveDim,
+                        disabledIndicatorColor   = MegaDriveDim,
+                        cursorColor              = MegaDrivePrimary,
                     ),
                     textStyle = androidx.compose.ui.text.TextStyle(
                         fontFamily = MonoFontFamily, fontSize = 13.sp, color = MegaDrivePrimary

@@ -19,13 +19,17 @@ class ScriptTemplateEngine @Inject constructor() {
     fun renderSetup(server: Server, project: Project): String {
         val path = projectPath(server, project)
         val session = sessionName(project)
-        val gitClone = if (project.gitUrl.isNotBlank()) {
+        // When a gitUrl is set, do NOT pre-create $path — git clone must create it itself.
+        // After the clone attempt (success or fail), ensure $path exists for tmux.
+        val dirSetup = if (project.gitUrl.isNotBlank()) {
             val safeUrl = project.gitUrl.replace("'", "'\\''")
-            "if [ ! -d '$path/.git' ]; then git clone '$safeUrl' '$path' 2>/dev/null || true; fi; "
-        } else ""
+            "if [ ! -d '$path/.git' ]; then git clone '$safeUrl' '$path' 2>/dev/null || true; fi; " +
+            "mkdir -p '$path' 2>/dev/null; "
+        } else {
+            "mkdir -p '$path' 2>/dev/null; "
+        }
         return if (project.useTmux) {
-            "mkdir -p $path 2>/dev/null; " +
-            gitClone +
+            dirSetup +
             "if tmux has-session -t $session 2>/dev/null; then " +
             "if tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1; then " +
             "tmux kill-session -t $session 2>/dev/null; " +
@@ -38,7 +42,7 @@ class ScriptTemplateEngine @Inject constructor() {
             "fi; " +
             renderTmuxTouchScrollSetup(session)
         } else {
-            "mkdir -p $path 2>/dev/null; " + gitClone.trimEnd()
+            dirSetup.trimEnd()
         }
     }
 

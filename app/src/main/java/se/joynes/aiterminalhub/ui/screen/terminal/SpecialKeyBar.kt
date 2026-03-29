@@ -24,10 +24,10 @@ import se.joynes.aiterminalhub.ui.theme.*
 
 private val KEY_H   = 34.dp
 private val ESC_W   = 42.dp  // ESC slightly wider
-private val KEY_W   = 28.dp  // TAB : / @ 1 2 3 ↑
-private val RET_W   = 34.dp  // RET
-private val MOD_W   = 40.dp  // CTRL ALT SHIFT
-private val ACT_W   = 32.dp  // ⌨ pen + (action keys, row 2 center)
+private val KEY_W   = 28.dp  // ⇥ : / @ 1 2 3 ↑
+private val RET_W   = 34.dp  // ↵
+private val MOD_W   = 40.dp  // CTRL ALT ⇧
+private val ACT_W   = 38.dp  // ⌨ pen + (action keys, row 2 center)
 private val ARROW_W = 30.dp  // ← ↓ →
 
 @Composable
@@ -72,7 +72,7 @@ fun SpecialKeyBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(MegaDriveSurface)
-            .padding(horizontal = 4.dp, vertical = 3.dp)
+            .padding(horizontal = 4.dp)
             .pointerInput(onPrevTab, onNextTab) {
                 var totalDragX = 0f
                 detectHorizontalDragGestures(
@@ -85,16 +85,16 @@ fun SpecialKeyBar(
                     onDragCancel     = { totalDragX = 0f }
                 )
             },
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+        verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        // Row 1: ESC  TAB  :  /  @  1  2  3  [spacer]  RET  ↑
+        // Row 1: ESC  ⇥  :  /  @  1  2  3  [spacer]  ↑  ↵
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             TermKey("ESC", ESC_W) { modifierManager.clearTransients(); onKey("\u001B") }
-            TermKey("TAB", KEY_W) { onKey(modified("\t")) }
+            TermKey("⇥",   KEY_W) { onKey(modified("\t")) }
             TermKey(":",   KEY_W) { onKey(modified(":")) }
             TermKey("/",   KEY_W) { onKey(modified("/")) }
             TermKey("@",   KEY_W) { onKey(modified("@")) }
@@ -102,8 +102,8 @@ fun SpecialKeyBar(
             TermKey("2",   KEY_W) { onKey(modified("2")) }
             TermKey("3",   KEY_W) { onKey(modified("3")) }
             Spacer(Modifier.weight(1f))
-            TermKey("RET", RET_W) { modifierManager.clearTransients(); onKey("\r") }
             TermKey("↑",   KEY_W) { onKey(arrowKey('A')) }
+            TermKey("↵",   RET_W) { modifierManager.clearTransients(); onKey("\r") }
         }
 
         // Row 2: CTRL  ALT  SHIFT  [spacer]  ⌨  ✎  +  [spacer]  ←  ↓  →
@@ -114,7 +114,7 @@ fun SpecialKeyBar(
         ) {
             TermKey("CTRL",  MOD_W, active = ctrlActive)  { modifierManager.toggleCtrl() }
             TermKey("ALT",   MOD_W, active = altActive)   { modifierManager.toggleAlt() }
-            TermKey("SHIFT", MOD_W, active = shiftActive) { modifierManager.toggleShift() }
+            TermKey("⇧",     MOD_W, active = shiftActive, fontSize = 16.sp) { modifierManager.toggleShift() }
             Spacer(Modifier.weight(1f))
             TermKey("⌨", ACT_W, fontSize = 18.sp) { onKeyboardToggle() }
             IconTermKey(Icons.Default.Edit, "text input",  ACT_W, onClick = onTextInput)
