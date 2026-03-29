@@ -99,7 +99,7 @@ class TerminalSessionManager @Inject constructor(
         tmuxSessionName: String? = null
     ) {
         if (entries.containsKey(sessionId)) return
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         val terminalClient = TerminalSessionClientImpl(context) { changedSession ->
             _screenUpdates.tryEmit(changedSession)
