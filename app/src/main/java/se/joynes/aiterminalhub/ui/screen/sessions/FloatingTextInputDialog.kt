@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.IntOffset
@@ -43,33 +42,12 @@ fun FloatingTextInputDialog(
     history: List<String> = emptyList(),
     onSaveHistory: (String) -> Unit = {}
 ) {
-    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-
-    val screenWidthPx  = with(density) { configuration.screenWidthDp.dp.toPx() }
-    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
-    val imeBottomPx    = WindowInsets.ime.getBottom(density).toFloat()
-    val visibleHeightPx = (screenHeightPx - imeBottomPx).coerceAtLeast(with(density) { 220.dp.toPx() })
-    val panelWidthDp   = (configuration.screenWidthDp * 0.92f).dp
-    val panelWidthPx   = with(density) { panelWidthDp.toPx() }
-    val minPanelTopPx  = with(density) { 80.dp.toPx() }
-    val keyBarHeightPx = with(density) { 74.dp.toPx() }
-    val panelBottomGapPx = with(density) { 8.dp.toPx() }
-    val panelHeightPx  = with(density) { 160.dp.toPx() }
-    val maxPanelTopPx  = (visibleHeightPx - panelHeightPx).coerceAtLeast(minPanelTopPx)
-    val anchoredPanelTopPx = (visibleHeightPx - keyBarHeightPx - panelHeightPx - panelBottomGapPx)
-        .coerceIn(minPanelTopPx, maxPanelTopPx)
-
-    var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
-    var offsetY by remember { mutableFloatStateOf(anchoredPanelTopPx) }
     var text    by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    LaunchedEffect(anchoredPanelTopPx, maxPanelTopPx) {
-        offsetY = offsetY.coerceIn(minPanelTopPx, maxPanelTopPx)
-    }
 
     fun send() {
         if (text.isNotEmpty()) {
@@ -80,7 +58,7 @@ fun FloatingTextInputDialog(
     }
 
     // Full-size overlay so tapping outside dismisses
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .pointerInput(Unit) {
@@ -88,6 +66,34 @@ fun FloatingTextInputDialog(
                 detectTapGestures { onDismiss() }
             }
     ) {
+        val availableWidthPx = with(density) { maxWidth.toPx() }
+        val availableHeightPx = with(density) { maxHeight.toPx() }
+        val panelWidthDp = maxWidth * 0.92f
+        val panelWidthPx = with(density) { panelWidthDp.toPx() }
+        val panelHeightPx = with(density) { 160.dp.toPx() }
+        val minPanelTopPx = with(density) { 12.dp.toPx() }
+        val panelBottomGapPx = with(density) { 8.dp.toPx() }
+        val maxPanelTopPx = (availableHeightPx - panelHeightPx).coerceAtLeast(minPanelTopPx)
+        val anchoredPanelTopPx = (availableHeightPx - panelHeightPx - panelBottomGapPx)
+            .coerceIn(minPanelTopPx, maxPanelTopPx)
+
+        var offsetX by remember(availableWidthPx, panelWidthPx) {
+            mutableFloatStateOf(((availableWidthPx - panelWidthPx) / 2f).coerceAtLeast(0f))
+        }
+        var offsetY by remember(anchoredPanelTopPx) { mutableFloatStateOf(anchoredPanelTopPx) }
+
+        LaunchedEffect(availableWidthPx, panelWidthPx) {
+            offsetX = offsetX.coerceIn(0f, (availableWidthPx - panelWidthPx).coerceAtLeast(0f))
+        }
+        LaunchedEffect(anchoredPanelTopPx, maxPanelTopPx) {
+            val draggedAwayFromAnchor = kotlin.math.abs(offsetY - anchoredPanelTopPx) > 1f
+            offsetY = if (draggedAwayFromAnchor) {
+                offsetY.coerceIn(minPanelTopPx, maxPanelTopPx)
+            } else {
+                anchoredPanelTopPx
+            }
+        }
+
         Column(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
@@ -112,7 +118,7 @@ fun FloatingTextInputDialog(
                     .pointerInput(Unit) {
                         detectDragGestures { change, drag ->
                             change.consume()
-                            offsetX = (offsetX + drag.x).coerceIn(0f, screenWidthPx - panelWidthPx)
+                            offsetX = (offsetX + drag.x).coerceIn(0f, (availableWidthPx - panelWidthPx).coerceAtLeast(0f))
                             offsetY = (offsetY + drag.y).coerceIn(minPanelTopPx, maxPanelTopPx)
                         }
                     }

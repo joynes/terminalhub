@@ -140,8 +140,11 @@ fun SessionHostScreen(
     }
 
     fun syncRemotePty(tv: TerminalView) {
+        tv.setBackgroundColor(0xFF0D0D1A.toInt())
+        tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
         tv.updateSize()
         tv.onScreenUpdated(true)
+        tv.invalidate()
         val emulator = tv.mEmulator ?: return
         viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
     }
@@ -418,6 +421,7 @@ fun SessionHostScreen(
                                     if (tv.mTermSession !== sess) {
                                         tv.attachSession(sess)
                                     }
+                                    tv.setBackgroundColor(0xFF0D0D1A.toInt())
                                     tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
                                     terminalViewRef.value = tv
                                     syncRemotePty(tv)
