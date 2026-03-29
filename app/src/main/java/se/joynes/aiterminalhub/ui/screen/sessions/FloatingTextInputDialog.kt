@@ -57,7 +57,7 @@ fun FloatingTextInputDialog(
     val maxPanelTopPx  = (visibleHeightPx - panelHeightPx).coerceAtLeast(minPanelTopPx)
 
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
-    var offsetY by remember { mutableFloatStateOf(maxPanelTopPx) }
+    var offsetY by remember { mutableFloatStateOf(minPanelTopPx) }
     var text    by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
