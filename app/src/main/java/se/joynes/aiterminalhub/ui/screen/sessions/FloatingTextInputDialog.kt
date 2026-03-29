@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -46,16 +48,24 @@ fun FloatingTextInputDialog(
 
     val screenWidthPx  = with(density) { configuration.screenWidthDp.dp.toPx() }
     val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+    val imeBottomPx    = WindowInsets.ime.getBottom(density).toFloat()
+    val visibleHeightPx = (screenHeightPx - imeBottomPx).coerceAtLeast(with(density) { 220.dp.toPx() })
     val panelWidthDp   = (configuration.screenWidthDp * 0.92f).dp
     val panelWidthPx   = with(density) { panelWidthDp.toPx() }
+    val minPanelTopPx  = with(density) { 80.dp.toPx() }
+    val panelHeightPx  = with(density) { 160.dp.toPx() }
+    val maxPanelTopPx  = (visibleHeightPx - panelHeightPx).coerceAtLeast(minPanelTopPx)
 
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
-    var offsetY by remember { mutableFloatStateOf(screenHeightPx * 0.62f) }
+    var offsetY by remember { mutableFloatStateOf(maxPanelTopPx) }
     var text    by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(maxPanelTopPx) {
+        offsetY = offsetY.coerceIn(minPanelTopPx, maxPanelTopPx)
+    }
 
     fun send() {
         if (text.isNotEmpty()) {
@@ -99,7 +109,7 @@ fun FloatingTextInputDialog(
                         detectDragGestures { change, drag ->
                             change.consume()
                             offsetX = (offsetX + drag.x).coerceIn(0f, screenWidthPx - panelWidthPx)
-                            offsetY = (offsetY + drag.y).coerceIn(0f, screenHeightPx - with(density) { 160.dp.toPx() })
+                            offsetY = (offsetY + drag.y).coerceIn(minPanelTopPx, maxPanelTopPx)
                         }
                     }
                     .padding(horizontal = 10.dp),
