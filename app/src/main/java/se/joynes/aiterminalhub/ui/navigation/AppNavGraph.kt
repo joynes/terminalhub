@@ -52,6 +52,7 @@ fun AppNavGraph() {
             SessionHostScreen(
                 viewModel = viewModel,
                 onEditServer = { serverId?.let { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) } },
+                onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
                 onAddProject = { serverId?.let { id -> navController.navigate(Screen.AddEditProject.createRoute(id)) } },
                 onOpenLogs = { navController.navigate(Screen.AppLog.route) }
             )

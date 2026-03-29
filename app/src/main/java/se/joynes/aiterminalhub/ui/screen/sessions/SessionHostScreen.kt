@@ -41,6 +41,7 @@ import se.joynes.aiterminalhub.ui.theme.*
 @Composable
 fun SessionHostScreen(
     onEditServer: () -> Unit,
+    onAddServer: () -> Unit,
     onAddProject: () -> Unit,
     onOpenLogs: () -> Unit,
     viewModel: SessionHostViewModel = hiltViewModel()
@@ -249,14 +250,25 @@ fun SessionHostScreen(
             if (projectTabs.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            "NO PROJECTS",
-                            color = MegaDriveDim,
-                            fontSize = 12.sp,
-                            fontFamily = MonoFontFamily
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        RetroButton("[ + ADD PROJECT ]", onAddProject)
+                        if (serverId == null) {
+                            Text(
+                                "NO SERVER",
+                                color = MegaDriveDim,
+                                fontSize = 12.sp,
+                                fontFamily = MonoFontFamily
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            RetroButton("[ + ADD SERVER ]", onAddServer)
+                        } else {
+                            Text(
+                                "NO PROJECTS",
+                                color = MegaDriveDim,
+                                fontSize = 12.sp,
+                                fontFamily = MonoFontFamily
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            RetroButton("[ + ADD PROJECT ]", onAddProject)
+                        }
                     }
                 }
             } else {
