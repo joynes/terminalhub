@@ -96,14 +96,19 @@ class SessionHostViewModel @Inject constructor(
                 projectRepo.getByServer(sId).collect { projects ->
                     _allDbProjects.value = projects
                     val visible = projects.filter { !sessionManager.isProjectClosed(it.id) }
+                    val prevIds = _dbProjects.value.map { it.id }.toSet()
+                    val isFirstLoad = _dbProjects.value.isEmpty() && prevIds.isEmpty()
                     _dbProjects.value = visible
-                    visible.forEach { activateProject(it) }
+                    visible.forEach { project ->
+                        val isNewlyAdded = !isFirstLoad && project.id !in prevIds
+                        activateProject(project, autoSwitch = isNewlyAdded)
+                    }
                 }
             }
         }
     }
 
-    private fun activateProject(project: Project) {
+    private fun activateProject(project: Project, autoSwitch: Boolean = false) {
         if (project.id in connectingProjectIds) return
         // Already registered as a session
         if (sessionManager.sessions.value.any { it.projectName == project.name }) return
@@ -145,6 +150,7 @@ class SessionHostViewModel @Inject constructor(
                     isTmux = project.useTmux,
                     tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null
                 )
+                if (autoSwitch) sessionManager.switchTo(TerminalSessionId(conn.sessionId))
             } else {
                 sshManager.destroySession(conn.sessionId)
                 return@launch

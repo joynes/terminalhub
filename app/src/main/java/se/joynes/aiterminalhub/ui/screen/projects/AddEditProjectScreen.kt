@@ -53,12 +53,12 @@ fun AddEditProjectScreen(
             // ── Project name ──────────────────────────────────────────────
             RetroTextField(
                 state.name,
-                { viewModel.update { copy(name = it) } },
+                { viewModel.update { copy(name = it.replace(" ", "-")) } },
                 "Project Name *",
                 Modifier.fillMaxWidth()
             )
             Text(
-                "Path and tmux session are derived from the server's projects folder and this name.",
+                "No spaces allowed (use dashes). Path and tmux session are derived from this name.",
                 color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
             )
 
