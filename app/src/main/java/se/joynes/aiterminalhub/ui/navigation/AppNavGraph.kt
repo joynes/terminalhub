@@ -1,5 +1,6 @@
 package se.joynes.aiterminalhub.ui.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -18,7 +19,10 @@ import se.joynes.aiterminalhub.ui.screen.status.ServerStatusScreen
 import se.joynes.aiterminalhub.ui.screen.upload.FileUploadScreen
 
 @Composable
-fun AppNavGraph() {
+fun AppNavGraph(
+    sharedUri: Uri? = null,
+    onConsumeSharedUri: () -> Unit = {}
+) {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = Screen.Splash.route) {
         composable(Screen.Splash.route) {
@@ -51,6 +55,8 @@ fun AppNavGraph() {
             val serverId by viewModel.serverId.collectAsState()
             SessionHostScreen(
                 viewModel = viewModel,
+                sharedUri = sharedUri,
+                onConsumeSharedUri = onConsumeSharedUri,
                 onEditServer = { serverId?.let { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) } },
                 onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
                 onAddProject = { serverId?.let { id -> navController.navigate(Screen.AddEditProject.createRoute(id)) } },

@@ -32,6 +32,7 @@ fun FloatingFileUploadDialog(
     viewModel: FileUploadViewModel,
     projectId: Long,
     serverId: Long,
+    initialUri: android.net.Uri? = null,
     onDismiss: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
@@ -48,6 +49,20 @@ fun FloatingFileUploadDialog(
 
     var selectedUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var selectedName by remember { mutableStateOf("") }
+
+    // Pre-populate from share intent
+    LaunchedEffect(initialUri) {
+        if (initialUri != null && selectedUri == null) {
+            selectedUri = initialUri
+            context.contentResolver.query(initialUri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) selectedName = cursor.getString(idx) ?: initialUri.lastPathSegment ?: "file"
+                }
+            }
+            if (selectedName.isBlank()) selectedName = initialUri.lastPathSegment ?: "file"
+        }
+    }
 
     val uploadState by viewModel.uploadState.collectAsState()
 

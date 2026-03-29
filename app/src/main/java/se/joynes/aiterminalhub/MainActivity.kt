@@ -4,19 +4,26 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.net.Uri
 import android.os.Bundle
 import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import se.joynes.aiterminalhub.service.SshSessionService
 import se.joynes.aiterminalhub.ui.navigation.AppNavGraph
 import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.viewmodel.SharedIntentViewModel
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val sharedIntentViewModel: SharedIntentViewModel by viewModels()
+
     private var bound = false
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -30,11 +37,29 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
         enableEdgeToEdge()
         setContent {
+            val pendingUri by sharedIntentViewModel.pendingUri.collectAsState()
             AITerminalHubTheme {
-                AppNavGraph()
+                AppNavGraph(
+                    sharedUri = pendingUri,
+                    onConsumeSharedUri = { sharedIntentViewModel.consume() }
+                )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent) {
+        if (intent.action == Intent.ACTION_SEND) {
+            @Suppress("DEPRECATION")
+            val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            uri?.let { sharedIntentViewModel.set(it) }
         }
     }
 

@@ -1,5 +1,6 @@
 package se.joynes.aiterminalhub.ui.screen.sessions
 
+import android.net.Uri
 import android.os.Build
 import android.view.WindowInsets as AndroidWindowInsets
 import android.view.inputmethod.InputMethodManager
@@ -49,6 +50,8 @@ fun SessionHostScreen(
     onAddServer: () -> Unit,
     onAddProject: () -> Unit,
     onOpenLogs: () -> Unit,
+    sharedUri: Uri? = null,
+    onConsumeSharedUri: () -> Unit = {},
     viewModel: SessionHostViewModel = hiltViewModel()
 ) {
     val projectTabs by viewModel.projectTabs.collectAsState()
@@ -138,6 +141,17 @@ fun SessionHostScreen(
         tv.updateSize()
         val emulator = tv.mEmulator ?: return
         viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
+    }
+
+    // Auto-open upload dialog when a file is shared to this app
+    var pendingSharedUri by remember { mutableStateOf<Uri?>(null) }
+    LaunchedEffect(sharedUri) {
+        if (sharedUri != null) {
+            pendingSharedUri = sharedUri
+            showTextInput = false
+            showFileUpload = true
+            onConsumeSharedUri()
+        }
     }
 
     LaunchedEffect(Unit) { viewModel.init() }
@@ -342,6 +356,7 @@ fun SessionHostScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
+                        .background(MegaDriveBg)
                 ) {
                     val sess = session
                     if (sess != null) {
@@ -368,6 +383,7 @@ fun SessionHostScreen(
                                     TerminalView(ctx, null).apply {
                                         isFocusable = true
                                         isFocusableInTouchMode = true
+                                        setBackgroundColor(0xFF0D0D1A.toInt())
                                         setTextSize(textSizePx)
                                         setTerminalViewClient(terminalViewClient)
                                         attachSession(sess)
@@ -441,8 +457,10 @@ fun SessionHostScreen(
                             viewModel = fileUploadViewModel,
                             projectId = activeProjectId ?: 0L,
                             serverId = serverId ?: 0L,
+                            initialUri = pendingSharedUri,
                             onDismiss = {
                                 showFileUpload = false
+                                pendingSharedUri = null
                                 terminalViewRef.value?.requestFocus()
                             }
                         )
