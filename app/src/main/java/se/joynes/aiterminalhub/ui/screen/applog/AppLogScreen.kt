@@ -1,10 +1,14 @@
 package se.joynes.aiterminalhub.ui.screen.applog
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -39,6 +43,7 @@ fun AppLogScreen(
     val search by viewModel.searchQuery.collectAsState()
     val selectedLevel by viewModel.selectedLevel.collectAsState()
     val autoScroll by viewModel.autoScroll.collectAsState()
+    var selectedEntry by remember { mutableStateOf<AppLogEntry?>(null) }
     val listState = rememberLazyListState()
     val clipboardManager = LocalClipboardManager.current
 
@@ -120,21 +125,29 @@ fun AppLogScreen(
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 items(logs, key = { it.id }) { entry ->
-                    LogEntryRow(entry)
+                    LogEntryRow(entry = entry, onOpen = { selectedEntry = it })
                 }
             }
         }
     }
+
+    selectedEntry?.let { entry ->
+        LogEntryDialog(
+            entry = entry,
+            onDismiss = { selectedEntry = null }
+        )
+    }
 }
 
 @Composable
-private fun LogEntryRow(entry: AppLogEntry) {
+private fun LogEntryRow(entry: AppLogEntry, onOpen: (AppLogEntry) -> Unit) {
     val color = LOG_LEVEL_COLORS[entry.level] ?: MegaDriveOnSurface
     val time = remember(entry.timestamp) { TIME_FMT.format(Date(entry.timestamp)) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MegaDriveSurface.copy(alpha = 0.5f))
+            .clickable { onOpen(entry) }
             .padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -143,6 +156,65 @@ private fun LogEntryRow(entry: AppLogEntry) {
         Text("[${entry.tag}]", color = MegaDriveDim, fontSize = 9.sp, fontFamily = MonoFontFamily)
         Text(entry.message, color = MegaDriveOnSurface, fontSize = 9.sp, fontFamily = MonoFontFamily, modifier = Modifier.weight(1f))
     }
+}
+
+@Composable
+private fun LogEntryDialog(
+    entry: AppLogEntry,
+    onDismiss: () -> Unit
+) {
+    val clipboardManager = LocalClipboardManager.current
+    val time = remember(entry.timestamp) { TIME_FMT.format(Date(entry.timestamp)) }
+    val fullText = remember(entry) {
+        buildString {
+            append(time)
+            append(' ')
+            append(entry.level)
+            append(" [")
+            append(entry.tag)
+            append("]\n\n")
+            append(entry.message)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                clipboardManager.setText(AnnotatedString(fullText))
+            }) {
+                Text("COPY ENTRY", fontFamily = MonoFontFamily, color = MegaDrivePrimary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CLOSE", fontFamily = MonoFontFamily, color = MegaDriveDim)
+            }
+        },
+        title = {
+            Text(
+                text = "${entry.level} [${entry.tag}]",
+                color = LOG_LEVEL_COLORS[entry.level] ?: MegaDriveOnSurface,
+                fontFamily = MonoFontFamily,
+                fontSize = 12.sp
+            )
+        },
+        text = {
+            SelectionContainer {
+                Text(
+                    text = fullText,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                    color = MegaDriveOnSurface,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 11.sp
+                )
+            }
+        },
+        containerColor = MegaDriveSurface
+    )
 }
 
 private fun formatLogsForClipboard(logs: List<AppLogEntry>, maxChars: Int = 200_000): String {
