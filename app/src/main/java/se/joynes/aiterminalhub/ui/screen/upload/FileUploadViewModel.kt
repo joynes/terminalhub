@@ -18,7 +18,7 @@ import javax.inject.Inject
 sealed interface UploadState {
     object Idle : UploadState
     data class Uploading(val fileName: String, val progress: Float) : UploadState
-    data class Done(val fileName: String) : UploadState
+    data class Done(val fileName: String, val remotePath: String) : UploadState
     data class Error(val message: String) : UploadState
 }
 
@@ -60,7 +60,7 @@ class FileUploadViewModel @Inject constructor(
                     _uploadState.value = UploadState.Uploading(progress.fileName, progress.percent / 100f)
                 }
 
-                _uploadState.value = UploadState.Done(fileName)
+                _uploadState.value = UploadState.Done(fileName, "$remotePath/$fileName")
             } catch (e: Exception) {
                 _uploadState.value = UploadState.Error(e.message ?: "Upload failed")
             }

@@ -13,9 +13,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -35,6 +37,7 @@ fun FloatingFileUploadDialog(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
     val screenWidthPx  = with(density) { configuration.screenWidthDp.dp.toPx() }
     val panelWidthDp   = (configuration.screenWidthDp * 0.92f).dp
@@ -62,9 +65,9 @@ fun FloatingFileUploadDialog(
         }
     }
 
-    // Auto-dismiss after Done
-    LaunchedEffect(uploadState) {
-        if (uploadState is UploadState.Done) {
+    var copied by remember { mutableStateOf(false) }
+    LaunchedEffect(copied) {
+        if (copied) {
             delay(1500)
             viewModel.reset()
             onDismiss()
@@ -150,11 +153,27 @@ fun FloatingFileUploadDialog(
                         )
                     }
                     isDone -> {
+                        val doneState = uploadState as UploadState.Done
                         Text(
-                            "DONE ✓",
+                            if (copied) "COPIED ✓" else "DONE ✓  ${doneState.fileName}",
                             color = MegaDrivePrimary,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontFamily = MonoFontFamily
+                        )
+                        Text(
+                            doneState.remotePath,
+                            color = MegaDriveDim,
+                            fontSize = 10.sp,
+                            fontFamily = MonoFontFamily,
+                            maxLines = 2
+                        )
+                        RetroButton(
+                            text = if (copied) "COPIED!" else "COPY PATH",
+                            onClick = {
+                                clipboard.setText(AnnotatedString(doneState.remotePath))
+                                copied = true
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                     isError -> {
