@@ -463,6 +463,15 @@ fun SessionHostScreen(
                                     tv.isDrawingCacheEnabled = false
                                 } catch (_: Exception) {}
                                 sb.append(" alpha=${tv.alpha} layer=${tv.layerType}")
+                                // Log cell styles at center position
+                                tv.mEmulator?.let { emu ->
+                                    val midRow = emu.mRows / 2
+                                    val midCol = emu.mColumns / 2
+                                    sb.append(" | cell: ${tv.debugCellAt(midRow, midCol)}")
+                                    // Also check row 0 and last row
+                                    sb.append(" | row0: ${tv.debugCellAt(0, 0)}")
+                                    sb.append(" | lastRow: ${tv.debugCellAt(emu.mRows - 1, 0)}")
+                                }
                                 viewModel.debugLog(sb.toString())
                             }
                         }
