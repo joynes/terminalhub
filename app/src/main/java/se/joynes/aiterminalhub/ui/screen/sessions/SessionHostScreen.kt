@@ -382,6 +382,7 @@ fun SessionHostScreen(
                                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                                                 isForceDarkAllowed = false
                                             }
+                                            setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
                                             isFocusable = true
                                             isFocusableInTouchMode = true
                                             setBackgroundColor(0xFF0D0D1A.toInt())
@@ -412,6 +413,7 @@ fun SessionHostScreen(
                                         if (tv.mTermSession !== sess) {
                                             tv.attachSession(sess)
                                         }
+                                        tv.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
                                         tv.setBackgroundColor(0xFF0D0D1A.toInt())
                                         tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
                                         terminalViewRef.value = tv
