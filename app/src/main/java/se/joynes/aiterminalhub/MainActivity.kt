@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
         enableEdgeToEdge()
+        window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#0D0D1A"))
         setContent {
             val pendingUri by sharedIntentViewModel.pendingUri.collectAsState()
             AITerminalHubTheme {

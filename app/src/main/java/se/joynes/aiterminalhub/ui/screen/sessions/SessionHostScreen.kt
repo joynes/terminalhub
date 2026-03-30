@@ -375,11 +375,14 @@ fun SessionHostScreen(
                                 }
                                 LaunchedEffect(sess) {
                                     keyboardVisible = true
+                                    kotlinx.coroutines.delay(50)
+                                    terminalViewRef.value?.postInvalidateOnAnimation()
                                 }
                                 AndroidView(
                                     factory = { ctx ->
                                         val textSizePx = (14 * ctx.resources.displayMetrics.scaledDensity + 0.5f).toInt()
                                         TerminalView(ctx, null).apply {
+                                            setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
                                             isFocusable = true
                                             isFocusableInTouchMode = true
                                             setBackgroundColor(0xFF0D0D1A.toInt())
