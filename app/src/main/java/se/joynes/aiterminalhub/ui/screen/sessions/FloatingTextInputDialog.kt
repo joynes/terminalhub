@@ -21,9 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.aiterminalhub.ui.components.RetroButton
@@ -40,8 +42,10 @@ fun FloatingTextInputDialog(
     onSend: (String) -> Unit,
     onDismiss: () -> Unit,
     history: List<String> = emptyList(),
-    onSaveHistory: (String) -> Unit = {}
+    onSaveHistory: (String) -> Unit = {},
+    bottomAvoidanceDp: Dp = 0.dp
 ) {
+    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     var text    by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
@@ -66,8 +70,13 @@ fun FloatingTextInputDialog(
                 detectTapGestures { onDismiss() }
             }
     ) {
+        val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+        val imeBottomPx = WindowInsets.ime.getBottom(density).toFloat()
+        val bottomAvoidancePx = with(density) { bottomAvoidanceDp.toPx() }
         val availableWidthPx = with(density) { maxWidth.toPx() }
-        val availableHeightPx = with(density) { maxHeight.toPx() }
+        val availableHeightPx = with(density) {
+            (screenHeightPx - imeBottomPx - bottomAvoidancePx).coerceAtLeast(220.dp.toPx())
+        }
         val panelWidthDp = maxWidth * 0.92f
         val panelWidthPx = with(density) { panelWidthDp.toPx() }
         val panelHeightPx = with(density) { 160.dp.toPx() }

@@ -28,8 +28,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,6 +42,8 @@ import se.joynes.aiterminalhub.ui.screen.terminal.MutableModifierManager
 import se.joynes.aiterminalhub.ui.screen.terminal.SpecialKeyBar
 import se.joynes.aiterminalhub.ui.screen.terminal.TerminalViewClientImpl
 import se.joynes.aiterminalhub.ui.theme.*
+
+private val KeyBarReservedHeight = 104.dp
 
 
 @Composable
@@ -198,20 +198,10 @@ fun SessionHostScreen(
             onDismiss = { showSessionHistory = false }
         )
     }
-
-    val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-
-    val imeBottomDp = with(density) {
-        if (keyboardVisible && imeBottom > 0) imeBottom.toDp() else 0.dp
-    }
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
-            .navigationBarsPadding()
-            .padding(bottom = imeBottomDp)
             .background(MegaDriveBg)
     ) {
             Row(
@@ -358,165 +348,179 @@ fun SessionHostScreen(
                     }
                 }
             } else {
-                // Single active terminal pane
                 Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .background(MegaDriveBg)
-                        .graphicsLayer { clip = true }
-                        .zIndex(0f)
                 ) {
-                    val sess = session
-                    if (sess != null) {
-                        // key(sess) forces TerminalView to fully recreate on tab switch
-                        key(sess) {
-                            val terminalViewClient = remember(sess) {
-                                TerminalViewClientImpl(
-                                    modifierManager = modifierManager,
-                                    onSendToSsh = { bytes -> viewModel.sendBytesToActive(bytes) },
-                                    onTerminalTap = {
-                                        keyboardVisible = true
-                                        showKeyboard()
-                                    }
-                                )
-                            }
-                            LaunchedEffect(sess) {
-                                keyboardVisible = true
-                                // Keyboard is shown by view.post{} inside the factory;
-                                // just ensure the state flag is set here.
-                            }
-                            AndroidView(
-                                factory = { ctx ->
-                                    val textSizePx = (14 * ctx.resources.displayMetrics.scaledDensity + 0.5f).toInt()
-                                    TerminalView(ctx, null).apply {
-                                        isFocusable = true
-                                        isFocusableInTouchMode = true
-                                        setBackgroundColor(0xFF0D0D1A.toInt())
-                                        setCanvasBackgroundColor(0xFF0D0D1A.toInt())
-                                        setTextSize(textSizePx)
-                                        setTerminalViewClient(terminalViewClient)
-                                        attachSession(sess)
-                                        addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-                                            syncRemotePty(view as TerminalView)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = KeyBarReservedHeight)
+                            .background(MegaDriveBg)
+                            .graphicsLayer { clip = true }
+                    ) {
+                        val sess = session
+                        if (sess != null) {
+                            key(sess) {
+                                val terminalViewClient = remember(sess) {
+                                    TerminalViewClientImpl(
+                                        modifierManager = modifierManager,
+                                        onSendToSsh = { bytes -> viewModel.sendBytesToActive(bytes) },
+                                        onTerminalTap = {
+                                            keyboardVisible = true
+                                            showKeyboard()
                                         }
-                                    }.also { tv ->
-                                        terminalViewRef.value = tv
-                                        // post{} runs after the view is attached to the window,
-                                        // which is required for showSoftInput() to succeed.
-                                        tv.post {
-                                            syncRemotePty(tv)
-                                            tv.requestFocusFromTouch()
-                                            tv.requestFocus()
-                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                                tv.windowInsetsController?.show(AndroidWindowInsets.Type.ime())
-                                            } else {
-                                                ctx.getSystemService(InputMethodManager::class.java)
-                                                    ?.showSoftInput(tv, InputMethodManager.SHOW_FORCED)
+                                    )
+                                }
+                                LaunchedEffect(sess) {
+                                    keyboardVisible = true
+                                }
+                                AndroidView(
+                                    factory = { ctx ->
+                                        val textSizePx = (14 * ctx.resources.displayMetrics.scaledDensity + 0.5f).toInt()
+                                        TerminalView(ctx, null).apply {
+                                            isFocusable = true
+                                            isFocusableInTouchMode = true
+                                            setBackgroundColor(0xFF0D0D1A.toInt())
+                                            setCanvasBackgroundColor(0xFF0D0D1A.toInt())
+                                            setTextSize(textSizePx)
+                                            setTerminalViewClient(terminalViewClient)
+                                            attachSession(sess)
+                                            addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
+                                                syncRemotePty(view as TerminalView)
+                                            }
+                                        }.also { tv ->
+                                            terminalViewRef.value = tv
+                                            tv.post {
+                                                syncRemotePty(tv)
+                                                tv.requestFocusFromTouch()
+                                                tv.requestFocus()
+                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                                    tv.windowInsetsController?.show(AndroidWindowInsets.Type.ime())
+                                                } else {
+                                                    ctx.getSystemService(InputMethodManager::class.java)
+                                                        ?.showSoftInput(tv, InputMethodManager.SHOW_FORCED)
+                                                }
                                             }
                                         }
-                                    }
-                                },
-                                update = { tv ->
-                                    if (tv.mTermSession !== sess) {
-                                        tv.attachSession(sess)
-                                    }
-                                    tv.setBackgroundColor(0xFF0D0D1A.toInt())
-                                    tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
-                                    terminalViewRef.value = tv
-                                    syncRemotePty(tv)
-                                },
+                                    },
+                                    update = { tv ->
+                                        if (tv.mTermSession !== sess) {
+                                            tv.attachSession(sess)
+                                        }
+                                        tv.setBackgroundColor(0xFF0D0D1A.toInt())
+                                        tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
+                                        terminalViewRef.value = tv
+                                        syncRemotePty(tv)
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer { clip = true }
+                                )
+                            }
+                        } else {
+                            Box(
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .graphicsLayer { clip = true }
-                            )
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(MegaDriveBg),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "CONNECTING...",
-                                color = MegaDrivePrimary,
-                                fontSize = 12.sp,
-                                fontFamily = MonoFontFamily
-                            )
-                        }
-                    }
-
-                    // Floating text input overlay
-                    if (showTextInput) {
-                        FloatingTextInputDialog(
-                            onSend = { text ->
-                                val payload = if (text.endsWith("\n") || text.endsWith("\r")) text else "$text\r"
-                                viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
-                            },
-                            onDismiss = {
-                                showTextInput = false
-                                keyboardVisible = true
-                                showKeyboard()
-                            },
-                            history = textInputHistory,
-                            onSaveHistory = { text ->
-                                activeProjectId?.let { viewModel.saveTextInput(it, text) }
+                                    .background(MegaDriveBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "CONNECTING...",
+                                    color = MegaDrivePrimary,
+                                    fontSize = 12.sp,
+                                    fontFamily = MonoFontFamily
+                                )
                             }
-                        )
+                        }
+
+                        if (showTextInput) {
+                            FloatingTextInputDialog(
+                                onSend = { text ->
+                                    val payload = if (text.endsWith("\n") || text.endsWith("\r")) text else "$text\r"
+                                    viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
+                                },
+                                onDismiss = {
+                                    showTextInput = false
+                                    keyboardVisible = true
+                                    showKeyboard()
+                                },
+                                history = textInputHistory,
+                                onSaveHistory = { text ->
+                                    activeProjectId?.let { viewModel.saveTextInput(it, text) }
+                                },
+                                bottomAvoidanceDp = KeyBarReservedHeight
+                            )
+                        }
+
+                        if (showFileUpload) {
+                            FloatingFileUploadDialog(
+                                viewModel = fileUploadViewModel,
+                                projectId = activeProjectId ?: 0L,
+                                serverId = serverId ?: 0L,
+                                initialUri = pendingSharedUri,
+                                onDismiss = {
+                                    showFileUpload = false
+                                    pendingSharedUri = null
+                                    terminalViewRef.value?.requestFocus()
+                                }
+                            )
+                        }
                     }
 
-                    if (showFileUpload) {
-                        FloatingFileUploadDialog(
-                            viewModel = fileUploadViewModel,
-                            projectId = activeProjectId ?: 0L,
-                            serverId = serverId ?: 0L,
-                            initialUri = pendingSharedUri,
-                            onDismiss = {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .fillMaxWidth()
+                    ) {
+                        SpecialKeyBar(
+                            modifierManager = modifierManager,
+                            onKey = {
+                                viewModel.sendBytesToActive(it.toByteArray(Charsets.UTF_8))
+                            },
+                            onPaste = {
+                                val text = clipboardManager.getText()?.text ?: return@SpecialKeyBar
+                                viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
+                            },
+                            onTextInput = {
                                 showFileUpload = false
-                                pendingSharedUri = null
-                                terminalViewRef.value?.requestFocus()
+                                showTextInput = true
+                            },
+                            onFileUpload = {
+                                showTextInput = false
+                                showFileUpload = true
+                            },
+                            onKeyboardToggle = {
+                                keyboardVisible = !keyboardVisible
+                                if (keyboardVisible) showKeyboard() else hideKeyboard()
+                            },
+                            onPrevTab = {
+                                val connected = projectTabs.filter { it.sessionId != null }
+                                val curIdx = connected.indexOfFirst { it.sessionId == activeId }
+                                if (curIdx > 0) {
+                                    connected[curIdx - 1].sessionId?.let {
+                                        viewModel.switchToSession(it)
+                                        terminalViewRef.value?.requestFocus()
+                                    }
+                                }
+                            },
+                            onNextTab = {
+                                val connected = projectTabs.filter { it.sessionId != null }
+                                val curIdx = connected.indexOfFirst { it.sessionId == activeId }
+                                if (curIdx in 0 until connected.size - 1) {
+                                    connected[curIdx + 1].sessionId?.let {
+                                        viewModel.switchToSession(it)
+                                        terminalViewRef.value?.requestFocus()
+                                    }
+                                }
                             }
                         )
                     }
                 }
-
-                SpecialKeyBar(
-                    modifierManager = modifierManager,
-                    onKey = {
-                        viewModel.sendBytesToActive(it.toByteArray(Charsets.UTF_8))
-                    },
-                    onPaste = {
-                        val text = clipboardManager.getText()?.text ?: return@SpecialKeyBar
-                        viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
-                    },
-                    onTextInput = { showFileUpload = false; showTextInput = true },
-                    onFileUpload = { showTextInput = false; showFileUpload = true },
-                    onKeyboardToggle = {
-                        keyboardVisible = !keyboardVisible
-                        if (keyboardVisible) showKeyboard() else hideKeyboard()
-                    },
-                    onPrevTab = {
-                        val connected = projectTabs.filter { it.sessionId != null }
-                        val curIdx = connected.indexOfFirst { it.sessionId == activeId }
-                        if (curIdx > 0) {
-                            connected[curIdx - 1].sessionId?.let {
-                                viewModel.switchToSession(it)
-                                terminalViewRef.value?.requestFocus()
-                            }
-                        }
-                    },
-                    onNextTab = {
-                        val connected = projectTabs.filter { it.sessionId != null }
-                        val curIdx = connected.indexOfFirst { it.sessionId == activeId }
-                        if (curIdx in 0 until connected.size - 1) {
-                            connected[curIdx + 1].sessionId?.let {
-                                viewModel.switchToSession(it)
-                                terminalViewRef.value?.requestFocus()
-                            }
-                        }
-                    }
-                )
             }
     }
 }
