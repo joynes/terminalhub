@@ -352,12 +352,13 @@ fun SessionHostScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .background(MegaDriveBg)
+                        .background(androidx.compose.ui.graphics.Color.Magenta) // DEBUG: test if Compose bleeds through
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(bottom = KeyBarReservedHeight)
+                            .background(androidx.compose.ui.graphics.Color.Magenta) // DEBUG: test compositing
                     ) {
                         val sess = session
                         if (sess != null) {
@@ -445,17 +446,25 @@ fun SessionHostScreen(
                                 kotlinx.coroutines.delay(500)
                                 val tv = terminalViewRef.value ?: continue
                                 var info = "emu=${tv.mEmulator != null} ${tv.width}x${tv.height}"
+                                // Log palette bg from emulator
+                                tv.mEmulator?.let { emu ->
+                                    val palBg = emu.mColors.mCurrentColors[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]
+                                    info += "\npalBg=#${Integer.toHexString(palBg)}"
+                                }
                                 try {
                                     @Suppress("DEPRECATION")
                                     tv.isDrawingCacheEnabled = true
                                     @Suppress("DEPRECATION")
                                     tv.drawingCache?.let { bmp ->
-                                        val px = bmp.getPixel(bmp.width / 2, bmp.height / 2)
-                                        info += " px=#${Integer.toHexString(px)}"
+                                        val top = bmp.getPixel(bmp.width / 2, 10.coerceAtMost(bmp.height - 1))
+                                        val mid = bmp.getPixel(bmp.width / 2, bmp.height / 2)
+                                        val bot = bmp.getPixel(bmp.width / 2, (bmp.height * 9 / 10).coerceAtMost(bmp.height - 1))
+                                        info += "\ntop=#${Integer.toHexString(top)} mid=#${Integer.toHexString(mid)} bot=#${Integer.toHexString(bot)}"
                                     }
                                     @Suppress("DEPRECATION")
                                     tv.isDrawingCacheEnabled = false
                                 } catch (_: Exception) {}
+                                info += "\nalpha=${tv.alpha} layer=${tv.layerType}"
                                 debugInfo = info
                             }
                         }
@@ -463,7 +472,11 @@ fun SessionHostScreen(
                             text = debugInfo,
                             color = androidx.compose.ui.graphics.Color.Yellow,
                             fontSize = 9.sp,
-                            modifier = Modifier.align(Alignment.TopStart).padding(4.dp)
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(4.dp)
+                                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f))
+                                .padding(4.dp)
                         )
 
                         if (showTextInput) {

@@ -1027,10 +1027,17 @@ public final class TerminalView extends View {
         long now = System.currentTimeMillis();
         if (now - mLastDrawLog > 1000) {
             mLastDrawLog = now;
+            String paletteBg = "n/a";
+            if (mEmulator != null) {
+                paletteBg = "#" + Integer.toHexString(mEmulator.mColors.mCurrentColors[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]);
+            }
             android.util.Log.d("TERMVIEW", "onDraw: emu=" + (mEmulator != null)
                 + " canvasBg=#" + Integer.toHexString(mCanvasBackgroundColor)
+                + " paletteBg=" + paletteBg
                 + " w=" + getWidth() + " h=" + getHeight()
-                + " hwAccel=" + canvas.isHardwareAccelerated());
+                + " alpha=" + getAlpha()
+                + " hwAccel=" + canvas.isHardwareAccelerated()
+                + " layerType=" + getLayerType());
         }
         if (mEmulator == null) {
             canvas.drawColor(mCanvasBackgroundColor);
