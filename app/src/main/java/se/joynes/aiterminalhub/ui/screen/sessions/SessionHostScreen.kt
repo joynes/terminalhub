@@ -459,10 +459,18 @@ fun SessionHostScreen(
                                     tv.isDrawingCacheEnabled = true
                                     @Suppress("DEPRECATION")
                                     tv.drawingCache?.let { bmp ->
-                                        val top = bmp.getPixel(bmp.width / 2, 10.coerceAtMost(bmp.height - 1))
+                                        val safeX = 4.coerceAtMost(bmp.width - 1)
+                                        val safeY = 4.coerceAtMost(bmp.height - 1)
+                                        val tl = bmp.getPixel(safeX, safeY)
+                                        val tr = bmp.getPixel((bmp.width - 5).coerceAtLeast(0), safeY)
+                                        val bl = bmp.getPixel(safeX, (bmp.height - 5).coerceAtLeast(0))
+                                        val br = bmp.getPixel((bmp.width - 5).coerceAtLeast(0), (bmp.height - 5).coerceAtLeast(0))
                                         val mid = bmp.getPixel(bmp.width / 2, bmp.height / 2)
-                                        val bot = bmp.getPixel(bmp.width / 2, (bmp.height * 9 / 10).coerceAtMost(bmp.height - 1))
-                                        sb.append(" top=#${Integer.toHexString(top)} mid=#${Integer.toHexString(mid)} bot=#${Integer.toHexString(bot)}")
+                                        sb.append(
+                                            " px tl=#${Integer.toHexString(tl)} tr=#${Integer.toHexString(tr)}" +
+                                                " bl=#${Integer.toHexString(bl)} br=#${Integer.toHexString(br)}" +
+                                                " mid=#${Integer.toHexString(mid)}"
+                                        )
                                     }
                                     @Suppress("DEPRECATION")
                                     tv.isDrawingCacheEnabled = false

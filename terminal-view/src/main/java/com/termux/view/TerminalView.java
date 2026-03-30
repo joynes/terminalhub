@@ -302,14 +302,16 @@ public final class TerminalView extends View {
             int rawBack = com.termux.terminal.TextStyle.decodeBackColor(style);
             int rawFore = com.termux.terminal.TextStyle.decodeForeColor(style);
             int[] palette = mEmulator.mColors.mCurrentColors;
-            // resolve palette indices to actual colors
-            int resolvedBack = (rawBack >= 256) ? palette[rawBack] : rawBack;
-            int resolvedFore = (rawFore >= 256) ? palette[rawFore] : rawFore;
-            boolean isTrueColorBg = (rawBack & 0xff000000) != 0;
+            boolean isTrueColorBg = (rawBack & 0xff000000) == 0xff000000;
+            boolean isTrueColorFg = (rawFore & 0xff000000) == 0xff000000;
+            // Resolve palette indices 0..257 to actual colors; leave truecolor values untouched.
+            int resolvedBack = isTrueColorBg ? rawBack : palette[rawBack];
+            int resolvedFore = isTrueColorFg ? rawFore : palette[rawFore];
             return "row=" + row + " col=" + col
                 + " rawBack=" + (isTrueColorBg ? "#" + Integer.toHexString(rawBack) : "idx" + rawBack)
                 + " resolved=#" + Integer.toHexString(resolvedBack)
-                + " rawFore=" + ((rawFore & 0xff000000) != 0 ? "#" + Integer.toHexString(rawFore) : "idx" + rawFore)
+                + " rawFore=" + (isTrueColorFg ? "#" + Integer.toHexString(rawFore) : "idx" + rawFore)
+                + " foreResolved=#" + Integer.toHexString(resolvedFore)
                 + " palDefault=#" + Integer.toHexString(palette[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]);
         } catch (Exception e) {
             return "err:" + e.getMessage();
