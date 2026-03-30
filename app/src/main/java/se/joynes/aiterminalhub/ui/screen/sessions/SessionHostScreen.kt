@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -359,7 +359,7 @@ fun SessionHostScreen(
                             .fillMaxSize()
                             .padding(bottom = KeyBarReservedHeight)
                             .background(MegaDriveBg)
-                            .graphicsLayer { clip = true }
+                            .clipToBounds()
                     ) {
                         val sess = session
                         if (sess != null) {
@@ -417,7 +417,6 @@ fun SessionHostScreen(
                                     },
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .graphicsLayer { clip = true }
                                 )
                             }
                         } else {
