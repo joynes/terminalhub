@@ -1079,6 +1079,11 @@ public final class TerminalView extends View {
             // render the text selection handles
             renderTextSelection();
         }
+
+        // DEBUG: red marker — if visible on screen, onDraw content reaches display
+        android.graphics.Paint debugPaint = new android.graphics.Paint();
+        debugPaint.setColor(0xFFFF0000);
+        canvas.drawRect(0, 0, 40, 40, debugPaint);
     }
 
     public TerminalSession getCurrentSession() {
