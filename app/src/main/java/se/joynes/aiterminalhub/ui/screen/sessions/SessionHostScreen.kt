@@ -352,13 +352,12 @@ fun SessionHostScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .background(androidx.compose.ui.graphics.Color.Magenta) // DEBUG: test if Compose bleeds through
+                        .background(MegaDriveBg)
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(bottom = KeyBarReservedHeight)
-                            .background(androidx.compose.ui.graphics.Color.Magenta) // DEBUG: test compositing
                     ) {
                         val sess = session
                         if (sess != null) {
@@ -407,7 +406,7 @@ fun SessionHostScreen(
                                         }
                                     },
                                     update = { tv ->
-                                        android.util.Log.d("TERMHOST", "update: emu=${tv.mEmulator != null} w=${tv.width} h=${tv.height}")
+                                        viewModel.debugLog("update: emu=${tv.mEmulator != null} w=${tv.width} h=${tv.height}")
                                         if (tv.mTermSession !== sess) {
                                             tv.attachSession(sess)
                                         }
@@ -439,17 +438,16 @@ fun SessionHostScreen(
                         // Force Compose to use full compositing path for AndroidView
                         Spacer(modifier = Modifier.matchParentSize())
 
-                        // DEBUG: on-screen diagnostic overlay
-                        var debugInfo by remember { mutableStateOf("...") }
+                        // DEBUG: diagnostic logging to app LogView
                         LaunchedEffect(Unit) {
                             while (true) {
-                                kotlinx.coroutines.delay(500)
+                                kotlinx.coroutines.delay(1000)
                                 val tv = terminalViewRef.value ?: continue
-                                var info = "emu=${tv.mEmulator != null} ${tv.width}x${tv.height}"
-                                // Log palette bg from emulator
+                                val sb = StringBuilder()
+                                sb.append("emu=${tv.mEmulator != null} ${tv.width}x${tv.height}")
                                 tv.mEmulator?.let { emu ->
                                     val palBg = emu.mColors.mCurrentColors[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]
-                                    info += "\npalBg=#${Integer.toHexString(palBg)}"
+                                    sb.append(" palBg=#${Integer.toHexString(palBg)}")
                                 }
                                 try {
                                     @Suppress("DEPRECATION")
@@ -459,25 +457,15 @@ fun SessionHostScreen(
                                         val top = bmp.getPixel(bmp.width / 2, 10.coerceAtMost(bmp.height - 1))
                                         val mid = bmp.getPixel(bmp.width / 2, bmp.height / 2)
                                         val bot = bmp.getPixel(bmp.width / 2, (bmp.height * 9 / 10).coerceAtMost(bmp.height - 1))
-                                        info += "\ntop=#${Integer.toHexString(top)} mid=#${Integer.toHexString(mid)} bot=#${Integer.toHexString(bot)}"
+                                        sb.append(" top=#${Integer.toHexString(top)} mid=#${Integer.toHexString(mid)} bot=#${Integer.toHexString(bot)}")
                                     }
                                     @Suppress("DEPRECATION")
                                     tv.isDrawingCacheEnabled = false
                                 } catch (_: Exception) {}
-                                info += "\nalpha=${tv.alpha} layer=${tv.layerType}"
-                                debugInfo = info
+                                sb.append(" alpha=${tv.alpha} layer=${tv.layerType}")
+                                viewModel.debugLog(sb.toString())
                             }
                         }
-                        Text(
-                            text = debugInfo,
-                            color = androidx.compose.ui.graphics.Color.Yellow,
-                            fontSize = 9.sp,
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(4.dp)
-                                .background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.7f))
-                                .padding(4.dp)
-                        )
 
                         if (showTextInput) {
                             FloatingTextInputDialog(
