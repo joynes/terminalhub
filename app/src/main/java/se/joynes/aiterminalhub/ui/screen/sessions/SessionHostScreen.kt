@@ -115,6 +115,7 @@ fun SessionHostScreen(
 
     // Reference to the live TerminalView for direct IMM calls
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
+    val blackSwatchRef = remember { mutableStateOf<android.view.View?>(null) }
 
     fun showKeyboard() {
         val tv = terminalViewRef.value ?: return
@@ -423,6 +424,22 @@ fun SessionHostScreen(
                                         .fillMaxSize()
                                 )
                             }
+
+                            AndroidView(
+                                factory = { ctx ->
+                                    android.view.View(ctx).apply {
+                                        setBackgroundColor(android.graphics.Color.BLACK)
+                                    }.also { blackSwatchRef.value = it }
+                                },
+                                update = { swatch ->
+                                    swatch.setBackgroundColor(android.graphics.Color.BLACK)
+                                    blackSwatchRef.value = swatch
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .size(28.dp)
+                            )
                         } else {
                             Box(
                                 modifier = Modifier
@@ -476,6 +493,21 @@ fun SessionHostScreen(
                                     }
                                     @Suppress("DEPRECATION")
                                     tv.isDrawingCacheEnabled = false
+                                } catch (_: Exception) {}
+                                try {
+                                    val swatch = blackSwatchRef.value
+                                    @Suppress("DEPRECATION")
+                                    swatch?.isDrawingCacheEnabled = true
+                                    @Suppress("DEPRECATION")
+                                    swatch?.drawingCache?.let { bmp ->
+                                        val sample = bmp.getPixel(
+                                            (bmp.width / 2).coerceAtMost(bmp.width - 1),
+                                            (bmp.height / 2).coerceAtMost(bmp.height - 1)
+                                        )
+                                        sb.append(" swatch=#${Integer.toHexString(sample)}")
+                                    }
+                                    @Suppress("DEPRECATION")
+                                    swatch?.isDrawingCacheEnabled = false
                                 } catch (_: Exception) {}
                                 sb.append(" alpha=${tv.alpha} layer=${tv.layerType}")
                                 // Log cell styles at center position
