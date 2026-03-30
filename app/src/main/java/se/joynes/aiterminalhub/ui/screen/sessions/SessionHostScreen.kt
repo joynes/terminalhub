@@ -406,6 +406,7 @@ fun SessionHostScreen(
                                         }
                                     },
                                     update = { tv ->
+                                        android.util.Log.d("TERMHOST", "update: emu=${tv.mEmulator != null} w=${tv.width} h=${tv.height}")
                                         if (tv.mTermSession !== sess) {
                                             tv.attachSession(sess)
                                         }
@@ -436,6 +437,34 @@ fun SessionHostScreen(
 
                         // Force Compose to use full compositing path for AndroidView
                         Spacer(modifier = Modifier.matchParentSize())
+
+                        // DEBUG: on-screen diagnostic overlay
+                        var debugInfo by remember { mutableStateOf("...") }
+                        LaunchedEffect(Unit) {
+                            while (true) {
+                                kotlinx.coroutines.delay(500)
+                                val tv = terminalViewRef.value ?: continue
+                                var info = "emu=${tv.mEmulator != null} ${tv.width}x${tv.height}"
+                                try {
+                                    @Suppress("DEPRECATION")
+                                    tv.isDrawingCacheEnabled = true
+                                    @Suppress("DEPRECATION")
+                                    tv.drawingCache?.let { bmp ->
+                                        val px = bmp.getPixel(bmp.width / 2, bmp.height / 2)
+                                        info += " px=#${Integer.toHexString(px)}"
+                                    }
+                                    @Suppress("DEPRECATION")
+                                    tv.isDrawingCacheEnabled = false
+                                } catch (_: Exception) {}
+                                debugInfo = info
+                            }
+                        }
+                        Text(
+                            text = debugInfo,
+                            color = androidx.compose.ui.graphics.Color.Yellow,
+                            fontSize = 9.sp,
+                            modifier = Modifier.align(Alignment.TopStart).padding(4.dp)
+                        )
 
                         if (showTextInput) {
                             FloatingTextInputDialog(

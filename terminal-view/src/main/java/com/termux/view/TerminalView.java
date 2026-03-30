@@ -71,6 +71,7 @@ public final class TerminalView extends View {
     int mTopRow;
     int[] mDefaultSelectors = new int[]{-1,-1,-1,-1};
     private int mCanvasBackgroundColor = 0xFF0D0D1A;
+    private long mLastDrawLog = 0;
 
     float mScaleFactor = 1.f;
     final GestureAndScaleRecognizer mGestureRecognizer;
@@ -998,6 +999,8 @@ public final class TerminalView extends View {
     public void updateSize() {
         int viewWidth = getWidth();
         int viewHeight = getHeight();
+        android.util.Log.d("TERMVIEW", "updateSize: w=" + viewWidth + " h=" + viewHeight
+            + " session=" + (mTermSession != null) + " emu=" + (mEmulator != null));
         if (viewWidth == 0 || viewHeight == 0 || mTermSession == null) return;
 
         // Set to 80 and 24 if you want to enable vttest.
@@ -1021,6 +1024,14 @@ public final class TerminalView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
+        long now = System.currentTimeMillis();
+        if (now - mLastDrawLog > 1000) {
+            mLastDrawLog = now;
+            android.util.Log.d("TERMVIEW", "onDraw: emu=" + (mEmulator != null)
+                + " canvasBg=#" + Integer.toHexString(mCanvasBackgroundColor)
+                + " w=" + getWidth() + " h=" + getHeight()
+                + " hwAccel=" + canvas.isHardwareAccelerated());
+        }
         if (mEmulator == null) {
             canvas.drawColor(mCanvasBackgroundColor);
         } else {
