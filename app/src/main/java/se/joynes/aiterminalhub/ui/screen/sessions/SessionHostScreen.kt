@@ -358,7 +358,6 @@ fun SessionHostScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(bottom = KeyBarReservedHeight)
-                            .background(MegaDriveBg)
                     ) {
                         val sess = session
                         if (sess != null) {
@@ -375,8 +374,6 @@ fun SessionHostScreen(
                                 }
                                 LaunchedEffect(sess) {
                                     keyboardVisible = true
-                                    kotlinx.coroutines.delay(50)
-                                    terminalViewRef.value?.postInvalidateOnAnimation()
                                 }
                                 AndroidView(
                                     factory = { ctx ->
@@ -436,6 +433,9 @@ fun SessionHostScreen(
                                 )
                             }
                         }
+
+                        // Force Compose to use full compositing path for AndroidView
+                        Spacer(modifier = Modifier.matchParentSize())
 
                         if (showTextInput) {
                             FloatingTextInputDialog(
