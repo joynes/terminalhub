@@ -379,7 +379,9 @@ fun SessionHostScreen(
                                     factory = { ctx ->
                                         val textSizePx = (14 * ctx.resources.displayMetrics.scaledDensity + 0.5f).toInt()
                                         TerminalView(ctx, null).apply {
-                                            // LAYER_TYPE_HARDWARE removed for diagnostic — testing compositing
+                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                                isForceDarkAllowed = false
+                                            }
                                             isFocusable = true
                                             isFocusableInTouchMode = true
                                             setBackgroundColor(0xFF0D0D1A.toInt())
@@ -434,9 +436,6 @@ fun SessionHostScreen(
                                 )
                             }
                         }
-
-                        // Force Compose to use full compositing path for AndroidView
-                        Spacer(modifier = Modifier.matchParentSize())
 
                         // DEBUG: diagnostic logging to app LogView
                         LaunchedEffect(Unit) {
