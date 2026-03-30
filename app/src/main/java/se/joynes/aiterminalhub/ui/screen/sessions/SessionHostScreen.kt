@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -202,6 +202,7 @@ fun SessionHostScreen(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding()
+            .imePadding()
             .background(MegaDriveBg)
     ) {
             Row(
@@ -359,7 +360,7 @@ fun SessionHostScreen(
                             .fillMaxSize()
                             .padding(bottom = KeyBarReservedHeight)
                             .background(MegaDriveBg)
-                            .clipToBounds()
+                            .graphicsLayer { clip = true }
                     ) {
                         val sess = session
                         if (sess != null) {
@@ -473,7 +474,6 @@ fun SessionHostScreen(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
-                            .imePadding()
                             .fillMaxWidth()
                     ) {
                         SpecialKeyBar(
