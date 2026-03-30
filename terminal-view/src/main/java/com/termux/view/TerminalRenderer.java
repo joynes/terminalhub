@@ -66,8 +66,10 @@ public final class TerminalRenderer {
         final int[] palette = mEmulator.mColors.mCurrentColors;
         final int cursorShape = mEmulator.getCursorStyle();
 
-        if (reverseVideo)
-            canvas.drawColor(palette[TextStyle.COLOR_INDEX_FOREGROUND], PorterDuff.Mode.SRC);
+        final int screenBackground = reverseVideo
+            ? palette[TextStyle.COLOR_INDEX_FOREGROUND]
+            : palette[TextStyle.COLOR_INDEX_BACKGROUND];
+        canvas.drawColor(screenBackground, PorterDuff.Mode.SRC);
 
         float heightOffset = mFontLineSpacingAndAscent;
         for (int row = topRow; row < endRow; row++) {
