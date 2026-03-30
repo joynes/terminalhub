@@ -445,8 +445,14 @@ fun SessionHostScreen(
                                 val sb = StringBuilder()
                                 sb.append("emu=${tv.mEmulator != null} ${tv.width}x${tv.height}")
                                 tv.mEmulator?.let { emu ->
-                                    val palBg = emu.mColors.mCurrentColors[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]
+                                    val palette = emu.mColors.mCurrentColors
+                                    val palBg = palette[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]
+                                    val palFg = palette[com.termux.terminal.TextStyle.COLOR_INDEX_FOREGROUND]
                                     sb.append(" palBg=#${Integer.toHexString(palBg)}")
+                                    sb.append(" palFg=#${Integer.toHexString(palFg)}")
+                                    sb.append(" reverseVideo=${emu.isReverseVideo}")
+                                    // Log first 8 palette entries in case shell changed them
+                                    sb.append(" pal0-7=[${(0..7).joinToString(",") { "#${Integer.toHexString(palette[it])}" }}]")
                                 }
                                 try {
                                     @Suppress("DEPRECATION")
