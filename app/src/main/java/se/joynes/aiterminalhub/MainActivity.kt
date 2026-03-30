@@ -39,6 +39,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
         enableEdgeToEdge()
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.decorView.isForceDarkAllowed = false
+        }
         window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#0D0D1A"))
         setContent {
             val pendingUri by sharedIntentViewModel.pendingUri.collectAsState()
