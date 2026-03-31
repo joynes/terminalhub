@@ -250,9 +250,12 @@ fun SessionHostScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Image(
-                        painter = painterResource(id = R.mipmap.ic_launcher),
+                        painter = painterResource(id = R.drawable.ic_launcher_foreground_image),
                         contentDescription = "App icon",
-                        modifier = Modifier.size(72.dp)
+                        modifier = Modifier
+                            .size(72.dp)
+                            .background(MegaDriveBg)
+                            .padding(6.dp)
                     )
                     Text(
                         "AI TERMINAL HUB",
