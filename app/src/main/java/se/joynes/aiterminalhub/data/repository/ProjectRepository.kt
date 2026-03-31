@@ -20,9 +20,9 @@ class ProjectRepository @Inject constructor(
 
     suspend fun getById(id: Long): Project? = dao.getById(id)?.toModel()
 
-    suspend fun save(project: Project): Long = dao.insert(project.toEntity())
+    suspend fun save(project: Project): Long = dao.insert(project.withColorSeed().toEntity())
 
-    suspend fun update(project: Project) = dao.update(project.toEntity())
+    suspend fun update(project: Project) = dao.update(project.withColorSeed().toEntity())
 
     suspend fun delete(project: Project) = dao.delete(project.toEntity())
 
@@ -49,4 +49,10 @@ class ProjectRepository @Inject constructor(
         colorSeed = colorSeed,
         gitUrl = gitUrl
     )
+
+    private fun Project.withColorSeed(): Project {
+        if (colorSeed != 0) return this
+        val fallbackSeed = ((name.hashCode().toLong() shl 32) xor System.nanoTime()).toInt()
+        return copy(colorSeed = if (fallbackSeed != 0) fallbackSeed else 1)
+    }
 }

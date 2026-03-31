@@ -7,6 +7,7 @@ import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -55,6 +56,33 @@ class AddEditProjectScreenTest {
         assertEquals(LOCAL_PROJECT_SERVER_ID, project.serverId)
         assertEquals(false, project.useTmux)
         assertEquals("local-demo", project.name)
+        assertNotEquals(0, project.colorSeed)
+    }
+
+    @Test
+    fun editingProjectPreservesExistingColorSeed() = runBlocking {
+        val existingId = projectRepo.save(
+            se.joynes.aiterminalhub.data.model.Project(
+                serverId = LOCAL_PROJECT_SERVER_ID,
+                targetType = ProjectTargetType.LOCAL,
+                name = "keep-color",
+                useTmux = false,
+                colorSeed = 123456789
+            )
+        )
+
+        val viewModel = AddEditProjectViewModel(projectRepo, serverRepo)
+        viewModel.loadProject(initialServerId = null, id = existingId)
+        assertTrue(waitUntil(5_000) { viewModel.state.value.name == "keep-color" })
+
+        viewModel.update { copy(name = "keep-color-renamed") }
+        viewModel.save()
+
+        assertTrue(waitUntil(5_000) { viewModel.state.value.saved })
+
+        val updated = projectRepo.getById(existingId)!!
+        assertEquals("keep-color-renamed", updated.name)
+        assertEquals(123456789, updated.colorSeed)
     }
 
     private fun waitUntil(timeoutMs: Long, condition: () -> Boolean): Boolean {

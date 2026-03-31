@@ -26,6 +26,7 @@ data class AddEditProjectState(
     val useTmux: Boolean = !BuildConfig.IS_DIAGNOSTIC,
     val customScript: String = "cd {{PROJECT_PATH}}",
     val aiCommand: String = "",
+    val colorSeed: Int = 0,
     val gitUrl: String = "",
     val saved: Boolean = false
 )
@@ -66,6 +67,7 @@ class AddEditProjectViewModel @Inject constructor(
                 useTmux = p.useTmux,
                 customScript = p.customScript,
                 aiCommand = p.aiCommand,
+                colorSeed = p.colorSeed,
                 gitUrl = p.gitUrl
             )
         }
@@ -91,6 +93,7 @@ class AddEditProjectViewModel @Inject constructor(
                 useTmux = s.useTmux,
                 customScript = s.customScript,
                 aiCommand = s.aiCommand,
+                colorSeed = s.colorSeed,
                 gitUrl = s.gitUrl
             )
             if (editingId != null) repo.update(project) else repo.save(project)
