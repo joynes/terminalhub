@@ -10,16 +10,23 @@ Reproduce and isolate the grey terminal rendering bug on the physical phone with
 - Use a separate package name for all diagnostic builds.
 - Prefer short iterative loops over broad changes.
 - Capture enough evidence per iteration to decide the next step without guessing.
+- Use `Local device` as the default test target unless a specific SSH comparison is needed.
 
 ## Main Strategy
 
 Create a dedicated diagnostic install path with its own application ID, then run a tight test loop on the phone:
 
 1. Build and install a side-by-side diagnostic app.
-2. Run one focused rendering hypothesis per build.
-3. Collect the same evidence every time.
-4. Compare against the previous run.
-5. Continue until the transform source is isolated.
+2. Run the terminal in `Local device` mode by default.
+3. Run one focused rendering hypothesis per build.
+4. Collect the same evidence every time.
+5. Compare against the previous run.
+6. Continue until the transform source is isolated.
+
+Reason:
+
+- The grey rendering issue reproduces in local mode as well, so SSH is no longer required for the primary reproduction loop.
+- Using `Local device` removes SSH transport, auth, remote shell startup, and server configuration as confounding variables.
 
 ## Packaging Strategy
 
@@ -66,20 +73,23 @@ For every iteration, run the same loop:
 
 1. Install the diagnostic APK only.
 2. Open the diagnostic app on the phone.
-3. Open the terminal test screen.
-4. Record:
+3. Create or open a project configured with `Local device`.
+4. Open the terminal test screen for that local project.
+5. Record:
    - screenshot
    - one `TERMDIAG` log line
+   - confirmation that the project target is `Local device`
    - whether the control swatch is black or grey
    - whether reverse video changes only terminal colors or the whole surface impression
-5. Change exactly one hypothesis in code.
-6. Rebuild the diagnostic APK.
-7. Reinstall the diagnostic app.
-8. Repeat.
+6. Change exactly one hypothesis in code.
+7. Rebuild the diagnostic APK.
+8. Reinstall the diagnostic app.
+9. Repeat.
 
 Rule:
 
 - Never mix multiple unrelated rendering changes in one iteration.
+- Keep the target mode fixed to `Local device` across iterations unless the current step is explicitly an SSH-vs-local comparison.
 
 ## Evidence To Capture Every Time
 
@@ -87,6 +97,7 @@ Minimum evidence bundle per run:
 
 - app version / git commit
 - package name
+- target mode (`Local device` by default)
 - screenshot of terminal screen
 - screenshot with developer option overlays if used
 - one copied `TERMDIAG` line
@@ -157,15 +168,17 @@ Important:
 ## Suggested Iteration Order
 
 1. Ship side-by-side diagnostic package.
-2. Compare terminal vs black Android swatch.
-3. Add Compose black swatch and compare.
-4. Add a dedicated diagnostic activity with no app chrome, no tabs, no overlays.
-5. Compare edge-to-edge enabled vs disabled.
-6. Compare same content in:
+2. Reproduce the bug in `Local device` mode and keep that as the baseline.
+3. Compare terminal vs black Android swatch.
+4. Add Compose black swatch and compare.
+5. Add a dedicated diagnostic activity with no app chrome, no tabs, no overlays.
+6. Compare edge-to-edge enabled vs disabled.
+7. Compare same content in:
    - `TerminalView`
    - plain `View`
    - Compose-only screen
-7. If all app-controlled paths still show grey, investigate phone display processing outside the app.
+8. Only after the local baseline is understood, optionally compare the same build in SSH mode to confirm whether the issue is transport-independent.
+9. If all app-controlled paths still show grey, investigate phone display processing outside the app.
 
 ## Implementation Tasks
 
@@ -176,6 +189,7 @@ Important:
    - Android black swatch
    - Compose black swatch
    - optional RGB strip
+   - explicit label showing current target mode: `Local device` or `SSH`
 4. Add a compact diagnostics panel that prints:
    - package name
    - build type
@@ -201,3 +215,4 @@ Implement the first safe milestone:
 - keep the current release package untouched
 - move the current terminal diagnostics into that diagnostic package
 - use that package for all further phone loops
+- make `Local device` the default project target for all diagnostic iterations
