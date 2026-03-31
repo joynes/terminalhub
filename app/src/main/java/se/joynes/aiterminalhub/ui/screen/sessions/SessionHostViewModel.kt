@@ -13,6 +13,7 @@ import se.joynes.aiterminalhub.data.db.dao.TextInputHistoryDao
 import se.joynes.aiterminalhub.data.db.entity.TextInputHistoryEntity
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogLevel
+import se.joynes.aiterminalhub.data.model.ProjectTargetType
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
@@ -93,21 +94,24 @@ class SessionHostViewModel @Inject constructor(
         initialized = true
         logger.log(LogLevel.INFO, "SessionHostViewModel", "init snapshot=${debugSnapshot()}")
         viewModelScope.launch {
-            serverRepo.getAll().collect { servers ->
-                val sId = servers.firstOrNull()?.id ?: return@collect
-                if (_serverId.value == sId) return@collect
-                _serverId.value = sId
-                projectRepo.getByServer(sId).collect { projects ->
-                    _allDbProjects.value = projects
-                    val visible = projects.filter { !sessionManager.isProjectClosed(it.id) }
-                    val prevIds = _dbProjects.value.map { it.id }.toSet()
-                    val isFirstLoad = _dbProjects.value.isEmpty() && prevIds.isEmpty()
-                    _dbProjects.value = visible
-                    visible.forEach { project ->
-                        val isNewlyAdded = !isFirstLoad && project.id !in prevIds
-                        activateProject(project, autoSwitch = isNewlyAdded)
-                    }
+            projectRepo.getAll().collect { projects ->
+                _allDbProjects.value = projects
+                val visible = projects.filter { !sessionManager.isProjectClosed(it.id) }
+                val prevIds = _dbProjects.value.map { it.id }.toSet()
+                val isFirstLoad = _dbProjects.value.isEmpty() && prevIds.isEmpty()
+                _dbProjects.value = visible
+                visible.forEach { project ->
+                    val isNewlyAdded = !isFirstLoad && project.id !in prevIds
+                    activateProject(project, autoSwitch = isNewlyAdded)
                 }
+            }
+        }
+        viewModelScope.launch {
+            combine(activeId, _allDbProjects) { activeSessionId, projects ->
+                val activeProjectId = sessionManager.sessions.value.firstOrNull { it.id == activeSessionId }?.projectId
+                projects.firstOrNull { it.id == activeProjectId && it.targetType == ProjectTargetType.SSH }?.serverId
+            }.collect { activeServerId ->
+                _serverId.value = activeServerId
             }
         }
     }
@@ -115,69 +119,97 @@ class SessionHostViewModel @Inject constructor(
     private fun activateProject(project: Project, autoSwitch: Boolean = false) {
         if (project.id in connectingProjectIds) return
         // Already registered as a session
-        if (sessionManager.sessions.value.any { it.projectName == project.name }) return
+        if (sessionManager.sessions.value.any { it.projectId == project.id }) return
         connectingProjectIds.add(project.id)
 
         connectingJobs[project.id] = viewModelScope.launch {
-            val srv = serverRepo.getById(_serverId.value ?: return@launch) ?: return@launch
-            val conn = connectToServer(srv)
-            val setupCmd    = engine.renderSetup(srv, project)
-            val attachCmd   = engine.renderAttach(srv, project)
-            val customScript = engine.renderCustomScript(srv, project)
-            val aiCmd       = engine.renderAiCommand(project)
-            conn.connected.first { it }
-            if (sessionManager.isProjectClosed(project.id)) {
-                sshManager.destroySession(conn.sessionId)
-                return@launch
+            try {
+                when (project.targetType) {
+                    ProjectTargetType.LOCAL -> activateLocalProject(project, autoSwitch)
+                    ProjectTargetType.SSH -> activateSshProject(project, autoSwitch)
+                }
+            } finally {
+                connectingJobs.remove(project.id)
+                connectingProjectIds.remove(project.id)
             }
-            // 1. Silent exec: mkdir + create tmux session if needed
-            val setupOutput = if (setupCmd.isNotBlank()) conn.runSilent(setupCmd) else ""
-            val shouldRunStartupCommands = if (project.useTmux) {
-                setupOutput.contains("TMUX_SESSION_CREATED")
-            } else {
-                true
-            }
-            // 2. Wait for the interactive shell banner/prompt to settle before sending commands.
-            conn.awaitOutputQuiescence(requireNewOutput = true)
+        }
+    }
 
-            // 3. Attach to tmux session (or plain shell if useTmux=false)
-            if (attachCmd.isNotBlank()) {
-                conn.send("$attachCmd\n")
-                conn.awaitTransportQuiescence()
-            }
-            if (!sessionManager.isProjectClosed(project.id)) {
-                sessionManager.register(
-                    conn.sessionId,
-                    conn,
-                    project.name,
-                    project.id,
-                    isTmux = project.useTmux,
-                    tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null
-                )
-                if (autoSwitch) sessionManager.switchTo(TerminalSessionId(conn.sessionId))
-            } else {
-                sshManager.destroySession(conn.sessionId)
-                return@launch
-            }
+    private suspend fun activateSshProject(project: Project, autoSwitch: Boolean) {
+        val srv = serverRepo.getById(project.serverId) ?: return
+        val conn = connectToServer(srv)
+        val setupCmd = engine.renderSetup(srv, project)
+        val attachCmd = engine.renderAttach(srv, project)
+        val customScript = engine.renderCustomScript(srv, project)
+        val aiCmd = engine.renderAiCommand(project)
+        conn.connected.first { it }
+        if (sessionManager.isProjectClosed(project.id)) {
+            sshManager.destroySession(conn.sessionId)
+            return
+        }
+        val setupOutput = if (setupCmd.isNotBlank()) conn.runSilent(setupCmd) else ""
+        val shouldRunStartupCommands = if (project.useTmux) {
+            setupOutput.contains("TMUX_SESSION_CREATED")
+        } else {
+            true
+        }
+        conn.awaitOutputQuiescence(requireNewOutput = true)
 
-            // 4. Wait until attach/plain shell traffic settles, then run the custom script.
+        if (attachCmd.isNotBlank()) {
+            conn.send("$attachCmd\n")
             conn.awaitTransportQuiescence()
-            if (shouldRunStartupCommands && customScript.isNotBlank()) {
-                conn.send("$customScript\n")
-                conn.awaitTransportQuiescence()
-            }
+        }
+        if (!sessionManager.isProjectClosed(project.id)) {
+            sessionManager.register(
+                conn.sessionId,
+                conn,
+                project.name,
+                project.id,
+                isTmux = project.useTmux,
+                tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null
+            )
+            if (autoSwitch) sessionManager.switchTo(TerminalSessionId(conn.sessionId))
+        } else {
+            sshManager.destroySession(conn.sessionId)
+            return
+        }
 
-            // 5. AI tool last, after prior command output settles.
-            if (shouldRunStartupCommands && aiCmd.isNotBlank()) {
-                conn.awaitTransportQuiescence()
-                conn.send("$aiCmd\n")
-            }
-            connectingJobs.remove(project.id)
+        conn.awaitTransportQuiescence()
+        if (shouldRunStartupCommands && customScript.isNotBlank()) {
+            conn.send("$customScript\n")
+            conn.awaitTransportQuiescence()
+        }
+
+        if (shouldRunStartupCommands && aiCmd.isNotBlank()) {
+            conn.awaitTransportQuiescence()
+            conn.send("$aiCmd\n")
+        }
+    }
+
+    private fun activateLocalProject(project: Project, autoSwitch: Boolean) {
+        val localBasePath = sessionManager.localProjectPath("").trimEnd('/')
+        val customScript = engine.renderLocalCustomScript(localBasePath, project)
+        val aiCmd = engine.renderAiCommand(project)
+        val startupCommands = buildList {
+            if (customScript.isNotBlank()) add(customScript)
+            if (aiCmd.isNotBlank()) add(aiCmd)
+        }
+        sessionManager.registerLocal(
+            projectName = project.name,
+            projectId = project.id,
+            startupCommands = startupCommands
+        )
+        if (autoSwitch) {
+            sessionManager.sessions.value.firstOrNull { it.projectId == project.id }?.id?.let { sessionManager.switchTo(it) }
         }
     }
 
     fun switchToSession(id: TerminalSessionId) {
         sessionManager.switchTo(id)
+        val projectId = sessionManager.sessions.value.firstOrNull { it.id == id }?.projectId
+        _serverId.value = _allDbProjects.value.firstOrNull {
+            it.id == projectId && it.targetType == ProjectTargetType.SSH
+        }?.serverId
     }
 
     fun closeSession(projectId: Long, sessionId: TerminalSessionId?) {

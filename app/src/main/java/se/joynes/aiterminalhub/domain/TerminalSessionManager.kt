@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -20,7 +21,9 @@ import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.ssh.SshConnection
 import se.joynes.aiterminalhub.data.ssh.SshManager
 import se.joynes.aiterminalhub.data.ssh.TerminalSessionClientImpl
+import java.io.File
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -40,7 +43,7 @@ data class TerminalSessionMeta(
 
 private data class SessionEntry(
     val meta: TerminalSessionMeta,
-    val conn: SshConnection,
+    val conn: SshConnection?,
     val terminalSession: TerminalSession,
     val scope: CoroutineScope,
     val tmuxSessionName: String? = null
@@ -89,6 +92,9 @@ class TerminalSessionManager @Inject constructor(
     fun isProjectClosed(projectId: Long)   = projectId in closedProjectIds
 
     fun activeSession(): StateFlow<TerminalSession?> = _activeSession.asStateFlow()
+
+    fun localProjectPath(projectName: String): String =
+        File(File(context.filesDir, "projects"), projectName).absolutePath
 
     fun register(
         sessionId: String,
@@ -151,6 +157,64 @@ class TerminalSessionManager @Inject constructor(
         if (_activeId.value == null) switchTo(TerminalSessionId(sessionId))
     }
 
+    fun registerLocal(
+        projectName: String,
+        projectId: Long = 0L,
+        startupCommands: List<String> = emptyList()
+    ) {
+        if (entries.values.any { it.meta.projectId == projectId }) return
+        val sessionId = "local-${projectId}-${UUID.randomUUID()}"
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val terminalClient = TerminalSessionClientImpl(context) { changedSession ->
+            _screenUpdates.tryEmit(changedSession)
+        }
+
+        val projectDir = File(localProjectPath(projectName)).apply { mkdirs() }
+        val shellPath = if (File("/system/bin/sh").exists()) "/system/bin/sh" else "/bin/sh"
+        val env = arrayOf(
+            "TERM=xterm-256color",
+            "HOME=${context.filesDir.absolutePath}",
+            "PATH=${System.getenv("PATH") ?: "/system/bin:/system/xbin"}"
+        )
+        val terminalSession = TerminalSession(
+            shellPath,
+            projectDir.absolutePath,
+            arrayOf(shellPath),
+            env,
+            5000,
+            terminalClient
+        )
+
+        val now = System.currentTimeMillis()
+        val meta = TerminalSessionMeta(
+            id = TerminalSessionId(sessionId),
+            projectName = projectName,
+            projectId = projectId,
+            isTmux = false,
+            isConnected = true,
+            hasUnreadOutput = false,
+            previewLines = emptyList(),
+            lastOpenedAt = now,
+            createdAt = now
+        )
+        entries[sessionId] = SessionEntry(meta, null, terminalSession, scope, null)
+        publishSessions()
+        logger.log(LogLevel.INFO, TAG, "Local session registered: $projectName cwd=${projectDir.absolutePath}")
+
+        scope.launch {
+            while (terminalSession.emulator == null) delay(50)
+            delay(150)
+            startupCommands.filter { it.isNotBlank() }.forEach { command ->
+                val payload = if (command.endsWith("\n")) command else "$command\n"
+                val bytes = payload.toByteArray(StandardCharsets.UTF_8)
+                terminalSession.write(bytes, 0, bytes.size)
+                delay(100)
+            }
+        }
+
+        if (_activeId.value == null) switchTo(TerminalSessionId(sessionId))
+    }
+
     fun switchTo(id: TerminalSessionId) {
         val entry = entries[id.value] ?: return
         val updated = entry.copy(meta = entry.meta.copy(lastOpenedAt = System.currentTimeMillis()))
@@ -166,12 +230,16 @@ class TerminalSessionManager @Inject constructor(
         val closedMeta = entry.meta.copy(isConnected = false)
         _closedSessions.value = (_closedSessions.value + closedMeta).takeLast(50)
         entry.scope.coroutineContext[Job]?.cancel()
-        if (entry.meta.isTmux && !entry.tmuxSessionName.isNullOrBlank()) {
+        if (entry.conn != null && entry.meta.isTmux && !entry.tmuxSessionName.isNullOrBlank()) {
             val tmuxSession = entry.tmuxSessionName
             entry.conn.send("tmux kill-session -t '${tmuxSession.replace("'", "'\\''")}'\n")
             logger.log(LogLevel.INFO, TAG, "Requested tmux kill for close: sessionId=${id.value} tmuxSession=$tmuxSession")
         }
-        sshManager.destroySession(id.value)
+        if (entry.conn != null) {
+            sshManager.destroySession(id.value)
+        } else {
+            entry.terminalSession.finishIfRunning()
+        }
         publishSessions()
 
         if (_activeId.value == id) {
@@ -202,7 +270,12 @@ class TerminalSessionManager @Inject constructor(
     /** Send bytes to the active SSH connection (not the dummy subprocess). */
     fun sendBytesToActive(bytes: ByteArray) {
         val id = _activeId.value?.value ?: return
-        entries[id]?.conn?.sendBytes(bytes)
+        val entry = entries[id] ?: return
+        if (entry.conn != null) {
+            entry.conn.sendBytes(bytes)
+        } else {
+            entry.terminalSession.write(bytes, 0, bytes.size)
+        }
     }
 
     fun resizeActivePty(cols: Int, rows: Int) {
@@ -211,7 +284,9 @@ class TerminalSessionManager @Inject constructor(
     }
 
     private fun publishSessions() {
-        _sessions.value = entries.values.map { it.meta }
+        _sessions.value = entries.values.map { entry ->
+            entry.meta.copy(isConnected = entry.conn?.connected?.value ?: entry.terminalSession.isRunning)
+        }
     }
 
     private fun shouldSuppressTerminalReply(data: ByteArray, offset: Int, count: Int): Boolean {

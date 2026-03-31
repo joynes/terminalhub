@@ -12,6 +12,9 @@ class ScriptTemplateEngine @Inject constructor() {
     fun projectPath(server: Server, project: Project): String =
         "${server.projectsFolder}/${project.name}"
 
+    fun localProjectPath(baseDir: String, project: Project): String =
+        "$baseDir/${project.name}"
+
     fun sessionName(project: Project): String =
         project.name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
@@ -60,15 +63,22 @@ class ScriptTemplateEngine @Inject constructor() {
     fun renderCustomScript(server: Server, project: Project): String =
         render(project.customScript, server, project)
 
+    fun renderLocalCustomScript(baseDir: String, project: Project): String =
+        render(project.customScript, localProjectPath(baseDir, project), project)
+
     /** AI tool command run last. Empty = none. */
     fun renderAiCommand(project: Project): String = project.aiCommand.trim()
 
     fun render(template: String, server: Server, project: Project): String {
         val path = projectPath(server, project)
+        return render(template, path, project)
+    }
+
+    fun render(template: String, projectPath: String, project: Project): String {
         val session = sessionName(project)
         return template
             .replace("{{PROJECT_NAME}}", project.name)
-            .replace("{{PROJECT_PATH}}", path)
+            .replace("{{PROJECT_PATH}}", projectPath)
             .replace("{{SESSION_NAME}}", session)
     }
 

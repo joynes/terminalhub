@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.map
 import se.joynes.aiterminalhub.data.db.dao.ProjectDao
 import se.joynes.aiterminalhub.data.db.entity.ProjectEntity
 import se.joynes.aiterminalhub.data.model.Project
+import se.joynes.aiterminalhub.data.model.ProjectTargetType
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +26,27 @@ class ProjectRepository @Inject constructor(
 
     suspend fun delete(project: Project) = dao.delete(project.toEntity())
 
-    private fun ProjectEntity.toModel() = Project(id, serverId, name, useTmux, customScript, aiCommand, colorSeed, gitUrl)
-    private fun Project.toEntity() = ProjectEntity(id, serverId, name, useTmux, customScript, aiCommand, colorSeed, gitUrl = gitUrl)
+    private fun ProjectEntity.toModel() = Project(
+        id = id,
+        serverId = serverId,
+        targetType = ProjectTargetType.valueOf(targetType.uppercase()),
+        name = name,
+        useTmux = useTmux,
+        customScript = customScript,
+        aiCommand = aiCommand,
+        colorSeed = colorSeed,
+        gitUrl = gitUrl
+    )
+
+    private fun Project.toEntity() = ProjectEntity(
+        id = id,
+        serverId = serverId,
+        targetType = targetType.name.lowercase(),
+        name = name,
+        useTmux = useTmux,
+        customScript = customScript,
+        aiCommand = aiCommand,
+        colorSeed = colorSeed,
+        gitUrl = gitUrl
+    )
 }

@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.aiterminalhub.ui.components.*
 import se.joynes.aiterminalhub.ui.theme.*
+import se.joynes.aiterminalhub.data.model.ProjectTargetType
 
 private val AI_TOOLS = listOf(
     "None"         to "",
@@ -33,7 +34,10 @@ fun AddEditProjectScreen(
     LaunchedEffect(projectId) { viewModel.loadProject(serverId, projectId) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
     var serverMenuExpanded by remember { mutableStateOf(false) }
-    val selectedServerName = state.serverOptions.firstOrNull { it.id == state.selectedServerId }?.name ?: "Choose server"
+    val selectedServerName = when (state.targetType) {
+        ProjectTargetType.LOCAL -> "Local device"
+        ProjectTargetType.SSH -> state.serverOptions.firstOrNull { it.id == state.selectedServerId }?.name ?: "Choose server"
+    }
 
     Scaffold(
         topBar = {
@@ -95,7 +99,12 @@ fun AddEditProjectScreen(
                                 )
                             },
                             onClick = {
-                                viewModel.update { copy(selectedServerId = server.id) }
+                                viewModel.update {
+                                    copy(
+                                        targetType = ProjectTargetType.SSH,
+                                        selectedServerId = server.id
+                                    )
+                                }
                                 serverMenuExpanded = false
                             }
                         )
@@ -103,19 +112,27 @@ fun AddEditProjectScreen(
                     DropdownMenuItem(
                         text = {
                             Text(
-                                "Local (coming soon)",
-                                color = MegaDriveDim,
+                                "Local device",
+                                color = MegaDriveOnSurface,
                                 fontFamily = MonoFontFamily,
                                 fontSize = 12.sp
                             )
                         },
-                        onClick = { serverMenuExpanded = false },
-                        enabled = false
+                        onClick = {
+                            viewModel.update {
+                                copy(
+                                    targetType = ProjectTargetType.LOCAL,
+                                    selectedServerId = null,
+                                    useTmux = false
+                                )
+                            }
+                            serverMenuExpanded = false
+                        }
                     )
                 }
             }
             Text(
-                "Each project still uses one target at a time. Local execution is not supported yet; the current session engine is SSH-based only.",
+                "Each project still uses one target at a time. Local projects run in a shell on the device. SSH projects run on the selected server.",
                 color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
             )
 
@@ -152,8 +169,9 @@ fun AddEditProjectScreen(
             ) {
                 Text("USE TMUX", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
                 Checkbox(
-                    checked = state.useTmux,
+                    checked = state.useTmux && state.targetType == ProjectTargetType.SSH,
                     onCheckedChange = { viewModel.update { copy(useTmux = it) } },
+                    enabled = state.targetType == ProjectTargetType.SSH,
                     colors = CheckboxDefaults.colors(
                         checkedColor = MegaDrivePrimary,
                         uncheckedColor = MegaDriveDim,
@@ -162,7 +180,9 @@ fun AddEditProjectScreen(
                 )
             }
             Text(
-                if (state.useTmux)
+                if (state.targetType == ProjectTargetType.LOCAL)
+                    "Local mode currently uses a plain device shell without tmux."
+                else if (state.useTmux)
                     "Creates a tmux session named after the project, or attaches if it already exists."
                 else
                     "Connects to a plain shell without tmux.",
@@ -246,7 +266,8 @@ fun AddEditProjectScreen(
                 text = "[ SAVE ]",
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.name.isNotBlank() && state.selectedServerId != null
+                enabled = state.name.isNotBlank() &&
+                    (state.targetType == ProjectTargetType.LOCAL || state.selectedServerId != null)
             )
         }
     }

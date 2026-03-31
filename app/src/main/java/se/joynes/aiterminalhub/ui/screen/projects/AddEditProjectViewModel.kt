@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import se.joynes.aiterminalhub.data.model.LOCAL_PROJECT_SERVER_ID
 import se.joynes.aiterminalhub.data.model.Project
+import se.joynes.aiterminalhub.data.model.ProjectTargetType
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
 import javax.inject.Inject
@@ -16,6 +18,7 @@ data class ProjectServerOption(
 )
 
 data class AddEditProjectState(
+    val targetType: ProjectTargetType = ProjectTargetType.SSH,
     val selectedServerId: Long? = null,
     val serverOptions: List<ProjectServerOption> = emptyList(),
     val name: String = "",
@@ -46,6 +49,7 @@ class AddEditProjectViewModel @Inject constructor(
             val p = repo.getById(id) ?: return@launch
             editingId = id
             _state.value = AddEditProjectState(
+                targetType = p.targetType,
                 selectedServerId = p.serverId,
                 serverOptions = options,
                 name = p.name,
@@ -64,10 +68,15 @@ class AddEditProjectViewModel @Inject constructor(
     fun save() {
         viewModelScope.launch {
             val s = _state.value
-            val selectedServerId = s.selectedServerId ?: return@launch
+            val selectedServerId = if (s.targetType == ProjectTargetType.LOCAL) {
+                LOCAL_PROJECT_SERVER_ID
+            } else {
+                s.selectedServerId ?: return@launch
+            }
             val project = Project(
                 id = editingId ?: 0L,
                 serverId = selectedServerId,
+                targetType = s.targetType,
                 name = s.name,
                 useTmux = s.useTmux,
                 customScript = s.customScript,

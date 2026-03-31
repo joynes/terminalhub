@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 data class ProjectEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val serverId: Long,
+    val targetType: String = "ssh",
     val name: String,
     val useTmux: Boolean = true,
     val customScript: String = "cd {{PROJECT_PATH}}",
