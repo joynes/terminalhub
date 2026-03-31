@@ -34,6 +34,9 @@ fun AddEditProjectScreen(
     LaunchedEffect(projectId) { viewModel.loadProject(serverId, projectId) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
     var serverMenuExpanded by remember { mutableStateOf(false) }
+    val normalizedGitUrl = remember(state.gitUrl, state.targetType) {
+        AddEditProjectViewModel.normalizeGitUrl(state.gitUrl, state.targetType)
+    }
     val selectedServerName = when (state.targetType) {
         ProjectTargetType.LOCAL -> "Local device"
         ProjectTargetType.SSH -> state.serverOptions.firstOrNull { it.id == state.selectedServerId }?.name ?: "Choose server"
@@ -156,7 +159,14 @@ fun AddEditProjectScreen(
                 Modifier.fillMaxWidth()
             )
             Text(
-                "If set, the repo will be cloned into the project folder on first connect.",
+                when {
+                    state.targetType == ProjectTargetType.LOCAL ->
+                        "Local projects do not clone via server SSH. This URL is only used for SSH targets."
+                    normalizedGitUrl != state.gitUrl.trim() ->
+                        "GitHub HTTPS URLs are converted to SSH on save for server-side clone: $normalizedGitUrl"
+                    else ->
+                        "If set, the repo will be cloned into the project folder on first connect. For GitHub on servers, prefer SSH form like git@github.com:owner/repo.git"
+                },
                 color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
             )
 

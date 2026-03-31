@@ -94,10 +94,22 @@ class AddEditProjectViewModel @Inject constructor(
                 customScript = s.customScript,
                 aiCommand = s.aiCommand,
                 colorSeed = s.colorSeed,
-                gitUrl = s.gitUrl
+                gitUrl = normalizeGitUrl(s.gitUrl, s.targetType)
             )
             if (editingId != null) repo.update(project) else repo.save(project)
             _state.value = s.copy(saved = true)
+        }
+    }
+
+    companion object {
+        fun normalizeGitUrl(gitUrl: String, targetType: ProjectTargetType): String {
+            val trimmed = gitUrl.trim()
+            if (targetType != ProjectTargetType.SSH) return trimmed
+            val githubHttps = Regex("^https://github\\.com/([^/]+)/([^/]+?)(?:\\.git)?/?$")
+            val match = githubHttps.matchEntire(trimmed) ?: return trimmed
+            val owner = match.groupValues[1]
+            val repo = match.groupValues[2]
+            return "git@github.com:$owner/$repo.git"
         }
     }
 }
