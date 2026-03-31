@@ -39,6 +39,8 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun FloatingTextInputDialog(
+    text: String,
+    onTextChange: (String) -> Unit,
     onSend: (String) -> Unit,
     onDismiss: () -> Unit,
     history: List<String> = emptyList(),
@@ -47,7 +49,6 @@ fun FloatingTextInputDialog(
 ) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    var text    by remember { mutableStateOf("") }
     var showHistory by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
@@ -178,7 +179,7 @@ fun FloatingTextInputDialog(
                                     )
                                 },
                                 onClick = {
-                                    text = entry
+                                    onTextChange(entry)
                                     showHistory = false
                                 },
                                 modifier = Modifier.background(MegaDriveSurface)
@@ -197,7 +198,7 @@ fun FloatingTextInputDialog(
             ) {
                 TextField(
                     value = text,
-                    onValueChange = { text = it },
+                    onValueChange = onTextChange,
                     placeholder = {
                         Text(
                             "Type or dictate...",

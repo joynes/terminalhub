@@ -32,6 +32,11 @@ fun FloatingFileUploadDialog(
     viewModel: FileUploadViewModel,
     projectId: Long,
     serverId: Long,
+    uploadState: UploadState,
+    selectedUri: android.net.Uri?,
+    selectedName: String,
+    onSelectedUriChange: (android.net.Uri?) -> Unit,
+    onSelectedNameChange: (String) -> Unit,
     initialUri: android.net.Uri? = null,
     onDismiss: () -> Unit
 ) {
@@ -47,36 +52,31 @@ fun FloatingFileUploadDialog(
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
 
-    var selectedUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    var selectedName by remember { mutableStateOf("") }
-
     // Pre-populate from share intent
     LaunchedEffect(initialUri) {
         if (initialUri != null && selectedUri == null) {
-            selectedUri = initialUri
+            onSelectedUriChange(initialUri)
             context.contentResolver.query(initialUri, null, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (idx >= 0) selectedName = cursor.getString(idx) ?: initialUri.lastPathSegment ?: "file"
+                    if (idx >= 0) onSelectedNameChange(cursor.getString(idx) ?: initialUri.lastPathSegment ?: "file")
                 }
             }
-            if (selectedName.isBlank()) selectedName = initialUri.lastPathSegment ?: "file"
+            if (selectedName.isBlank()) onSelectedNameChange(initialUri.lastPathSegment ?: "file")
         }
     }
 
-    val uploadState by viewModel.uploadState.collectAsState()
-
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            selectedUri = uri
+            onSelectedUriChange(uri)
             // Resolve display name immediately for the label
             context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
                 if (cursor.moveToFirst()) {
                     val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (idx >= 0) selectedName = cursor.getString(idx) ?: uri.lastPathSegment ?: "file"
+                    if (idx >= 0) onSelectedNameChange(cursor.getString(idx) ?: uri.lastPathSegment ?: "file")
                 }
             }
-            if (selectedName.isBlank()) selectedName = uri.lastPathSegment ?: "file"
+            if (selectedName.isBlank()) onSelectedNameChange(uri.lastPathSegment ?: "file")
         }
     }
 
@@ -84,7 +84,7 @@ fun FloatingFileUploadDialog(
     LaunchedEffect(copied) {
         if (copied) {
             delay(1500)
-            viewModel.reset()
+            viewModel.reset(projectId)
             onDismiss()
         }
     }
@@ -128,7 +128,7 @@ fun FloatingFileUploadDialog(
                 Text("FILE UPLOAD", color = MegaDriveBg, fontSize = 11.sp, fontFamily = MonoFontFamily)
                 Text(
                     "✕", color = MegaDriveBg, fontSize = 13.sp, fontFamily = MonoFontFamily,
-                    modifier = Modifier.clickable { viewModel.reset(); onDismiss() }
+                    modifier = Modifier.clickable { viewModel.reset(projectId); onDismiss() }
                 )
             }
 

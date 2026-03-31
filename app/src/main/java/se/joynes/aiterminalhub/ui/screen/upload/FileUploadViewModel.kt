@@ -31,13 +31,17 @@ class FileUploadViewModel @Inject constructor(
     private val securePrefs: SecurePrefsManager
 ) : ViewModel() {
 
-    private val _uploadState = MutableStateFlow<UploadState>(UploadState.Idle)
-    val uploadState: StateFlow<UploadState> = _uploadState.asStateFlow()
+    private val _uploadStates = MutableStateFlow<Map<Long, UploadState>>(emptyMap())
 
-    fun reset() { _uploadState.value = UploadState.Idle }
+    fun uploadState(projectId: Long): Flow<UploadState> =
+        _uploadStates.map { it[projectId] ?: UploadState.Idle }
+
+    fun reset(projectId: Long) {
+        _uploadStates.update { states -> states - projectId }
+    }
 
     fun startUpload(serverId: Long, projectId: Long, uri: Uri, context: Context) {
-        if (_uploadState.value is UploadState.Uploading) return
+        if (_uploadStates.value[projectId] is UploadState.Uploading) return
         viewModelScope.launch {
             try {
                 val server  = serverRepo.getById(serverId)  ?: error("Server not found")
@@ -46,7 +50,7 @@ class FileUploadViewModel @Inject constructor(
                 val (fileName, fileSize) = resolveFileInfo(context, uri)
                 val stream = context.contentResolver.openInputStream(uri) ?: error("Cannot open file")
 
-                _uploadState.value = UploadState.Uploading(fileName, 0f)
+                setUploadState(projectId, UploadState.Uploading(fileName, 0f))
 
                 scpUploader.upload(
                     server       = server,
@@ -57,14 +61,18 @@ class FileUploadViewModel @Inject constructor(
                     inputStream  = stream,
                     remoteDir    = remotePath
                 ).collect { progress ->
-                    _uploadState.value = UploadState.Uploading(progress.fileName, progress.percent / 100f)
+                    setUploadState(projectId, UploadState.Uploading(progress.fileName, progress.percent / 100f))
                 }
 
-                _uploadState.value = UploadState.Done(fileName, "$remotePath/$fileName")
+                setUploadState(projectId, UploadState.Done(fileName, "$remotePath/$fileName"))
             } catch (e: Exception) {
-                _uploadState.value = UploadState.Error(e.message ?: "Upload failed")
+                setUploadState(projectId, UploadState.Error(e.message ?: "Upload failed"))
             }
         }
+    }
+
+    private fun setUploadState(projectId: Long, state: UploadState) {
+        _uploadStates.update { states -> states + (projectId to state) }
     }
 
     private fun resolveFileInfo(context: Context, uri: Uri): Pair<String, Long> {

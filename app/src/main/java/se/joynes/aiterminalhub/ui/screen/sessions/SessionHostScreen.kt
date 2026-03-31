@@ -39,6 +39,7 @@ import se.joynes.aiterminalhub.ui.screen.export.ExportImportState
 import se.joynes.aiterminalhub.ui.screen.export.ExportImportViewModel
 import se.joynes.aiterminalhub.ui.screen.upload.FileUploadViewModel
 import se.joynes.aiterminalhub.ui.screen.upload.FloatingFileUploadDialog
+import se.joynes.aiterminalhub.ui.screen.upload.UploadState
 import com.termux.view.TerminalView
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
@@ -79,8 +80,11 @@ fun SessionHostScreen(
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
-    var showTextInput by remember { mutableStateOf(false) }
-    var showFileUpload by remember { mutableStateOf(false) }
+    val textInputVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
+    val textInputDraftByProject = remember { mutableStateMapOf<Long, String>() }
+    val fileUploadVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
+    val fileUploadSelectedUriByProject = remember { mutableStateMapOf<Long, Uri?>() }
+    val fileUploadSelectedNameByProject = remember { mutableStateMapOf<Long, String>() }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
     val exportImportState by exportImportViewModel.state.collectAsState()
@@ -118,9 +122,17 @@ fun SessionHostScreen(
     val activeProjectId = remember(activeId, projectTabs) {
         projectTabs.firstOrNull { it.sessionId == activeId }?.projectId
     }
+    val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
+    val activeTextInputDraft = activeProjectId?.let { textInputDraftByProject[it].orEmpty() }.orEmpty()
+    val activeFileUploadVisible = activeProjectId?.let { fileUploadVisibleByProject[it] == true } ?: false
+    val activeFileUploadSelectedUri = activeProjectId?.let { fileUploadSelectedUriByProject[it] }
+    val activeFileUploadSelectedName = activeProjectId?.let { fileUploadSelectedNameByProject[it].orEmpty() }.orEmpty()
     val textInputHistory by remember(activeProjectId) {
         activeProjectId?.let { viewModel.textInputHistory(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
     }.collectAsState(initial = emptyList())
+    val fileUploadState by remember(activeProjectId) {
+        activeProjectId?.let { fileUploadViewModel.uploadState(it) } ?: kotlinx.coroutines.flow.flowOf(UploadState.Idle)
+    }.collectAsState(initial = UploadState.Idle)
 
     // Shared modifier manager: toggles in SpecialKeyBar are read by TerminalViewClientImpl
     val modifierManager = remember { MutableModifierManager() }
@@ -171,13 +183,12 @@ fun SessionHostScreen(
         viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
     }
 
-    // Auto-open upload dialog when a file is shared to this app
-    var pendingSharedUri by remember { mutableStateOf<Uri?>(null) }
     LaunchedEffect(sharedUri) {
-        if (sharedUri != null) {
-            pendingSharedUri = sharedUri
-            showTextInput = false
-            showFileUpload = true
+        val projectId = activeProjectId
+        if (sharedUri != null && projectId != null) {
+            fileUploadSelectedUriByProject[projectId] = sharedUri
+            textInputVisibleByProject[projectId] = false
+            fileUploadVisibleByProject[projectId] = true
             onConsumeSharedUri()
         }
     }
@@ -649,14 +660,18 @@ fun SessionHostScreen(
                             }
                         }
 
-                        if (showTextInput) {
+                        if (activeTextInputVisible && activeProjectId != null) {
                             FloatingTextInputDialog(
+                                text = activeTextInputDraft,
+                                onTextChange = { textInputDraftByProject[activeProjectId] = it },
                                 onSend = { text ->
                                     val payload = if (text.endsWith("\n") || text.endsWith("\r")) text else "$text\r"
                                     viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
+                                    textInputDraftByProject[activeProjectId] = ""
+                                    textInputVisibleByProject[activeProjectId] = false
                                 },
                                 onDismiss = {
-                                    showTextInput = false
+                                    textInputVisibleByProject[activeProjectId] = false
                                     keyboardVisible = true
                                     showKeyboard()
                                 },
@@ -668,15 +683,19 @@ fun SessionHostScreen(
                             )
                         }
 
-                        if (showFileUpload) {
+                        if (activeFileUploadVisible && activeProjectId != null) {
                             FloatingFileUploadDialog(
                                 viewModel = fileUploadViewModel,
-                                projectId = activeProjectId ?: 0L,
+                                projectId = activeProjectId,
                                 serverId = serverId ?: 0L,
-                                initialUri = pendingSharedUri,
+                                uploadState = fileUploadState,
+                                selectedUri = activeFileUploadSelectedUri,
+                                selectedName = activeFileUploadSelectedName,
+                                onSelectedUriChange = { fileUploadSelectedUriByProject[activeProjectId] = it },
+                                onSelectedNameChange = { fileUploadSelectedNameByProject[activeProjectId] = it },
+                                initialUri = activeFileUploadSelectedUri,
                                 onDismiss = {
-                                    showFileUpload = false
-                                    pendingSharedUri = null
+                                    fileUploadVisibleByProject[activeProjectId] = false
                                     terminalViewRef.value?.requestFocus()
                                 }
                             )
@@ -699,12 +718,16 @@ fun SessionHostScreen(
                                 viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
                             },
                             onTextInput = {
-                                showFileUpload = false
-                                showTextInput = true
+                                activeProjectId?.let { projectId ->
+                                    fileUploadVisibleByProject[projectId] = false
+                                    textInputVisibleByProject[projectId] = true
+                                }
                             },
                             onFileUpload = {
-                                showTextInput = false
-                                showFileUpload = true
+                                activeProjectId?.let { projectId ->
+                                    textInputVisibleByProject[projectId] = false
+                                    fileUploadVisibleByProject[projectId] = true
+                                }
                             },
                             onKeyboardToggle = {
                                 keyboardVisible = !keyboardVisible
