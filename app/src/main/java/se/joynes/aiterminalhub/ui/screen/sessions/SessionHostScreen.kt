@@ -45,6 +45,11 @@ import se.joynes.aiterminalhub.ui.theme.*
 
 private val KeyBarReservedHeight = 104.dp
 
+private fun shouldUseSoftwareTerminalLayer(): Boolean {
+    return Build.MANUFACTURER.equals("samsung", ignoreCase = true) ||
+        Build.BRAND.equals("samsung", ignoreCase = true)
+}
+
 
 @Composable
 fun SessionHostScreen(
@@ -65,7 +70,7 @@ fun SessionHostScreen(
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
 
-    var keyboardVisible by remember { mutableStateOf(true) }
+    var keyboardVisible by remember { mutableStateOf(false) }
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showTextInput by remember { mutableStateOf(false) }
@@ -118,6 +123,14 @@ fun SessionHostScreen(
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
     val blackSwatchRef = remember { mutableStateOf<android.view.View?>(null) }
 
+    fun applyTerminalRenderCompatibility(tv: TerminalView) {
+        if (shouldUseSoftwareTerminalLayer()) {
+            tv.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
+        } else {
+            tv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+        }
+    }
+
     fun showKeyboard() {
         val tv = terminalViewRef.value ?: return
         tv.requestFocusFromTouch()
@@ -141,6 +154,7 @@ fun SessionHostScreen(
     }
 
     fun syncRemotePty(tv: TerminalView) {
+        applyTerminalRenderCompatibility(tv)
         tv.setBackgroundColor(0xFF0D0D1A.toInt())
         tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
         tv.updateSize()
@@ -378,7 +392,7 @@ fun SessionHostScreen(
                                     )
                                 }
                                 LaunchedEffect(sess) {
-                                    keyboardVisible = true
+                                    keyboardVisible = false
                                 }
                                 AndroidView(
                                     factory = { ctx ->
@@ -387,9 +401,12 @@ fun SessionHostScreen(
                                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                                                 isForceDarkAllowed = false
                                             }
-                                            setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
+                                            applyTerminalRenderCompatibility(this)
                                             isFocusable = true
                                             isFocusableInTouchMode = true
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                defaultFocusHighlightEnabled = false
+                                            }
                                             setBackgroundColor(0xFF0D0D1A.toInt())
                                             setCanvasBackgroundColor(0xFF0D0D1A.toInt())
                                             setTextSize(textSizePx)
@@ -404,12 +421,6 @@ fun SessionHostScreen(
                                                 syncRemotePty(tv)
                                                 tv.requestFocusFromTouch()
                                                 tv.requestFocus()
-                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                                    tv.windowInsetsController?.show(AndroidWindowInsets.Type.ime())
-                                                } else {
-                                                    ctx.getSystemService(InputMethodManager::class.java)
-                                                        ?.showSoftInput(tv, InputMethodManager.SHOW_FORCED)
-                                                }
                                             }
                                         }
                                     },
@@ -418,32 +429,33 @@ fun SessionHostScreen(
                                         if (tv.mTermSession !== sess) {
                                             tv.attachSession(sess)
                                         }
-                                        tv.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
+                                        applyTerminalRenderCompatibility(tv)
                                         tv.setBackgroundColor(0xFF0D0D1A.toInt())
                                         tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
                                         terminalViewRef.value = tv
                                         syncRemotePty(tv)
                                     },
-                                    modifier = Modifier
-                                        .fillMaxSize()
+                                    modifier = Modifier.fillMaxSize()
                                 )
                             }
 
-                            AndroidView(
-                                factory = { ctx ->
-                                    android.view.View(ctx).apply {
-                                        setBackgroundColor(android.graphics.Color.BLACK)
-                                    }.also { blackSwatchRef.value = it }
-                                },
-                                update = { swatch ->
-                                    swatch.setBackgroundColor(android.graphics.Color.BLACK)
-                                    blackSwatchRef.value = swatch
-                                },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                                    .size(28.dp)
-                            )
+                            if (BuildConfig.IS_DIAGNOSTIC) {
+                                AndroidView(
+                                    factory = { ctx ->
+                                        android.view.View(ctx).apply {
+                                            setBackgroundColor(android.graphics.Color.BLACK)
+                                        }.also { blackSwatchRef.value = it }
+                                    },
+                                    update = { swatch ->
+                                        swatch.setBackgroundColor(android.graphics.Color.BLACK)
+                                        blackSwatchRef.value = swatch
+                                    },
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                        .size(28.dp)
+                                )
+                            }
                         } else {
                             Box(
                                 modifier = Modifier
@@ -461,7 +473,7 @@ fun SessionHostScreen(
                         }
 
                         // DEBUG: diagnostic logging to app LogView
-                        LaunchedEffect(Unit) {
+                        if (BuildConfig.IS_DIAGNOSTIC) LaunchedEffect(Unit) {
                             while (true) {
                                 kotlinx.coroutines.delay(1000)
                                 val tv = terminalViewRef.value ?: continue

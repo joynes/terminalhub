@@ -2,7 +2,6 @@ package com.termux.view;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 
 import com.termux.terminal.TerminalBuffer;
@@ -65,11 +64,6 @@ public final class TerminalRenderer {
         final TerminalBuffer screen = mEmulator.getScreen();
         final int[] palette = mEmulator.mColors.mCurrentColors;
         final int cursorShape = mEmulator.getCursorStyle();
-
-        final int screenBackground = reverseVideo
-            ? palette[TextStyle.COLOR_INDEX_FOREGROUND]
-            : palette[TextStyle.COLOR_INDEX_BACKGROUND];
-        canvas.drawColor(screenBackground, PorterDuff.Mode.SRC);
 
         float heightOffset = mFontLineSpacingAndAscent;
         for (int row = topRow; row < endRow; row++) {
@@ -201,11 +195,8 @@ public final class TerminalRenderer {
             savedMatrix = true;
         }
 
-        if (backColor != palette[TextStyle.COLOR_INDEX_BACKGROUND]) {
-            // Only draw non-default background.
-            mTextPaint.setColor(backColor);
-            canvas.drawRect(left, y - mFontLineSpacingAndAscent + mFontAscent, right, y, mTextPaint);
-        }
+        mTextPaint.setColor(backColor);
+        canvas.drawRect(left, y - mFontLineSpacingAndAscent + mFontAscent, right, y, mTextPaint);
 
         if (cursor != 0) {
             mTextPaint.setColor(cursor);

@@ -18,6 +18,11 @@ import se.joynes.aiterminalhub.ui.theme.MegaDriveBg
 import se.joynes.aiterminalhub.ui.theme.MegaDrivePrimary
 import se.joynes.aiterminalhub.ui.theme.MonoFontFamily
 
+private fun shouldUseSoftwareTerminalLayer(): Boolean {
+    return Build.MANUFACTURER.equals("samsung", ignoreCase = true) ||
+        Build.BRAND.equals("samsung", ignoreCase = true)
+}
+
 @Composable
 fun TerminalScreen(
     viewModel: TerminalViewModel = hiltViewModel()
@@ -27,7 +32,15 @@ fun TerminalScreen(
     val modifierManager = remember { MutableModifierManager() }
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
 
-    var keyboardVisible by remember { mutableStateOf(true) }
+    var keyboardVisible by remember { mutableStateOf(false) }
+
+    fun applyTerminalRenderCompatibility(tv: TerminalView) {
+        if (shouldUseSoftwareTerminalLayer()) {
+            tv.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
+        } else {
+            tv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
+        }
+    }
 
     fun showKeyboard() {
         val tv = terminalViewRef.value ?: return
@@ -42,6 +55,7 @@ fun TerminalScreen(
     }
 
     fun syncRemotePty(tv: TerminalView) {
+        applyTerminalRenderCompatibility(tv)
         tv.updateSize()
         val emulator = tv.mEmulator ?: return
         viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
@@ -70,14 +84,18 @@ fun TerminalScreen(
                         }
                     )
                 }
-                LaunchedEffect(sess) { keyboardVisible = true }
+                LaunchedEffect(sess) { keyboardVisible = false }
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     AndroidView(
                         factory = { ctx ->
                             val textSizePx = (14 * ctx.resources.displayMetrics.scaledDensity + 0.5f).toInt()
                             TerminalView(ctx, null).apply {
+                                applyTerminalRenderCompatibility(this)
                                 isFocusable = true
                                 isFocusableInTouchMode = true
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    defaultFocusHighlightEnabled = false
+                                }
                                 setTextSize(textSizePx)
                                 setTerminalViewClient(terminalViewClient)
                                 attachSession(sess)
@@ -90,12 +108,6 @@ fun TerminalScreen(
                                     syncRemotePty(tv)
                                     tv.requestFocusFromTouch()
                                     tv.requestFocus()
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                        tv.windowInsetsController?.show(AndroidWindowInsets.Type.ime())
-                                    } else {
-                                        ctx.getSystemService(InputMethodManager::class.java)
-                                            ?.showSoftInput(tv, InputMethodManager.SHOW_FORCED)
-                                    }
                                 }
                             }
                         },
@@ -103,6 +115,7 @@ fun TerminalScreen(
                             if (tv.mTermSession !== sess) {
                                 tv.attachSession(sess)
                             }
+                            applyTerminalRenderCompatibility(tv)
                             terminalViewRef.value = tv
                             syncRemotePty(tv)
                         },

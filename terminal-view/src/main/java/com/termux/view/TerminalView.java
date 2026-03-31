@@ -71,7 +71,7 @@ public final class TerminalView extends View {
     int mTopRow;
     int[] mDefaultSelectors = new int[]{-1,-1,-1,-1};
     private int mCanvasBackgroundColor = 0xFF0D0D1A;
-    private long mLastDrawLog = 0;
+    private int mViewBackgroundColor = 0xFF0D0D1A;
 
     float mScaleFactor = 1.f;
     final GestureAndScaleRecognizer mGestureRecognizer;
@@ -138,6 +138,7 @@ public final class TerminalView extends View {
 
     public TerminalView(Context context, AttributeSet attributes) { // NO_UCD (unused code)
         super(context, attributes);
+        super.setBackgroundColor(mViewBackgroundColor);
         mGestureRecognizer = new GestureAndScaleRecognizer(context, new GestureAndScaleRecognizer.Listener() {
 
             boolean scrolledWithFinger;
@@ -292,6 +293,12 @@ public final class TerminalView extends View {
         if (mCanvasBackgroundColor == color) return;
         mCanvasBackgroundColor = color;
         invalidate();
+    }
+
+    private void updateViewBackgroundColor(int color) {
+        if (mViewBackgroundColor == color) return;
+        mViewBackgroundColor = color;
+        super.setBackgroundColor(color);
     }
 
     /** Debug: return cell style info at the given screen row/col for diagnostic logging. */
@@ -1023,8 +1030,6 @@ public final class TerminalView extends View {
     public void updateSize() {
         int viewWidth = getWidth();
         int viewHeight = getHeight();
-        android.util.Log.d("TERMVIEW", "updateSize: w=" + viewWidth + " h=" + viewHeight
-            + " session=" + (mTermSession != null) + " emu=" + (mEmulator != null));
         if (viewWidth == 0 || viewHeight == 0 || mTermSession == null) return;
 
         // Set to 80 and 24 if you want to enable vttest.
@@ -1048,27 +1053,15 @@ public final class TerminalView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        long now = System.currentTimeMillis();
-        if (now - mLastDrawLog > 1000) {
-            mLastDrawLog = now;
-            String paletteBg = "n/a";
-            if (mEmulator != null) {
-                paletteBg = "#" + Integer.toHexString(mEmulator.mColors.mCurrentColors[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]);
-            }
-            android.util.Log.d("TERMVIEW", "onDraw: emu=" + (mEmulator != null)
-                + " canvasBg=#" + Integer.toHexString(mCanvasBackgroundColor)
-                + " paletteBg=" + paletteBg
-                + " w=" + getWidth() + " h=" + getHeight()
-                + " alpha=" + getAlpha()
-                + " hwAccel=" + canvas.isHardwareAccelerated()
-                + " layerType=" + getLayerType());
-        }
         if (mEmulator == null) {
+            updateViewBackgroundColor(mCanvasBackgroundColor);
             canvas.drawColor(mCanvasBackgroundColor);
         } else {
-            // Clear with the host app's terminal surface color before each frame so hardware-
-            // accelerated redraws don't leave stale pixels or let OSC background changes repaint UI chrome.
-            canvas.drawColor(mCanvasBackgroundColor);
+            int[] palette = mEmulator.mColors.mCurrentColors;
+            int screenBackground = mEmulator.isReverseVideo()
+                ? palette[com.termux.terminal.TextStyle.COLOR_INDEX_FOREGROUND]
+                : palette[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND];
+            updateViewBackgroundColor(screenBackground);
 
             // render the terminal view and highlight any selected text
             int[] sel = mDefaultSelectors;
