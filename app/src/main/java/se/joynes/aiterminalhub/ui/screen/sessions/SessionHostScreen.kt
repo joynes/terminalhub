@@ -69,6 +69,7 @@ fun SessionHostScreen(
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val bottomBarReservedHeight = KeyBarReservedHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     var keyboardVisible by remember { mutableStateOf(false) }
     var showSessionHistory by remember { mutableStateOf(false) }
@@ -377,7 +378,7 @@ fun SessionHostScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(bottom = KeyBarReservedHeight)
+                            .padding(bottom = bottomBarReservedHeight)
                     ) {
                         val sess = session
                         if (sess != null) {
@@ -599,7 +600,7 @@ fun SessionHostScreen(
                                 onSaveHistory = { text ->
                                     activeProjectId?.let { viewModel.saveTextInput(it, text) }
                                 },
-                                bottomAvoidanceDp = KeyBarReservedHeight
+                                bottomAvoidanceDp = bottomBarReservedHeight
                             )
                         }
 
