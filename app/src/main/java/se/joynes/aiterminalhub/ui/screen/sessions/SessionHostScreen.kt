@@ -30,6 +30,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
+import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.ui.screen.export.ExportImportState
 import se.joynes.aiterminalhub.ui.screen.export.ExportImportViewModel
 import se.joynes.aiterminalhub.ui.screen.upload.FileUploadViewModel
@@ -329,13 +330,16 @@ fun SessionHostScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         if (serverId == null) {
                             Text(
-                                "NO SERVER",
+                                if (BuildConfig.IS_DIAGNOSTIC) "NO LOCAL PROJECTS" else "NO SERVER",
                                 color = MegaDriveDim,
                                 fontSize = 12.sp,
                                 fontFamily = MonoFontFamily
                             )
                             Spacer(Modifier.height(16.dp))
-                            RetroButton("[ + ADD SERVER ]", onAddServer)
+                            RetroButton(
+                                if (BuildConfig.IS_DIAGNOSTIC) "[ + ADD PROJECT ]" else "[ + ADD SERVER ]",
+                                onAddServer
+                            )
                         } else {
                             Text(
                                 "NO PROJECTS",

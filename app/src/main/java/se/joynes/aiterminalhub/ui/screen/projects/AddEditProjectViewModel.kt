@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.data.model.LOCAL_PROJECT_SERVER_ID
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.model.ProjectTargetType
@@ -18,11 +19,11 @@ data class ProjectServerOption(
 )
 
 data class AddEditProjectState(
-    val targetType: ProjectTargetType = ProjectTargetType.SSH,
+    val targetType: ProjectTargetType = if (BuildConfig.IS_DIAGNOSTIC) ProjectTargetType.LOCAL else ProjectTargetType.SSH,
     val selectedServerId: Long? = null,
     val serverOptions: List<ProjectServerOption> = emptyList(),
     val name: String = "",
-    val useTmux: Boolean = true,
+    val useTmux: Boolean = !BuildConfig.IS_DIAGNOSTIC,
     val customScript: String = "cd {{PROJECT_PATH}}",
     val aiCommand: String = "",
     val gitUrl: String = "",
@@ -43,7 +44,16 @@ class AddEditProjectViewModel @Inject constructor(
             val servers = serverRepo.getAll().first()
             val options = servers.map { ProjectServerOption(it.id, it.name) }
             val fallbackServerId = initialServerId ?: servers.firstOrNull()?.id
-            _state.update { it.copy(serverOptions = options, selectedServerId = fallbackServerId) }
+            _state.update { state ->
+                state.copy(
+                    serverOptions = options,
+                    selectedServerId = if (state.targetType == ProjectTargetType.LOCAL) {
+                        null
+                    } else {
+                        state.selectedServerId ?: fallbackServerId
+                    }
+                )
+            }
 
             if (id == null) return@launch
             val p = repo.getById(id) ?: return@launch

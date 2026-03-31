@@ -14,6 +14,7 @@ fun gitCommitCount(): Int = try {
 android {
     namespace = "se.joynes.aiterminalhub"
     compileSdk = 36
+    flavorDimensions += "mode"
 
     defaultConfig {
         applicationId = "se.joynes.aiterminalhub"
@@ -23,6 +24,18 @@ android {
         versionName = "1.${gitCommitCount()}"
 
         testInstrumentationRunner = "se.joynes.aiterminalhub.HiltTestRunner"
+    }
+    productFlavors {
+        create("production") {
+            dimension = "mode"
+            buildConfigField("boolean", "IS_DIAGNOSTIC", "false")
+        }
+        create("diagnostic") {
+            dimension = "mode"
+            applicationIdSuffix = ".diag"
+            versionNameSuffix = "-diag"
+            buildConfigField("boolean", "IS_DIAGNOSTIC", "true")
+        }
     }
 
     signingConfigs {

@@ -9,10 +9,12 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import com.termux.terminal.TerminalSession
+import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.data.db.dao.TextInputHistoryDao
 import se.joynes.aiterminalhub.data.db.entity.TextInputHistoryEntity
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogLevel
+import se.joynes.aiterminalhub.data.model.LOCAL_PROJECT_SERVER_ID
 import se.joynes.aiterminalhub.data.model.ProjectTargetType
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
@@ -93,6 +95,9 @@ class SessionHostViewModel @Inject constructor(
         if (initialized) return
         initialized = true
         logger.log(LogLevel.INFO, "SessionHostViewModel", "init snapshot=${debugSnapshot()}")
+        if (BuildConfig.IS_DIAGNOSTIC) {
+            viewModelScope.launch { ensureDiagnosticLocalProject() }
+        }
         viewModelScope.launch {
             projectRepo.getAll().collect { projects ->
                 _allDbProjects.value = projects
@@ -114,6 +119,21 @@ class SessionHostViewModel @Inject constructor(
                 _serverId.value = activeServerId
             }
         }
+    }
+
+    private suspend fun ensureDiagnosticLocalProject() {
+        if (projectRepo.getAll().first().isNotEmpty()) return
+        projectRepo.save(
+            Project(
+                serverId = LOCAL_PROJECT_SERVER_ID,
+                targetType = ProjectTargetType.LOCAL,
+                name = "diag-local",
+                useTmux = false,
+                customScript = "cd {{PROJECT_PATH}}",
+                aiCommand = ""
+            )
+        )
+        logger.log(LogLevel.INFO, "SessionHostViewModel", "Created default diagnostic local project")
     }
 
     private fun activateProject(project: Project, autoSwitch: Boolean = false) {

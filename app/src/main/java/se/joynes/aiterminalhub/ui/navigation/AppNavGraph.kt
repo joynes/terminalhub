@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.ui.screen.applog.AppLogScreen
 import se.joynes.aiterminalhub.ui.screen.projects.AddEditProjectScreen
 import se.joynes.aiterminalhub.ui.screen.servers.AddEditServerScreen
@@ -58,7 +59,13 @@ fun AppNavGraph(
                 sharedUri = sharedUri,
                 onConsumeSharedUri = onConsumeSharedUri,
                 onEditServer = { serverId?.let { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) } },
-                onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
+                onAddServer = {
+                    if (BuildConfig.IS_DIAGNOSTIC) {
+                        navController.navigate(Screen.AddEditProject.createRoute())
+                    } else {
+                        navController.navigate(Screen.AddEditServer.createRoute())
+                    }
+                },
                 onAddProject = { navController.navigate(Screen.AddEditProject.createRoute(serverId)) },
                 onOpenLogs = { navController.navigate(Screen.AppLog.route) }
             )

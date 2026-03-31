@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        if (BuildConfig.IS_DIAGNOSTIC) return
         val intent = Intent(this, SshSessionService::class.java)
         ContextCompat.startForegroundService(this, intent)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
