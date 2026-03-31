@@ -58,7 +58,7 @@ private fun shouldUseSoftwareTerminalLayer(): Boolean {
 
 @Composable
 fun SessionHostScreen(
-    onEditServer: () -> Unit,
+    onOpenServers: () -> Unit,
     onAddServer: () -> Unit,
     onAddProject: () -> Unit,
     onOpenLogs: () -> Unit,
@@ -334,15 +334,15 @@ fun SessionHostScreen(
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    "Edit Server",
-                                    color = if (serverId != null) Color.White else MegaDriveDim,
+                                    "Servers",
+                                    color = Color.White,
                                     fontFamily = MonoFontFamily,
                                     fontSize = 12.sp
                                 )
                             },
                             onClick = {
                                 showSettingsMenu = false
-                                if (serverId != null) onEditServer()
+                                onOpenServers()
                             }
                         )
                         DropdownMenuItem(

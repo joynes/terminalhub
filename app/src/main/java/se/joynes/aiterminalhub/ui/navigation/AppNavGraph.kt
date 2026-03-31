@@ -13,6 +13,7 @@ import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.ui.screen.applog.AppLogScreen
 import se.joynes.aiterminalhub.ui.screen.projects.AddEditProjectScreen
 import se.joynes.aiterminalhub.ui.screen.servers.AddEditServerScreen
+import se.joynes.aiterminalhub.ui.screen.servers.ServerListScreen
 import se.joynes.aiterminalhub.ui.screen.sessions.SessionHostScreen
 import se.joynes.aiterminalhub.ui.screen.sessionlog.SessionLogScreen
 import se.joynes.aiterminalhub.ui.screen.splash.SplashScreen
@@ -40,6 +41,21 @@ fun AppNavGraph(
             val serverId = backStackEntry.arguments?.getLong("serverId")?.takeIf { it >= 0 }
             AddEditServerScreen(serverId = serverId, onBack = { navController.popBackStack() })
         }
+        composable(Screen.ServerList.route) {
+            ServerListScreen(
+                onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
+                onEditServer = { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) },
+                onOpenTerminal = {
+                    navController.navigate(Screen.SessionHost.route) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenStatus = { id -> navController.navigate(Screen.ServerStatus.createRoute(id)) },
+                onOpenUpload = { id -> navController.navigate(Screen.FileUpload.createRoute(id)) },
+                onOpenLog = { navController.navigate(Screen.AppLog.route) },
+                onOpenSessionLog = { navController.navigate(Screen.SessionLog.route) }
+            )
+        }
         composable(
             Screen.AddEditProject.route,
             arguments = listOf(
@@ -58,7 +74,7 @@ fun AppNavGraph(
                 viewModel = viewModel,
                 sharedUri = sharedUri,
                 onConsumeSharedUri = onConsumeSharedUri,
-                onEditServer = { serverId?.let { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) } },
+                onOpenServers = { navController.navigate(Screen.ServerList.route) },
                 onAddServer = {
                     if (BuildConfig.IS_DIAGNOSTIC) {
                         navController.navigate(Screen.AddEditProject.createRoute())
