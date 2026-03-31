@@ -95,6 +95,25 @@ class ScriptTemplateEngine @Inject constructor() {
     private fun shellPath(path: String): String =
         if (path.startsWith("~/")) "\$HOME/${path.removePrefix("~/")}" else path
 
-    private fun shellQuote(value: String): String =
-        "'${value.replace("'", "'\\''")}'"
+    private fun shellQuote(value: String): String {
+        val homePrefix = "\$HOME/"
+        return if (value.startsWith(homePrefix)) {
+            "\"\$HOME/${escapeForDoubleQuotes(value.removePrefix(homePrefix))}\""
+        } else {
+            "\"${escapeForDoubleQuotes(value)}\""
+        }
+    }
+
+    private fun escapeForDoubleQuotes(value: String): String =
+        buildString(value.length) {
+            value.forEach { ch ->
+                when (ch) {
+                    '\\' -> append("\\\\")
+                    '"' -> append("\\\"")
+                    '$' -> append("\\$")
+                    '`' -> append("\\`")
+                    else -> append(ch)
+                }
+            }
+        }
 }

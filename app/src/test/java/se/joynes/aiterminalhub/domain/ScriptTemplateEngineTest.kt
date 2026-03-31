@@ -24,8 +24,8 @@ class ScriptTemplateEngineTest {
 
         val setup = engine.renderSetup(server, project)
 
-        assertTrue(setup.contains("git clone --depth 1 'https://github.com/example/sample-project' '\$HOME/projects with spaces/sample-project'"))
+        assertTrue(setup.contains("git clone --depth 1 'https://github.com/example/sample-project' \"\$HOME/projects with spaces/sample-project\""))
         assertTrue(setup.contains(ScriptTemplateEngine.GIT_CLONE_FAILED_MARKER))
-        assertTrue(setup.contains("mkdir -p '\$HOME/projects with spaces/sample-project'"))
+        assertTrue(setup.contains("mkdir -p \"\$HOME/projects with spaces/sample-project\""))
     }
 }
