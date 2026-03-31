@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.theme.*
 import kotlin.math.roundToInt
 
@@ -189,52 +188,38 @@ fun FloatingTextInputDialog(
                 }
             }
 
-            Row(
+            TextField(
+                value = text,
+                onValueChange = onTextChange,
+                placeholder = {
+                    Text(
+                        "Type or dictate...",
+                        color = MegaDriveDim, fontSize = 12.sp, fontFamily = MonoFontFamily
+                    )
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { send() }),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor    = MegaDriveBg,
+                    unfocusedContainerColor  = MegaDriveBg,
+                    disabledContainerColor   = MegaDriveBg,
+                    focusedTextColor         = MegaDrivePrimary,
+                    unfocusedTextColor       = MegaDrivePrimary,
+                    disabledTextColor        = MegaDriveDim,
+                    focusedIndicatorColor    = MegaDrivePrimary,
+                    unfocusedIndicatorColor  = MegaDriveDim,
+                    disabledIndicatorColor   = MegaDriveDim,
+                    cursorColor              = MegaDrivePrimary,
+                ),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = MonoFontFamily, fontSize = 13.sp, color = MegaDrivePrimary
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(8.dp),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                TextField(
-                    value = text,
-                    onValueChange = onTextChange,
-                    placeholder = {
-                        Text(
-                            "Type or dictate...",
-                            color = MegaDriveDim, fontSize = 12.sp, fontFamily = MonoFontFamily
-                        )
-                    },
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                    keyboardActions = KeyboardActions(onSend = { send() }),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor    = MegaDriveBg,
-                        unfocusedContainerColor  = MegaDriveBg,
-                        disabledContainerColor   = MegaDriveBg,
-                        focusedTextColor         = MegaDrivePrimary,
-                        unfocusedTextColor       = MegaDrivePrimary,
-                        disabledTextColor        = MegaDriveDim,
-                        focusedIndicatorColor    = MegaDrivePrimary,
-                        unfocusedIndicatorColor  = MegaDriveDim,
-                        disabledIndicatorColor   = MegaDriveDim,
-                        cursorColor              = MegaDrivePrimary,
-                    ),
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontFamily = MonoFontFamily, fontSize = 13.sp, color = MegaDrivePrimary
-                    ),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(108.dp)
-                        .focusRequester(focusRequester)
-                )
-                RetroButton(
-                    text = "SEND",
-                    onClick = { send() },
-                    modifier = Modifier
-                        .width(78.dp)
-                        .height(42.dp)
-                )
-            }
+                    .padding(8.dp)
+                    .height(108.dp)
+                    .focusRequester(focusRequester)
+            )
         }
     }
 }
