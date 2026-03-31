@@ -43,7 +43,7 @@ import se.joynes.aiterminalhub.ui.screen.terminal.SpecialKeyBar
 import se.joynes.aiterminalhub.ui.screen.terminal.TerminalViewClientImpl
 import se.joynes.aiterminalhub.ui.theme.*
 
-private val KeyBarReservedHeight = 104.dp
+private val KeyBarReservedHeight = 70.dp
 
 private fun shouldUseSoftwareTerminalLayer(): Boolean {
     return Build.MANUFACTURER.equals("samsung", ignoreCase = true) ||
@@ -122,6 +122,7 @@ fun SessionHostScreen(
     // Reference to the live TerminalView for direct IMM calls
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
     val blackSwatchRef = remember { mutableStateOf<android.view.View?>(null) }
+    val canvasProbeRef = remember { mutableStateOf<android.view.View?>(null) }
 
     fun applyTerminalRenderCompatibility(tv: TerminalView) {
         if (shouldUseSoftwareTerminalLayer()) {
@@ -440,21 +441,50 @@ fun SessionHostScreen(
                             }
 
                             if (BuildConfig.IS_DIAGNOSTIC) {
-                                AndroidView(
-                                    factory = { ctx ->
-                                        android.view.View(ctx).apply {
-                                            setBackgroundColor(android.graphics.Color.BLACK)
-                                        }.also { blackSwatchRef.value = it }
-                                    },
-                                    update = { swatch ->
-                                        swatch.setBackgroundColor(android.graphics.Color.BLACK)
-                                        blackSwatchRef.value = swatch
-                                    },
+                                Row(
                                     modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(8.dp)
-                                        .size(28.dp)
-                                )
+                                        .padding(8.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    AndroidView(
+                                        factory = { ctx ->
+                                            android.view.View(ctx).apply {
+                                                setBackgroundColor(android.graphics.Color.BLACK)
+                                            }.also { blackSwatchRef.value = it }
+                                        },
+                                        update = { swatch ->
+                                            swatch.setBackgroundColor(android.graphics.Color.BLACK)
+                                            blackSwatchRef.value = swatch
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    AndroidView(
+                                        factory = { ctx ->
+                                            object : android.view.View(ctx) {
+                                                private val paint = android.graphics.Paint().apply {
+                                                    color = android.graphics.Color.BLACK
+                                                    style = android.graphics.Paint.Style.FILL
+                                                }
+
+                                                override fun onDraw(canvas: android.graphics.Canvas) {
+                                                    canvas.drawRect(
+                                                        0f,
+                                                        0f,
+                                                        width.toFloat(),
+                                                        height.toFloat(),
+                                                        paint
+                                                    )
+                                                }
+                                            }.also { canvasProbeRef.value = it }
+                                        },
+                                        update = { probe ->
+                                            canvasProbeRef.value = probe
+                                            probe.invalidate()
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
                             }
                         } else {
                             Box(
@@ -524,6 +554,21 @@ fun SessionHostScreen(
                                     }
                                     @Suppress("DEPRECATION")
                                     swatch?.isDrawingCacheEnabled = false
+                                } catch (_: Exception) {}
+                                try {
+                                    val probe = canvasProbeRef.value
+                                    @Suppress("DEPRECATION")
+                                    probe?.isDrawingCacheEnabled = true
+                                    @Suppress("DEPRECATION")
+                                    probe?.drawingCache?.let { bmp ->
+                                        val sample = bmp.getPixel(
+                                            (bmp.width / 2).coerceAtMost(bmp.width - 1),
+                                            (bmp.height / 2).coerceAtMost(bmp.height - 1)
+                                        )
+                                        sb.append(" probe=#${Integer.toHexString(sample)}")
+                                    }
+                                    @Suppress("DEPRECATION")
+                                    probe?.isDrawingCacheEnabled = false
                                 } catch (_: Exception) {}
                                 sb.append(" alpha=${tv.alpha} layer=${tv.layerType}")
                                 // Log cell styles at center position
