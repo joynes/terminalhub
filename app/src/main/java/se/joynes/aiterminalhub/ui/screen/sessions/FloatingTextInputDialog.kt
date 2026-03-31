@@ -80,7 +80,7 @@ fun FloatingTextInputDialog(
         }
         val panelWidthDp = maxWidth * 0.92f
         val panelWidthPx = with(density) { panelWidthDp.toPx() }
-        val panelHeightPx = with(density) { 160.dp.toPx() }
+        val panelHeightPx = with(density) { 184.dp.toPx() }
         val minPanelTopPx = with(density) { 12.dp.toPx() }
         val panelBottomGapPx = with(density) { 8.dp.toPx() }
         val maxPanelTopPx = (availableHeightPx - panelHeightPx).coerceAtLeast(minPanelTopPx)
@@ -224,10 +224,16 @@ fun FloatingTextInputDialog(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .height(80.dp)
+                        .height(108.dp)
                         .focusRequester(focusRequester)
                 )
-                RetroButton(text = "SEND", onClick = { send() })
+                RetroButton(
+                    text = "SEND",
+                    onClick = { send() },
+                    modifier = Modifier
+                        .width(78.dp)
+                        .height(42.dp)
+                )
             }
         }
     }
