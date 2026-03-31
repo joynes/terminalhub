@@ -1,5 +1,7 @@
 package se.joynes.aiterminalhub.ui.screen.sessions
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,6 +43,7 @@ data class ProjectTabState(
 
 @HiltViewModel
 class SessionHostViewModel @Inject constructor(
+    @ApplicationContext context: Context,
     private val logger: AppLogger,
     private val serverRepo: ServerRepository,
     private val projectRepo: ProjectRepository,
@@ -50,20 +53,26 @@ class SessionHostViewModel @Inject constructor(
     val sessionManager: TerminalSessionManager,
     private val textInputHistoryDao: TextInputHistoryDao
 ) : ViewModel() {
+    private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
+    private val tabOrderKey = "project_tab_order"
 
     private val instanceId = System.identityHashCode(this)
 
     // All projects from DB (shown immediately, even while connecting)
     private val _dbProjects = MutableStateFlow<List<Project>>(emptyList())
     private val _allDbProjects = MutableStateFlow<List<Project>>(emptyList())
+    private val _projectOrder = MutableStateFlow(loadProjectOrder())
 
     /** Combined tab list: DB projects merged with live session state. */
     val projectTabs: StateFlow<List<ProjectTabState>> = combine(
         _dbProjects,
-        sessionManager.sessions
-    ) { projects, sessions ->
+        sessionManager.sessions,
+        _projectOrder
+    ) { projects, sessions, projectOrder ->
         val sessionByName = sessions.associateBy { it.projectName }
-        projects.map { p ->
+        projects
+            .sortedByProjectOrder(projectOrder)
+            .map { p ->
             val session = sessionByName[p.name]
             ProjectTabState(
                 projectId = p.id,
@@ -72,7 +81,7 @@ class SessionHostViewModel @Inject constructor(
                 isConnected = session?.isConnected ?: false,
                 colorSeed = p.colorSeed
             )
-        }
+            }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val activeId: StateFlow<TerminalSessionId?> = sessionManager.activeId
@@ -101,6 +110,7 @@ class SessionHostViewModel @Inject constructor(
         viewModelScope.launch {
             projectRepo.getAll().collect { projects ->
                 _allDbProjects.value = projects
+                syncProjectOrder(projects)
                 val visible = projects.filter { !sessionManager.isProjectClosed(it.id) }
                 val prevIds = _dbProjects.value.map { it.id }.toSet()
                 val isFirstLoad = _dbProjects.value.isEmpty() && prevIds.isEmpty()
@@ -249,7 +259,20 @@ class SessionHostViewModel @Inject constructor(
         activateProject(project)
     }
 
-    fun moveSession(fromIndex: Int, toIndex: Int) = sessionManager.moveSession(fromIndex, toIndex)
+    fun moveSession(fromIndex: Int, toIndex: Int) {
+        val visibleTabs = projectTabs.value
+        if (fromIndex !in visibleTabs.indices || toIndex !in visibleTabs.indices) return
+        val visibleIds = visibleTabs.map { it.projectId }.toMutableList()
+        val visibleIdSet = visibleIds.toSet()
+        val movedId = visibleIds.removeAt(fromIndex)
+        visibleIds.add(toIndex, movedId)
+        val allIds = _allDbProjects.value.sortedByProjectOrder(_projectOrder.value).map { it.id }
+        val reorderedVisible = ArrayDeque(visibleIds)
+        val mergedOrder = allIds.map { projectId ->
+            if (projectId in visibleIdSet) reorderedVisible.removeFirst() else projectId
+        }
+        persistProjectOrder(mergedOrder)
+    }
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)
     fun resizeActivePty(cols: Int, rows: Int) = sessionManager.resizeActivePty(cols, rows)
@@ -276,5 +299,28 @@ class SessionHostViewModel @Inject constructor(
         append(",connecting=").append(connectingProjectIds.joinToString(prefix = "[", postfix = "]"))
         append(",ssh={").append(sshManager.debugSnapshot()).append("}")
         append(",terminals={").append(sessionManager.debugSnapshot()).append("}")
+    }
+
+    private fun loadProjectOrder(): List<Long> =
+        prefs.getString(tabOrderKey, null)
+            ?.split(',')
+            ?.mapNotNull { it.toLongOrNull() }
+            ?: emptyList()
+
+    private fun persistProjectOrder(order: List<Long>) {
+        _projectOrder.value = order
+        prefs.edit().putString(tabOrderKey, order.joinToString(",")).apply()
+    }
+
+    private fun syncProjectOrder(projects: List<Project>) {
+        val normalized = projects.sortedByProjectOrder(_projectOrder.value).map { it.id }
+        if (normalized != _projectOrder.value) {
+            persistProjectOrder(normalized)
+        }
+    }
+
+    private fun List<Project>.sortedByProjectOrder(order: List<Long>): List<Project> {
+        val orderIndex = order.withIndex().associate { it.value to it.index }
+        return sortedWith(compareBy<Project> { orderIndex[it.id] ?: Int.MAX_VALUE }.thenBy { it.id })
     }
 }
