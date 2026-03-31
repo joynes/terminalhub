@@ -9,6 +9,10 @@ import javax.inject.Singleton
 @Singleton
 class ScriptTemplateEngine @Inject constructor() {
 
+    companion object {
+        const val GIT_CLONE_FAILED_MARKER = "AITERM_GIT_CLONE_FAILED"
+    }
+
     fun projectPath(server: Server, project: Project): String =
         "${server.projectsFolder}/${project.name}"
 
@@ -20,29 +24,32 @@ class ScriptTemplateEngine @Inject constructor() {
 
     /** Silent exec: mkdir + optional git clone + create tmux session if useTmux. */
     fun renderSetup(server: Server, project: Project): String {
-        val path = projectPath(server, project)
+        val path = shellPath(projectPath(server, project))
         val session = sessionName(project)
-        // When a gitUrl is set, do NOT pre-create $path — git clone must create it itself.
-        // After the clone attempt (success or fail), ensure $path exists for tmux.
-        // Paths are UNQUOTED so bash expands `~`. Project names must not contain spaces (enforced in UI).
+        val quotedPath = shellQuote(path)
         val dirSetup = if (project.gitUrl.isNotBlank()) {
             val safeUrl = project.gitUrl.replace("'", "'\\''")
-            "if [ ! -d $path/.git ]; then git clone '$safeUrl' $path 2>/dev/null || true; fi; " +
-            "mkdir -p $path 2>/dev/null; "
+            "if [ ! -d $quotedPath/.git ]; then " +
+            "if ! git clone --depth 1 '$safeUrl' $quotedPath; then " +
+            "echo $GIT_CLONE_FAILED_MARKER; " +
+            "mkdir -p $quotedPath 2>/dev/null; " +
+            "fi; " +
+            "fi; " +
+            "mkdir -p $quotedPath 2>/dev/null; "
         } else {
-            "mkdir -p $path 2>/dev/null; "
+            "mkdir -p $quotedPath 2>/dev/null; "
         }
         return if (project.useTmux) {
             dirSetup +
             "if tmux has-session -t $session 2>/dev/null; then " +
             "if tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1; then " +
             "tmux kill-session -t $session 2>/dev/null; " +
-            "tmux new-session -d -s $session -c $path && echo TMUX_SESSION_CREATED; " +
+            "tmux new-session -d -s $session -c $quotedPath && echo TMUX_SESSION_CREATED; " +
             "else " +
             "echo TMUX_SESSION_EXISTS; " +
             "fi; " +
             "else " +
-            "tmux new-session -d -s $session -c $path && echo TMUX_SESSION_CREATED; " +
+            "tmux new-session -d -s $session -c $quotedPath && echo TMUX_SESSION_CREATED; " +
             "fi; " +
             renderTmuxTouchScrollSetup(session)
         } else {
@@ -70,7 +77,7 @@ class ScriptTemplateEngine @Inject constructor() {
     fun renderAiCommand(project: Project): String = project.aiCommand.trim()
 
     fun render(template: String, server: Server, project: Project): String {
-        val path = projectPath(server, project)
+        val path = shellPath(projectPath(server, project))
         return render(template, path, project)
     }
 
@@ -84,4 +91,10 @@ class ScriptTemplateEngine @Inject constructor() {
 
     private fun renderTmuxTouchScrollSetup(session: String): String =
         "tmux set-option -t $session mouse on 2>/dev/null || true"
+
+    private fun shellPath(path: String): String =
+        if (path.startsWith("~/")) "\$HOME/${path.removePrefix("~/")}" else path
+
+    private fun shellQuote(value: String): String =
+        "'${value.replace("'", "'\\''")}'"
 }

@@ -178,6 +178,7 @@ class SessionHostViewModel @Inject constructor(
             return
         }
         val setupOutput = if (setupCmd.isNotBlank()) conn.runSilent(setupCmd) else ""
+        val gitCloneFailed = setupOutput.contains(ScriptTemplateEngine.GIT_CLONE_FAILED_MARKER)
         val shouldRunStartupCommands = if (project.useTmux) {
             setupOutput.contains("TMUX_SESSION_CREATED")
         } else {
@@ -204,13 +205,22 @@ class SessionHostViewModel @Inject constructor(
             return
         }
 
+        if (gitCloneFailed) {
+            logger.log(
+                LogLevel.WARN,
+                "SessionHostViewModel",
+                "Git clone failed for project=${project.name} url=${project.gitUrl}"
+            )
+            conn.send("printf '\\n[AITerminalHub] Git clone failed for ${project.name}. Check git/network/path on the server.\\n'\n")
+        }
+
         conn.awaitTransportQuiescence()
-        if (shouldRunStartupCommands && customScript.isNotBlank()) {
+        if (!gitCloneFailed && shouldRunStartupCommands && customScript.isNotBlank()) {
             conn.send("$customScript\n")
             conn.awaitTransportQuiescence()
         }
 
-        if (shouldRunStartupCommands && aiCmd.isNotBlank()) {
+        if (!gitCloneFailed && shouldRunStartupCommands && aiCmd.isNotBlank()) {
             conn.awaitTransportQuiescence()
             conn.send("$aiCmd\n")
         }
