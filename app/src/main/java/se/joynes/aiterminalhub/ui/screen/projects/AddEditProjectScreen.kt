@@ -21,9 +21,10 @@ private val AI_TOOLS = listOf(
     "Openclaw"     to "openclaw tui"
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEditProjectScreen(
-    serverId: Long,
+    serverId: Long?,
     projectId: Long?,
     onBack: () -> Unit,
     viewModel: AddEditProjectViewModel = hiltViewModel()
@@ -31,6 +32,8 @@ fun AddEditProjectScreen(
     val state by viewModel.state.collectAsState()
     LaunchedEffect(projectId) { viewModel.loadProject(serverId, projectId) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
+    var serverMenuExpanded by remember { mutableStateOf(false) }
+    val selectedServerName = state.serverOptions.firstOrNull { it.id == state.selectedServerId }?.name ?: "Choose server"
 
     Scaffold(
         topBar = {
@@ -50,6 +53,72 @@ fun AddEditProjectScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text("TARGET", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+            ExposedDropdownMenuBox(
+                expanded = serverMenuExpanded,
+                onExpandedChange = { serverMenuExpanded = !serverMenuExpanded }
+            ) {
+                OutlinedTextField(
+                    value = selectedServerName,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier
+                        .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                        .fillMaxWidth(),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontFamily = MonoFontFamily, fontSize = 12.sp, color = MegaDriveOnSurface
+                    ),
+                    label = {
+                        Text("Server", fontFamily = MonoFontFamily)
+                    },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = serverMenuExpanded) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MegaDrivePrimary,
+                        unfocusedBorderColor = MegaDriveDim,
+                        focusedTextColor = MegaDriveOnSurface,
+                        unfocusedTextColor = MegaDriveOnSurface,
+                        cursorColor = MegaDrivePrimary
+                    )
+                )
+                ExposedDropdownMenu(
+                    expanded = serverMenuExpanded,
+                    onDismissRequest = { serverMenuExpanded = false }
+                ) {
+                    state.serverOptions.forEach { server ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    server.name,
+                                    color = MegaDriveOnSurface,
+                                    fontFamily = MonoFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            onClick = {
+                                viewModel.update { copy(selectedServerId = server.id) }
+                                serverMenuExpanded = false
+                            }
+                        )
+                    }
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Local (coming soon)",
+                                color = MegaDriveDim,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 12.sp
+                            )
+                        },
+                        onClick = { serverMenuExpanded = false },
+                        enabled = false
+                    )
+                }
+            }
+            Text(
+                "Each project still uses one target at a time. Local execution is not supported yet; the current session engine is SSH-based only.",
+                color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
+            )
+
             // ── Project name ──────────────────────────────────────────────
             RetroTextField(
                 state.name,
@@ -177,7 +246,7 @@ fun AddEditProjectScreen(
                 text = "[ SAVE ]",
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = state.name.isNotBlank()
+                enabled = state.name.isNotBlank() && state.selectedServerId != null
             )
         }
     }

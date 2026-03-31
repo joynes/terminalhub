@@ -7,9 +7,17 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
+import se.joynes.aiterminalhub.data.repository.ServerRepository
 import javax.inject.Inject
 
+data class ProjectServerOption(
+    val id: Long,
+    val name: String
+)
+
 data class AddEditProjectState(
+    val selectedServerId: Long? = null,
+    val serverOptions: List<ProjectServerOption> = emptyList(),
     val name: String = "",
     val useTmux: Boolean = true,
     val customScript: String = "cd {{PROJECT_PATH}}",
@@ -20,20 +28,26 @@ data class AddEditProjectState(
 
 @HiltViewModel
 class AddEditProjectViewModel @Inject constructor(
-    private val repo: ProjectRepository
+    private val repo: ProjectRepository,
+    private val serverRepo: ServerRepository
 ) : ViewModel() {
     private val _state = MutableStateFlow(AddEditProjectState())
     val state: StateFlow<AddEditProjectState> = _state.asStateFlow()
     private var editingId: Long? = null
-    private var serverId: Long = 0L
 
-    fun loadProject(sId: Long, id: Long?) {
-        serverId = sId
-        if (id == null) return
+    fun loadProject(initialServerId: Long?, id: Long?) {
         viewModelScope.launch {
+            val servers = serverRepo.getAll().first()
+            val options = servers.map { ProjectServerOption(it.id, it.name) }
+            val fallbackServerId = initialServerId ?: servers.firstOrNull()?.id
+            _state.update { it.copy(serverOptions = options, selectedServerId = fallbackServerId) }
+
+            if (id == null) return@launch
             val p = repo.getById(id) ?: return@launch
             editingId = id
             _state.value = AddEditProjectState(
+                selectedServerId = p.serverId,
+                serverOptions = options,
                 name = p.name,
                 useTmux = p.useTmux,
                 customScript = p.customScript,
@@ -50,9 +64,10 @@ class AddEditProjectViewModel @Inject constructor(
     fun save() {
         viewModelScope.launch {
             val s = _state.value
+            val selectedServerId = s.selectedServerId ?: return@launch
             val project = Project(
                 id = editingId ?: 0L,
-                serverId = serverId,
+                serverId = selectedServerId,
                 name = s.name,
                 useTmux = s.useTmux,
                 customScript = s.customScript,
