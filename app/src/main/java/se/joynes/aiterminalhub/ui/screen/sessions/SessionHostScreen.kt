@@ -12,11 +12,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.Image
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -24,12 +26,14 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
+import se.joynes.aiterminalhub.R
 import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.ui.screen.export.ExportImportState
 import se.joynes.aiterminalhub.ui.screen.export.ExportImportViewModel
@@ -74,6 +78,7 @@ fun SessionHostScreen(
     var keyboardVisible by remember { mutableStateOf(false) }
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
     var showTextInput by remember { mutableStateOf(false) }
     var showFileUpload by remember { mutableStateOf(false) }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
@@ -215,6 +220,51 @@ fun SessionHostScreen(
             onDismiss = { showSessionHistory = false }
         )
     }
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            containerColor = MegaDriveSurface,
+            title = {
+                Text(
+                    "ABOUT",
+                    color = MegaDrivePrimary,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 14.sp
+                )
+            },
+            text = {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Image(
+                        painter = painterResource(id = R.mipmap.ic_launcher),
+                        contentDescription = "App icon",
+                        modifier = Modifier.size(72.dp)
+                    )
+                    Text(
+                        "AI TERMINAL HUB",
+                        color = Color.White,
+                        fontFamily = MonoFontFamily,
+                        fontSize = 13.sp
+                    )
+                    Text(
+                        "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        color = MegaDriveDim,
+                        fontFamily = MonoFontFamily,
+                        fontSize = 12.sp
+                    )
+                }
+            },
+            confirmButton = {
+                RetroButton(
+                    text = "CLOSE",
+                    onClick = { showAboutDialog = false }
+                )
+            }
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -335,6 +385,20 @@ fun SessionHostScreen(
                             onClick = {
                                 showSettingsMenu = false
                                 importLauncher.launch(arrayOf("text/plain", "application/yaml", "*/*"))
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "About",
+                                    color = Color.White,
+                                    fontFamily = MonoFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            onClick = {
+                                showSettingsMenu = false
+                                showAboutDialog = true
                             }
                         )
                     }
