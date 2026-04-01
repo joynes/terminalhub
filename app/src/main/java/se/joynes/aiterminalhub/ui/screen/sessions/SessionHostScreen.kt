@@ -26,11 +26,11 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -148,9 +148,6 @@ fun SessionHostScreen(
 
     // Reference to the live TerminalView for direct IMM calls
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
-    val blackSwatchRef = remember { mutableStateOf<android.view.View?>(null) }
-    val canvasProbeRef = remember { mutableStateOf<android.view.View?>(null) }
-
     fun applyTerminalRenderCompatibility(tv: TerminalView) {
         if (shouldUseSoftwareTerminalLayer()) {
             tv.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
@@ -204,26 +201,31 @@ fun SessionHostScreen(
 
     LaunchedEffect(Unit) { viewModel.init() }
 
-    LaunchedEffect(viewModel) {
-        viewModel.screenUpdates.collect { changedSession ->
-            val tv = terminalViewRef.value ?: return@collect
-            if (tv.mTermSession === changedSession) {
-                tv.onScreenUpdated()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            viewModel.screenUpdates.collect { changedSession ->
+                val tv = terminalViewRef.value ?: return@collect
+                if (tv.mTermSession === changedSession) {
+                    tv.onScreenUpdated()
+                }
             }
         }
     }
 
     // Re-request focus when the app comes back from background
-    val lifecycleOwner = LocalLifecycleOwner.current
     val currentSession by rememberUpdatedState(session)
-    val currentActiveId by rememberUpdatedState(activeId)
-    val currentViewModel by rememberUpdatedState(viewModel)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             val tv = terminalViewRef.value
             if (event == Lifecycle.Event.ON_RESUME && currentSession != null) {
                 keyboardVisible = true
                 tv?.requestFocus()
+            } else if (event == Lifecycle.Event.ON_STOP) {
+                keyboardVisible = false
+                hideKeyboard()
+                tv?.clearFocus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -594,7 +596,6 @@ fun SessionHostScreen(
                                         }
                                     },
                                     update = { tv ->
-                                        viewModel.debugLog("update: emu=${tv.mEmulator != null} w=${tv.width} h=${tv.height}")
                                         if (tv.mTermSession !== sess) {
                                             tv.attachSession(sess)
                                         }
@@ -608,52 +609,6 @@ fun SessionHostScreen(
                                 )
                             }
 
-                            if (BuildConfig.IS_DIAGNOSTIC) {
-                                Row(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(8.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    AndroidView(
-                                        factory = { ctx ->
-                                            android.view.View(ctx).apply {
-                                                setBackgroundColor(android.graphics.Color.BLACK)
-                                            }.also { blackSwatchRef.value = it }
-                                        },
-                                        update = { swatch ->
-                                            swatch.setBackgroundColor(android.graphics.Color.BLACK)
-                                            blackSwatchRef.value = swatch
-                                        },
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    AndroidView(
-                                        factory = { ctx ->
-                                            object : android.view.View(ctx) {
-                                                private val paint = android.graphics.Paint().apply {
-                                                    color = android.graphics.Color.BLACK
-                                                    style = android.graphics.Paint.Style.FILL
-                                                }
-
-                                                override fun onDraw(canvas: android.graphics.Canvas) {
-                                                    canvas.drawRect(
-                                                        0f,
-                                                        0f,
-                                                        width.toFloat(),
-                                                        height.toFloat(),
-                                                        paint
-                                                    )
-                                                }
-                                            }.also { canvasProbeRef.value = it }
-                                        },
-                                        update = { probe ->
-                                            canvasProbeRef.value = probe
-                                            probe.invalidate()
-                                        },
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                }
-                            }
                         } else {
                             Box(
                                 modifier = Modifier
@@ -669,89 +624,6 @@ fun SessionHostScreen(
                                 )
                             }
                         }
-
-                        // DEBUG: diagnostic logging to app LogView
-                        if (BuildConfig.IS_DIAGNOSTIC) LaunchedEffect(Unit) {
-                            while (true) {
-                                kotlinx.coroutines.delay(1000)
-                                val tv = terminalViewRef.value ?: continue
-                                val sb = StringBuilder()
-                                sb.append("emu=${tv.mEmulator != null} ${tv.width}x${tv.height}")
-                                tv.mEmulator?.let { emu ->
-                                    val palette = emu.mColors.mCurrentColors
-                                    val palBg = palette[com.termux.terminal.TextStyle.COLOR_INDEX_BACKGROUND]
-                                    val palFg = palette[com.termux.terminal.TextStyle.COLOR_INDEX_FOREGROUND]
-                                    sb.append(" palBg=#${Integer.toHexString(palBg)}")
-                                    sb.append(" palFg=#${Integer.toHexString(palFg)}")
-                                    sb.append(" reverseVideo=${emu.isReverseVideo}")
-                                    // Log first 8 palette entries in case shell changed them
-                                    sb.append(" pal0-7=[${(0..7).joinToString(",") { "#${Integer.toHexString(palette[it])}" }}]")
-                                }
-                                try {
-                                    @Suppress("DEPRECATION")
-                                    tv.isDrawingCacheEnabled = true
-                                    @Suppress("DEPRECATION")
-                                    tv.drawingCache?.let { bmp ->
-                                        val safeX = 4.coerceAtMost(bmp.width - 1)
-                                        val safeY = 4.coerceAtMost(bmp.height - 1)
-                                        val tl = bmp.getPixel(safeX, safeY)
-                                        val tr = bmp.getPixel((bmp.width - 5).coerceAtLeast(0), safeY)
-                                        val bl = bmp.getPixel(safeX, (bmp.height - 5).coerceAtLeast(0))
-                                        val br = bmp.getPixel((bmp.width - 5).coerceAtLeast(0), (bmp.height - 5).coerceAtLeast(0))
-                                        val mid = bmp.getPixel(bmp.width / 2, bmp.height / 2)
-                                        sb.append(
-                                            " px tl=#${Integer.toHexString(tl)} tr=#${Integer.toHexString(tr)}" +
-                                                " bl=#${Integer.toHexString(bl)} br=#${Integer.toHexString(br)}" +
-                                                " mid=#${Integer.toHexString(mid)}"
-                                        )
-                                    }
-                                    @Suppress("DEPRECATION")
-                                    tv.isDrawingCacheEnabled = false
-                                } catch (_: Exception) {}
-                                try {
-                                    val swatch = blackSwatchRef.value
-                                    @Suppress("DEPRECATION")
-                                    swatch?.isDrawingCacheEnabled = true
-                                    @Suppress("DEPRECATION")
-                                    swatch?.drawingCache?.let { bmp ->
-                                        val sample = bmp.getPixel(
-                                            (bmp.width / 2).coerceAtMost(bmp.width - 1),
-                                            (bmp.height / 2).coerceAtMost(bmp.height - 1)
-                                        )
-                                        sb.append(" swatch=#${Integer.toHexString(sample)}")
-                                    }
-                                    @Suppress("DEPRECATION")
-                                    swatch?.isDrawingCacheEnabled = false
-                                } catch (_: Exception) {}
-                                try {
-                                    val probe = canvasProbeRef.value
-                                    @Suppress("DEPRECATION")
-                                    probe?.isDrawingCacheEnabled = true
-                                    @Suppress("DEPRECATION")
-                                    probe?.drawingCache?.let { bmp ->
-                                        val sample = bmp.getPixel(
-                                            (bmp.width / 2).coerceAtMost(bmp.width - 1),
-                                            (bmp.height / 2).coerceAtMost(bmp.height - 1)
-                                        )
-                                        sb.append(" probe=#${Integer.toHexString(sample)}")
-                                    }
-                                    @Suppress("DEPRECATION")
-                                    probe?.isDrawingCacheEnabled = false
-                                } catch (_: Exception) {}
-                                sb.append(" alpha=${tv.alpha} layer=${tv.layerType}")
-                                // Log cell styles at center position
-                                tv.mEmulator?.let { emu ->
-                                    val midRow = emu.mRows / 2
-                                    val midCol = emu.mColumns / 2
-                                    sb.append(" | cell: ${tv.debugCellAt(midRow, midCol)}")
-                                    // Also check row 0 and last row
-                                    sb.append(" | row0: ${tv.debugCellAt(0, 0)}")
-                                    sb.append(" | lastRow: ${tv.debugCellAt(emu.mRows - 1, 0)}")
-                                }
-                                viewModel.debugLog(sb.toString())
-                            }
-                        }
-
                         if (activeTextInputVisible && activeProjectId != null) {
                             FloatingTextInputDialog(
                                 text = activeTextInputDraft,

@@ -99,10 +99,6 @@ class SessionHostViewModel @Inject constructor(
 
     private var initialized = false
 
-    fun debugLog(msg: String) {
-        logger.log(LogLevel.DEBUG, "TERMDIAG", msg)
-    }
-
     fun init() {
         if (initialized) return
         initialized = true
