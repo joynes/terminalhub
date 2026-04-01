@@ -3,6 +3,7 @@ package se.joynes.aiterminalhub.data.ssh
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.text.TextUtils
 import android.util.Log
 import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
@@ -20,7 +21,14 @@ class TerminalSessionClientImpl(
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
         clipboard?.setPrimaryClip(ClipData.newPlainText("terminal", text))
     }
-    override fun onPasteTextFromClipboard(session: TerminalSession?) {}
+    override fun onPasteTextFromClipboard(session: TerminalSession?) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
+        val clipData = clipboard.primaryClip ?: return
+        val text = clipData.getItemAt(0)?.coerceToText(context)
+        if (!TextUtils.isEmpty(text)) {
+            session?.getEmulator()?.paste(text.toString())
+        }
+    }
     override fun onBell(session: TerminalSession) {}
     override fun onColorsChanged(session: TerminalSession) {}
     override fun onTerminalCursorStateChange(state: Boolean) {}
