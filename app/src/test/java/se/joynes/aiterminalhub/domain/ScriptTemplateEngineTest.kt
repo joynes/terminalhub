@@ -28,4 +28,23 @@ class ScriptTemplateEngineTest {
         assertTrue(setup.contains(ScriptTemplateEngine.GIT_CLONE_FAILED_MARKER))
         assertTrue(setup.contains("mkdir -p \"\$HOME/projects with spaces/sample-project\""))
     }
+
+    @Test
+    fun renderMoveProjectToTrashMovesIntoTrashFolderUnderProjectsRoot() {
+        val server = Server(
+            name = "prod",
+            host = "example.com",
+            username = "demo",
+            projectsFolder = "~/projects with spaces"
+        )
+        val project = Project(
+            serverId = 1L,
+            name = "sample-project"
+        )
+
+        val command = engine.renderMoveProjectToTrash(server, project, "12345")
+
+        assertTrue(command.contains("mkdir -p \"\$HOME/projects with spaces/.trash\""))
+        assertTrue(command.contains("mv \"\$HOME/projects with spaces/sample-project\" \"\$HOME/projects with spaces/.trash/sample-project-12345\""))
+    }
 }

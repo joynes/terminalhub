@@ -19,6 +19,9 @@ class ScriptTemplateEngine @Inject constructor() {
     fun localProjectPath(baseDir: String, project: Project): String =
         "$baseDir/${project.name}"
 
+    fun trashProjectPath(server: Server, project: Project, trashKey: String): String =
+        "${server.projectsFolder}/.trash/${project.name}-$trashKey"
+
     fun sessionName(project: Project): String =
         project.name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
@@ -72,6 +75,14 @@ class ScriptTemplateEngine @Inject constructor() {
 
     fun renderLocalCustomScript(baseDir: String, project: Project): String =
         render(project.customScript, localProjectPath(baseDir, project), project)
+
+    fun renderMoveProjectToTrash(server: Server, project: Project, trashKey: String): String {
+        val projectPath = shellQuote(shellPath(projectPath(server, project)))
+        val trashDir = shellQuote(shellPath("${server.projectsFolder}/.trash"))
+        val trashPath = shellQuote(shellPath(trashProjectPath(server, project, trashKey)))
+        return "mkdir -p $trashDir 2>/dev/null; " +
+            "if [ -e $projectPath ]; then mv $projectPath $trashPath; fi"
+    }
 
     /** AI tool command run last. Empty = none. */
     fun renderAiCommand(project: Project): String = project.aiCommand.trim()

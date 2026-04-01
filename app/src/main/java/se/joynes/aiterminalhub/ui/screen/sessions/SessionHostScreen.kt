@@ -319,7 +319,7 @@ fun SessionHostScreen(
                             onCheckedChange = { deleteProjectOnClose = it }
                         )
                         Text(
-                            "Delete project from app",
+                            "Move project to .trash and remove from app",
                             color = Color.White,
                             fontFamily = MonoFontFamily,
                             fontSize = 12.sp

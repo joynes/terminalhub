@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import com.termux.terminal.TerminalSession
+import java.io.File
 import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.data.db.dao.TextInputHistoryDao
 import se.joynes.aiterminalhub.data.db.entity.TextInputHistoryEntity
@@ -268,15 +269,54 @@ class SessionHostViewModel @Inject constructor(
         killTmuxSession: Boolean = false,
         deleteProject: Boolean = false
     ) {
-        closeSession(projectId, sessionId, killTmuxSession = killTmuxSession)
-        if (!deleteProject) return
         viewModelScope.launch {
-            _projectOrder.value
-                .filterNot { it == projectId }
-                .let(::persistProjectOrder)
-            sessionManager.markProjectOpen(projectId)
-            _allDbProjects.value.firstOrNull { it.id == projectId }?.let { project ->
+            val project = _allDbProjects.value.firstOrNull { it.id == projectId }
+            if (deleteProject && project != null) {
+                moveProjectToTrash(project, sessionId, killTmuxSession)
+            }
+
+            closeSession(
+                projectId = projectId,
+                sessionId = sessionId,
+                killTmuxSession = if (deleteProject) false else killTmuxSession
+            )
+
+            if (deleteProject && project != null) {
+                _projectOrder.value
+                    .filterNot { it == projectId }
+                    .let(::persistProjectOrder)
+                sessionManager.markProjectOpen(projectId)
                 projectRepo.delete(project)
+            }
+        }
+    }
+
+    private suspend fun moveProjectToTrash(
+        project: Project,
+        sessionId: TerminalSessionId?,
+        killTmuxSession: Boolean
+    ) {
+        val trashKey = System.currentTimeMillis().toString()
+        when (project.targetType) {
+            ProjectTargetType.LOCAL -> {
+                val projectDir = File(sessionManager.localProjectPath(project.name))
+                if (!projectDir.exists()) return
+                val trashDir = File(projectDir.parentFile, ".trash").apply { mkdirs() }
+                val trashedDir = File(trashDir, "${project.name}-$trashKey")
+                projectDir.renameTo(trashedDir)
+            }
+            ProjectTargetType.SSH -> {
+                val server = serverRepo.getById(project.serverId) ?: return
+                val existingConn = sessionId?.let { sessionManager.getConnectionForProject(project.id) }
+                val conn = existingConn ?: connectToServer(server)
+                conn.connected.first { it }
+                if (killTmuxSession && project.useTmux) {
+                    conn.runSilent("tmux kill-session -t '${engine.sessionName(project).replace("'", "'\\''")}' 2>/dev/null || true")
+                }
+                conn.runSilent(engine.renderMoveProjectToTrash(server, project, trashKey))
+                if (existingConn == null) {
+                    sshManager.destroySession(conn.sessionId)
+                }
             }
         }
     }
