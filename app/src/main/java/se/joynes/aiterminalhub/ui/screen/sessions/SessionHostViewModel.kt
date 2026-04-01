@@ -38,7 +38,8 @@ data class ProjectTabState(
     val projectName: String,
     val sessionId: TerminalSessionId?,   // null = connecting
     val isConnected: Boolean,
-    val colorSeed: Int = 0
+    val colorSeed: Int = 0,
+    val usesTmux: Boolean = false
 )
 
 @HiltViewModel
@@ -79,7 +80,8 @@ class SessionHostViewModel @Inject constructor(
                 projectName = p.name,
                 sessionId = session?.id,
                 isConnected = session?.isConnected ?: false,
-                colorSeed = p.colorSeed
+                colorSeed = p.colorSeed,
+                usesTmux = p.targetType == ProjectTargetType.SSH && p.useTmux
             )
             }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -252,12 +254,31 @@ class SessionHostViewModel @Inject constructor(
         }?.serverId
     }
 
-    fun closeSession(projectId: Long, sessionId: TerminalSessionId?) {
+    fun closeSession(projectId: Long, sessionId: TerminalSessionId?, killTmuxSession: Boolean = false) {
         sessionManager.markProjectClosed(projectId)
         connectingJobs.remove(projectId)?.cancel()
         _dbProjects.value = _dbProjects.value.filter { it.id != projectId }
         connectingProjectIds.remove(projectId)
-        sessionId?.let { sessionManager.close(it) }
+        sessionId?.let { sessionManager.close(it, killTmuxSession = killTmuxSession) }
+    }
+
+    fun closeProject(
+        projectId: Long,
+        sessionId: TerminalSessionId?,
+        killTmuxSession: Boolean = false,
+        deleteProject: Boolean = false
+    ) {
+        closeSession(projectId, sessionId, killTmuxSession = killTmuxSession)
+        if (!deleteProject) return
+        viewModelScope.launch {
+            _projectOrder.value
+                .filterNot { it == projectId }
+                .let(::persistProjectOrder)
+            sessionManager.markProjectOpen(projectId)
+            _allDbProjects.value.firstOrNull { it.id == projectId }?.let { project ->
+                projectRepo.delete(project)
+            }
+        }
     }
 
     fun reopenSession(projectId: Long) {

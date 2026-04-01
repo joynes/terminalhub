@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,6 +51,12 @@ import se.joynes.aiterminalhub.ui.theme.*
 
 private val KeyBarReservedHeight = 70.dp
 
+private data class PendingTabClose(
+    val projectId: Long,
+    val projectName: String,
+    val sessionId: se.joynes.aiterminalhub.domain.TerminalSessionId?
+)
+
 private fun shouldUseSoftwareTerminalLayer(): Boolean {
     return Build.MANUFACTURER.equals("samsung", ignoreCase = true) ||
         Build.BRAND.equals("samsung", ignoreCase = true)
@@ -80,6 +87,8 @@ fun SessionHostScreen(
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
+    var pendingTabClose by remember { mutableStateOf<PendingTabClose?>(null) }
+    var deleteProjectOnClose by remember(pendingTabClose?.projectId) { mutableStateOf(false) }
     val textInputVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     val textInputDraftByProject = remember { mutableStateMapOf<Long, String>() }
     val fileUploadVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
@@ -279,6 +288,75 @@ fun SessionHostScreen(
             }
         )
     }
+    pendingTabClose?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { pendingTabClose = null },
+            containerColor = MegaDriveSurface,
+            title = {
+                Text(
+                    "CLOSE TMUX SESSION?",
+                    color = MegaDrivePrimary,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 14.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Project ${pending.projectName} uses tmux. Close only the tab, or also kill the remote tmux session?",
+                        color = Color.White,
+                        fontFamily = MonoFontFamily,
+                        fontSize = 12.sp
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { deleteProjectOnClose = !deleteProjectOnClose },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = deleteProjectOnClose,
+                            onCheckedChange = { deleteProjectOnClose = it }
+                        )
+                        Text(
+                            "Delete project from app",
+                            color = Color.White,
+                            fontFamily = MonoFontFamily,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            dismissButton = {
+                RetroButton(
+                    text = "TAB ONLY",
+                    onClick = {
+                        viewModel.closeProject(
+                            pending.projectId,
+                            pending.sessionId,
+                            killTmuxSession = false,
+                            deleteProject = deleteProjectOnClose
+                        )
+                        pendingTabClose = null
+                    }
+                )
+            },
+            confirmButton = {
+                RetroButton(
+                    text = "KILL TMUX",
+                    onClick = {
+                        viewModel.closeProject(
+                            pending.projectId,
+                            pending.sessionId,
+                            killTmuxSession = true,
+                            deleteProject = deleteProjectOnClose
+                        )
+                        pendingTabClose = null
+                    }
+                )
+            }
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -299,7 +377,18 @@ fun SessionHostScreen(
                         tabs = projectTabs,
                         activeId = activeId,
                         onSelect = { viewModel.switchToSession(it); terminalViewRef.value?.requestFocus() },
-                        onClose = { projectId, sessionId -> viewModel.closeSession(projectId, sessionId) },
+                        onClose = { projectId, sessionId ->
+                            val tab = projectTabs.firstOrNull { it.projectId == projectId }
+                            if (tab?.usesTmux == true && sessionId != null) {
+                                pendingTabClose = PendingTabClose(
+                                    projectId = projectId,
+                                    projectName = tab.projectName,
+                                    sessionId = sessionId
+                                )
+                            } else {
+                                viewModel.closeSession(projectId, sessionId)
+                            }
+                        },
                         onMove = { fromIndex, toIndex -> viewModel.moveSession(fromIndex, toIndex) },
                         onAddProject = onAddProject,
                         modifier = Modifier.weight(1f)
