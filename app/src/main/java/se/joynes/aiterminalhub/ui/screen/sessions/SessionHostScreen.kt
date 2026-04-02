@@ -131,6 +131,9 @@ fun SessionHostScreen(
     val activeProjectId = remember(activeId, projectTabs) {
         projectTabs.firstOrNull { it.sessionId == activeId }?.projectId
     }
+    val activeTab = remember(activeProjectId, projectTabs) {
+        activeProjectId?.let { projectId -> projectTabs.firstOrNull { it.projectId == projectId } }
+    }
     val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
     val activeTextInputDraft = activeProjectId?.let { textInputDraftByProject[it].orEmpty() }.orEmpty()
     val activeFileUploadVisible = activeProjectId?.let { fileUploadVisibleByProject[it] == true } ?: false
@@ -624,6 +627,38 @@ fun SessionHostScreen(
                                 )
                             }
                         }
+
+                        if (activeTab != null &&
+                            activeTab.targetType == se.joynes.aiterminalhub.data.model.ProjectTargetType.SSH &&
+                            !activeTab.isConnected &&
+                            activeTab.sessionId != null
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 12.dp)
+                                    .background(MegaDriveSurface)
+                                    .border(1.dp, MegaDriveError.copy(alpha = 0.45f))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        "SESSION DISCONNECTED",
+                                        color = MegaDriveError,
+                                        fontSize = 12.sp,
+                                        fontFamily = MonoFontFamily
+                                    )
+                                    RetroButton(
+                                        text = "RECONNECT",
+                                        onClick = { viewModel.reconnectProject(activeTab.projectId) }
+                                    )
+                                }
+                            }
+                        }
+
                         if (activeTextInputVisible && activeProjectId != null) {
                             FloatingTextInputDialog(
                                 text = activeTextInputDraft,

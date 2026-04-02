@@ -40,7 +40,8 @@ data class ProjectTabState(
     val sessionId: TerminalSessionId?,   // null = connecting
     val isConnected: Boolean,
     val colorSeed: Int = 0,
-    val usesTmux: Boolean = false
+    val usesTmux: Boolean = false,
+    val targetType: ProjectTargetType = ProjectTargetType.SSH
 )
 
 @HiltViewModel
@@ -82,7 +83,8 @@ class SessionHostViewModel @Inject constructor(
                 sessionId = session?.id,
                 isConnected = session?.isConnected ?: false,
                 colorSeed = p.colorSeed,
-                usesTmux = p.targetType == ProjectTargetType.SSH && p.useTmux
+                usesTmux = p.targetType == ProjectTargetType.SSH && p.useTmux,
+                targetType = p.targetType
             )
             }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -324,6 +326,16 @@ class SessionHostViewModel @Inject constructor(
             _dbProjects.value = _dbProjects.value + project
         }
         activateProject(project)
+    }
+
+    fun reconnectProject(projectId: Long) {
+        val project = _allDbProjects.value.find { it.id == projectId } ?: return
+        val existingSessionId = sessionManager.sessions.value.firstOrNull { it.projectId == projectId }?.id
+        existingSessionId?.let { sessionManager.close(it, killTmuxSession = false) }
+        connectingJobs.remove(projectId)?.cancel()
+        connectingProjectIds.remove(projectId)
+        sessionManager.markProjectOpen(projectId)
+        activateProject(project, autoSwitch = true)
     }
 
     fun moveSession(fromIndex: Int, toIndex: Int) {
