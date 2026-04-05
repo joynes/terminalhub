@@ -134,6 +134,10 @@ fun SessionHostScreen(
     val activeTab = remember(activeProjectId, projectTabs) {
         activeProjectId?.let { projectId -> projectTabs.firstOrNull { it.projectId == projectId } }
     }
+    val canReconnectActiveTab = activeTab != null &&
+        activeTab.targetType == se.joynes.aiterminalhub.data.model.ProjectTargetType.SSH &&
+        !activeTab.isConnected &&
+        activeTab.sessionId != null
     val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
     val activeTextInputDraft = activeProjectId?.let { textInputDraftByProject[it].orEmpty() }.orEmpty()
     val activeFileUploadVisible = activeProjectId?.let { fileUploadVisibleByProject[it] == true } ?: false
@@ -425,6 +429,22 @@ fun SessionHostScreen(
                         expanded = showSettingsMenu,
                         onDismissRequest = { showSettingsMenu = false }
                     ) {
+                        if (canReconnectActiveTab) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Reconnect",
+                                        color = Color.White,
+                                        fontFamily = MonoFontFamily,
+                                        fontSize = 12.sp
+                                    )
+                                },
+                                onClick = {
+                                    showSettingsMenu = false
+                                    activeTab?.let { viewModel.reconnectProject(it.projectId) }
+                                }
+                            )
+                        }
                         DropdownMenuItem(
                             text = {
                                 Text(
