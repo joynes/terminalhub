@@ -135,9 +135,7 @@ fun SessionHostScreen(
         activeProjectId?.let { projectId -> projectTabs.firstOrNull { it.projectId == projectId } }
     }
     val canReconnectActiveTab = activeTab != null &&
-        activeTab.targetType == se.joynes.aiterminalhub.data.model.ProjectTargetType.SSH &&
-        !activeTab.isConnected &&
-        activeTab.sessionId != null
+        activeTab.targetType == se.joynes.aiterminalhub.data.model.ProjectTargetType.SSH
     val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
     val activeTextInputDraft = activeProjectId?.let { textInputDraftByProject[it].orEmpty() }.orEmpty()
     val activeFileUploadVisible = activeProjectId?.let { fileUploadVisibleByProject[it] == true } ?: false
