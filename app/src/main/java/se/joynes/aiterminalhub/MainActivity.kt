@@ -13,7 +13,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import se.joynes.aiterminalhub.service.SshSessionService
 import se.joynes.aiterminalhub.ui.navigation.AppNavGraph
@@ -71,7 +70,7 @@ class MainActivity : ComponentActivity() {
         super.onStart()
         if (BuildConfig.IS_DIAGNOSTIC) return
         val intent = Intent(this, SshSessionService::class.java)
-        ContextCompat.startForegroundService(this, intent)
+        startService(intent)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
