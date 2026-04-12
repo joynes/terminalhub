@@ -57,12 +57,6 @@ private data class PendingTabClose(
     val sessionId: se.joynes.aiterminalhub.domain.TerminalSessionId?
 )
 
-private fun shouldUseSoftwareTerminalLayer(): Boolean {
-    return Build.MANUFACTURER.equals("samsung", ignoreCase = true) ||
-        Build.BRAND.equals("samsung", ignoreCase = true)
-}
-
-
 @Composable
 fun SessionHostScreen(
     onOpenServers: () -> Unit,
@@ -153,13 +147,10 @@ fun SessionHostScreen(
 
     // Reference to the live TerminalView for direct IMM calls
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
-    fun applyTerminalRenderCompatibility(tv: TerminalView) {
-        if (shouldUseSoftwareTerminalLayer()) {
-            tv.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
-        } else {
-            tv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-        }
-    }
+    var lastSyncedCols by remember { mutableIntStateOf(-1) }
+    var lastSyncedRows by remember { mutableIntStateOf(-1) }
+    var lastViewWidth by remember { mutableIntStateOf(-1) }
+    var lastViewHeight by remember { mutableIntStateOf(-1) }
 
     fun showKeyboard() {
         val tv = terminalViewRef.value ?: return
@@ -184,14 +175,24 @@ fun SessionHostScreen(
     }
 
     fun syncRemotePty(tv: TerminalView) {
-        applyTerminalRenderCompatibility(tv)
         tv.setBackgroundColor(0xFF0D0D1A.toInt())
         tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
-        tv.updateSize()
-        tv.onScreenUpdated(true)
-        tv.invalidate()
+        val viewChanged = tv.width != lastViewWidth || tv.height != lastViewHeight
+        if (viewChanged) {
+            lastViewWidth = tv.width
+            lastViewHeight = tv.height
+            tv.updateSize()
+        }
         val emulator = tv.mEmulator ?: return
-        viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
+        val ptyChanged = emulator.mColumns != lastSyncedCols || emulator.mRows != lastSyncedRows
+        if (ptyChanged) {
+            lastSyncedCols = emulator.mColumns
+            lastSyncedRows = emulator.mRows
+            viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
+        }
+        if (viewChanged || ptyChanged) {
+            tv.onScreenUpdated(true)
+        }
     }
 
     LaunchedEffect(sharedUri) {
@@ -593,7 +594,7 @@ fun SessionHostScreen(
                                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                                                 isForceDarkAllowed = false
                                             }
-                                            applyTerminalRenderCompatibility(this)
+                                            setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                                             isFocusable = true
                                             isFocusableInTouchMode = true
                                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -619,8 +620,12 @@ fun SessionHostScreen(
                                     update = { tv ->
                                         if (tv.mTermSession !== sess) {
                                             tv.attachSession(sess)
+                                            lastSyncedCols = -1
+                                            lastSyncedRows = -1
+                                            lastViewWidth = -1
+                                            lastViewHeight = -1
                                         }
-                                        applyTerminalRenderCompatibility(tv)
+                                        tv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                                         tv.setBackgroundColor(0xFF0D0D1A.toInt())
                                         tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
                                         terminalViewRef.value = tv

@@ -18,11 +18,6 @@ import se.joynes.aiterminalhub.ui.theme.MegaDriveBg
 import se.joynes.aiterminalhub.ui.theme.MegaDrivePrimary
 import se.joynes.aiterminalhub.ui.theme.MonoFontFamily
 
-private fun shouldUseSoftwareTerminalLayer(): Boolean {
-    return Build.MANUFACTURER.equals("samsung", ignoreCase = true) ||
-        Build.BRAND.equals("samsung", ignoreCase = true)
-}
-
 @Composable
 fun TerminalScreen(
     viewModel: TerminalViewModel = hiltViewModel()
@@ -31,16 +26,12 @@ fun TerminalScreen(
     val context = LocalContext.current
     val modifierManager = remember { MutableModifierManager() }
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
+    var lastSyncedCols by remember { mutableIntStateOf(-1) }
+    var lastSyncedRows by remember { mutableIntStateOf(-1) }
+    var lastViewWidth by remember { mutableIntStateOf(-1) }
+    var lastViewHeight by remember { mutableIntStateOf(-1) }
 
     var keyboardVisible by remember { mutableStateOf(false) }
-
-    fun applyTerminalRenderCompatibility(tv: TerminalView) {
-        if (shouldUseSoftwareTerminalLayer()) {
-            tv.setLayerType(android.view.View.LAYER_TYPE_SOFTWARE, null)
-        } else {
-            tv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
-        }
-    }
 
     fun showKeyboard() {
         val tv = terminalViewRef.value ?: return
@@ -55,10 +46,19 @@ fun TerminalScreen(
     }
 
     fun syncRemotePty(tv: TerminalView) {
-        applyTerminalRenderCompatibility(tv)
-        tv.updateSize()
+        val viewChanged = tv.width != lastViewWidth || tv.height != lastViewHeight
+        if (viewChanged) {
+            lastViewWidth = tv.width
+            lastViewHeight = tv.height
+            tv.updateSize()
+        }
         val emulator = tv.mEmulator ?: return
-        viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
+        val ptyChanged = emulator.mColumns != lastSyncedCols || emulator.mRows != lastSyncedRows
+        if (ptyChanged) {
+            lastSyncedCols = emulator.mColumns
+            lastSyncedRows = emulator.mRows
+            viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
+        }
     }
 
     LaunchedEffect(viewModel) {
@@ -90,7 +90,7 @@ fun TerminalScreen(
                         factory = { ctx ->
                             val textSizePx = (14 * ctx.resources.displayMetrics.scaledDensity + 0.5f).toInt()
                             TerminalView(ctx, null).apply {
-                                applyTerminalRenderCompatibility(this)
+                                setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                                 isFocusable = true
                                 isFocusableInTouchMode = true
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -114,8 +114,12 @@ fun TerminalScreen(
                         update = { tv ->
                             if (tv.mTermSession !== sess) {
                                 tv.attachSession(sess)
+                                lastSyncedCols = -1
+                                lastSyncedRows = -1
+                                lastViewWidth = -1
+                                lastViewHeight = -1
                             }
-                            applyTerminalRenderCompatibility(tv)
+                            tv.setLayerType(android.view.View.LAYER_TYPE_NONE, null)
                             terminalViewRef.value = tv
                             syncRemotePty(tv)
                         },
