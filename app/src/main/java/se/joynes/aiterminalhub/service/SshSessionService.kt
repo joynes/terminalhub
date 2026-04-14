@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -32,16 +31,8 @@ class SshSessionService : Service() {
     @Inject lateinit var sshManager: SshManager
     @Inject lateinit var terminalSessionManager: TerminalSessionManager
 
-    inner class LocalBinder : Binder() {
-        val service: SshSessionService
-            get() = this@SshSessionService
-    }
-
-    private val binder = LocalBinder()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var notificationJob: Job? = null
-    private var boundClients = 0
-    private var startCommandReceived = false
 
     override fun onCreate() {
         super.onCreate()
@@ -60,23 +51,12 @@ class SshSessionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startCommandReceived = true
         logger.log(LogLevel.INFO, TAG, "onStartCommand flags=$flags startId=$startId snapshot=${debugSnapshot()}")
+        maybeStopIfIdle()
         return START_NOT_STICKY
     }
 
-    override fun onBind(intent: Intent?): IBinder {
-        boundClients += 1
-        logger.log(LogLevel.INFO, TAG, "onBind boundClients=$boundClients snapshot=${debugSnapshot()}")
-        return binder
-    }
-
-    override fun onUnbind(intent: Intent?): Boolean {
-        boundClients = (boundClients - 1).coerceAtLeast(0)
-        logger.log(LogLevel.INFO, TAG, "onUnbind boundClients=$boundClients snapshot=${debugSnapshot()}")
-        maybeStopIfIdle()
-        return false
-    }
+    override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         notificationJob?.cancel()
@@ -86,14 +66,12 @@ class SshSessionService : Service() {
     }
 
     fun debugSnapshot(): String = buildString {
-        append("bound=").append(boundClients)
-        append(",ssh={").append(sshManager.debugSnapshot()).append("}")
+        append("ssh={").append(sshManager.debugSnapshot()).append("}")
         append(",terminals={").append(terminalSessionManager.debugSnapshot()).append("}")
     }
 
     private fun maybeStopIfIdle() {
-        if (!startCommandReceived) return
-        if (boundClients == 0 && sshManager.sessions.value.isEmpty()) {
+        if (sshManager.sessions.value.isEmpty()) {
             logger.log(LogLevel.INFO, TAG, "Stopping idle service; snapshot=${debugSnapshot()}")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()

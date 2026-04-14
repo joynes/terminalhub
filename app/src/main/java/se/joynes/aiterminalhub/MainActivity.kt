@@ -1,12 +1,8 @@
 package se.joynes.aiterminalhub
 
-import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
 import android.net.Uri
 import android.os.Bundle
-import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -14,7 +10,6 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import dagger.hilt.android.AndroidEntryPoint
-import se.joynes.aiterminalhub.service.SshSessionService
 import se.joynes.aiterminalhub.ui.navigation.AppNavGraph
 import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
 import se.joynes.aiterminalhub.ui.viewmodel.SharedIntentViewModel
@@ -22,17 +17,6 @@ import se.joynes.aiterminalhub.ui.viewmodel.SharedIntentViewModel
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val sharedIntentViewModel: SharedIntentViewModel by viewModels()
-
-    private var bound = false
-    private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            bound = true
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            bound = false
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,21 +48,5 @@ class MainActivity : ComponentActivity() {
             val uri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
             uri?.let { sharedIntentViewModel.set(it) }
         }
-    }
-
-    override fun onStart() {
-        super.onStart()
-        if (BuildConfig.IS_DIAGNOSTIC) return
-        val intent = Intent(this, SshSessionService::class.java)
-        startService(intent)
-        bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-    }
-
-    override fun onStop() {
-        if (bound) {
-            unbindService(serviceConnection)
-            bound = false
-        }
-        super.onStop()
     }
 }

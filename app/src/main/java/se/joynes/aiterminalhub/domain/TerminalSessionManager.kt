@@ -1,6 +1,8 @@
 package se.joynes.aiterminalhub.domain
 
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
 import com.termux.terminal.TerminalInputListener
 import com.termux.terminal.TerminalSession
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -21,6 +23,7 @@ import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.ssh.SshConnection
 import se.joynes.aiterminalhub.data.ssh.SshManager
 import se.joynes.aiterminalhub.data.ssh.TerminalSessionClientImpl
+import se.joynes.aiterminalhub.service.SshSessionService
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.UUID
@@ -105,6 +108,7 @@ class TerminalSessionManager @Inject constructor(
         tmuxSessionName: String? = null
     ) {
         if (entries.containsKey(sessionId)) return
+        ensureSshServiceStarted()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         val terminalClient = TerminalSessionClientImpl(context) { changedSession ->
@@ -237,6 +241,7 @@ class TerminalSessionManager @Inject constructor(
         }
         if (entry.conn != null) {
             sshManager.destroySession(id.value)
+            maybeStopSshService()
         } else {
             entry.terminalSession.finishIfRunning()
         }
@@ -317,6 +322,16 @@ class TerminalSessionManager @Inject constructor(
         append(",terminal=").append(_activeSession.value?.let { System.identityHashCode(it) })
         append(",ids=")
         append(entries.keys.joinToString(prefix = "[", postfix = "]"))
+    }
+
+    private fun ensureSshServiceStarted() {
+        ContextCompat.startForegroundService(context, Intent(context, SshSessionService::class.java))
+    }
+
+    private fun maybeStopSshService() {
+        if (entries.values.none { it.conn != null }) {
+            context.stopService(Intent(context, SshSessionService::class.java))
+        }
     }
 
     companion object { private const val TAG = "TerminalSessionManager" }
