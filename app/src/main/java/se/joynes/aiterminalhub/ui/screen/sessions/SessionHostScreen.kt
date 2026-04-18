@@ -73,6 +73,7 @@ fun SessionHostScreen(
     val session by viewModel.activeSession.collectAsState()
     val serverId by viewModel.serverId.collectAsState()
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
+    val preferFastResume by viewModel.preferFastResume.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val bottomBarReservedHeight = KeyBarReservedHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -177,6 +178,14 @@ fun SessionHostScreen(
     fun syncRemotePty(tv: TerminalView) {
         tv.setBackgroundColor(0xFF0D0D1A.toInt())
         tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
+        if (preferFastResume) {
+            tv.updateSize()
+            val emulator = tv.mEmulator ?: return
+            viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
+            tv.onScreenUpdated(true)
+            tv.invalidate()
+            return
+        }
         val viewChanged = tv.width != lastViewWidth || tv.height != lastViewHeight
         if (viewChanged) {
             lastViewWidth = tv.width
@@ -209,12 +218,21 @@ fun SessionHostScreen(
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    LaunchedEffect(viewModel, lifecycleOwner) {
-        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+    LaunchedEffect(viewModel, lifecycleOwner, preferFastResume) {
+        if (preferFastResume) {
             viewModel.screenUpdates.collect { changedSession ->
                 val tv = terminalViewRef.value ?: return@collect
                 if (tv.mTermSession === changedSession) {
                     tv.onScreenUpdated()
+                }
+            }
+        } else {
+            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.screenUpdates.collect { changedSession ->
+                    val tv = terminalViewRef.value ?: return@collect
+                    if (tv.mTermSession === changedSession) {
+                        tv.onScreenUpdated()
+                    }
                 }
             }
         }
@@ -228,7 +246,7 @@ fun SessionHostScreen(
             if (event == Lifecycle.Event.ON_RESUME && currentSession != null) {
                 keyboardVisible = true
                 tv?.requestFocus()
-            } else if (event == Lifecycle.Event.ON_STOP) {
+            } else if (event == Lifecycle.Event.ON_STOP && !preferFastResume) {
                 keyboardVisible = false
                 hideKeyboard()
                 tv?.clearFocus()
@@ -444,6 +462,20 @@ fun SessionHostScreen(
                                 }
                             )
                         }
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (preferFastResume) "Fast Resume: On" else "Fast Resume: Off",
+                                    color = Color.White,
+                                    fontFamily = MonoFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            },
+                            onClick = {
+                                viewModel.setPreferFastResume(!preferFastResume)
+                                showSettingsMenu = false
+                            }
+                        )
                         DropdownMenuItem(
                             text = {
                                 Text(

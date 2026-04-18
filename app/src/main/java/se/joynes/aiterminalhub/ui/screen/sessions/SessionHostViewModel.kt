@@ -58,6 +58,7 @@ class SessionHostViewModel @Inject constructor(
 ) : ViewModel() {
     private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
     private val tabOrderKey = "project_tab_order"
+    private val fastResumeKey = "prefer_fast_resume"
 
     private val instanceId = System.identityHashCode(this)
 
@@ -92,6 +93,8 @@ class SessionHostViewModel @Inject constructor(
     val activeId: StateFlow<TerminalSessionId?> = sessionManager.activeId
     val activeSession: StateFlow<TerminalSession?> = sessionManager.activeSession()
     val screenUpdates: SharedFlow<TerminalSession> = sessionManager.screenUpdates
+    private val _preferFastResume = MutableStateFlow(prefs.getBoolean(fastResumeKey, true))
+    val preferFastResume: StateFlow<Boolean> = _preferFastResume.asStateFlow()
 
     private val connectingProjectIds = mutableSetOf<Long>()
     private val connectingJobs = mutableMapOf<Long, Job>()
@@ -366,6 +369,12 @@ class SessionHostViewModel @Inject constructor(
             textInputHistoryDao.insert(TextInputHistoryEntity(projectId = projectId, text = text))
             textInputHistoryDao.pruneOldest(projectId)
         }
+    }
+
+    fun setPreferFastResume(enabled: Boolean) {
+        if (_preferFastResume.value == enabled) return
+        _preferFastResume.value = enabled
+        prefs.edit().putBoolean(fastResumeKey, enabled).apply()
     }
 
     fun debugSnapshot(): String = buildString {
