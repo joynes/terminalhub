@@ -22,6 +22,7 @@ import se.joynes.aiterminalhub.data.model.ProjectTargetType
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
+import se.joynes.aiterminalhub.data.settings.AppSettingsRepository
 import se.joynes.aiterminalhub.data.ssh.SshManager
 import se.joynes.aiterminalhub.domain.ScriptTemplateEngine
 import se.joynes.aiterminalhub.domain.TerminalSessionId
@@ -54,11 +55,11 @@ class SessionHostViewModel @Inject constructor(
     private val sshManager: SshManager,
     private val engine: ScriptTemplateEngine,
     val sessionManager: TerminalSessionManager,
-    private val textInputHistoryDao: TextInputHistoryDao
+    private val textInputHistoryDao: TextInputHistoryDao,
+    private val settingsRepository: AppSettingsRepository
 ) : ViewModel() {
     private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
     private val tabOrderKey = "project_tab_order"
-    private val fastResumeKey = "prefer_fast_resume"
 
     private val instanceId = System.identityHashCode(this)
 
@@ -93,8 +94,10 @@ class SessionHostViewModel @Inject constructor(
     val activeId: StateFlow<TerminalSessionId?> = sessionManager.activeId
     val activeSession: StateFlow<TerminalSession?> = sessionManager.activeSession()
     val screenUpdates: SharedFlow<TerminalSession> = sessionManager.screenUpdates
-    private val _preferFastResume = MutableStateFlow(prefs.getBoolean(fastResumeKey, true))
-    val preferFastResume: StateFlow<Boolean> = _preferFastResume.asStateFlow()
+    val preferFastResume: StateFlow<Boolean> =
+        settingsRepository.settings
+            .map { it.preferFastResume }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.preferFastResume)
 
     private val connectingProjectIds = mutableSetOf<Long>()
     private val connectingJobs = mutableMapOf<Long, Job>()
@@ -371,11 +374,7 @@ class SessionHostViewModel @Inject constructor(
         }
     }
 
-    fun setPreferFastResume(enabled: Boolean) {
-        if (_preferFastResume.value == enabled) return
-        _preferFastResume.value = enabled
-        prefs.edit().putBoolean(fastResumeKey, enabled).apply()
-    }
+    fun setPreferFastResume(enabled: Boolean) = settingsRepository.setPreferFastResume(enabled)
 
     fun debugSnapshot(): String = buildString {
         append("vm=").append(instanceId)

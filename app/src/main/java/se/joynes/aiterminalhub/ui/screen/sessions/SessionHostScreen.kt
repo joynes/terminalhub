@@ -63,6 +63,7 @@ fun SessionHostScreen(
     onAddServer: () -> Unit,
     onAddProject: () -> Unit,
     onOpenLogs: () -> Unit,
+    onOpenSettings: () -> Unit,
     sharedUri: Uri? = null,
     onConsumeSharedUri: () -> Unit = {},
     viewModel: SessionHostViewModel = hiltViewModel()
@@ -178,14 +179,6 @@ fun SessionHostScreen(
     fun syncRemotePty(tv: TerminalView) {
         tv.setBackgroundColor(0xFF0D0D1A.toInt())
         tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
-        if (preferFastResume) {
-            tv.updateSize()
-            val emulator = tv.mEmulator ?: return
-            viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
-            tv.onScreenUpdated(true)
-            tv.invalidate()
-            return
-        }
         val viewChanged = tv.width != lastViewWidth || tv.height != lastViewHeight
         if (viewChanged) {
             lastViewWidth = tv.width
@@ -465,15 +458,15 @@ fun SessionHostScreen(
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    if (preferFastResume) "Fast Resume: On" else "Fast Resume: Off",
+                                    "Settings",
                                     color = Color.White,
                                     fontFamily = MonoFontFamily,
                                     fontSize = 12.sp
                                 )
                             },
                             onClick = {
-                                viewModel.setPreferFastResume(!preferFastResume)
                                 showSettingsMenu = false
+                                onOpenSettings()
                             }
                         )
                         DropdownMenuItem(

@@ -5,6 +5,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import se.joynes.aiterminalhub.data.logging.AppLogger
+import se.joynes.aiterminalhub.data.settings.AppSettingsRepository
 import se.joynes.aiterminalhub.data.ssh.*
 import javax.inject.Singleton
 
@@ -14,8 +15,10 @@ object SshModule {
 
     @Provides
     @Singleton
-    fun provideConnectionFactory(logger: AppLogger): SshConnectionFactory =
-        SshConnectionFactory(logger)
+    fun provideConnectionFactory(
+        logger: AppLogger,
+        settingsRepository: AppSettingsRepository
+    ): SshConnectionFactory = SshConnectionFactory(logger, settingsRepository)
 
     @Provides
     @Singleton

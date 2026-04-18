@@ -12,6 +12,7 @@ import androidx.navigation.navArgument
 import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.ui.screen.applog.AppLogScreen
 import se.joynes.aiterminalhub.ui.screen.projects.AddEditProjectScreen
+import se.joynes.aiterminalhub.ui.screen.settings.SettingsScreen
 import se.joynes.aiterminalhub.ui.screen.servers.AddEditServerScreen
 import se.joynes.aiterminalhub.ui.screen.servers.ServerListScreen
 import se.joynes.aiterminalhub.ui.screen.sessions.SessionHostScreen
@@ -83,8 +84,12 @@ fun AppNavGraph(
                     }
                 },
                 onAddProject = { navController.navigate(Screen.AddEditProject.createRoute(serverId)) },
-                onOpenLogs = { navController.navigate(Screen.AppLog.route) }
+                onOpenLogs = { navController.navigate(Screen.AppLog.route) },
+                onOpenSettings = { navController.navigate(Screen.Settings.route) }
             )
+        }
+        composable(Screen.Settings.route) {
+            SettingsScreen(onBack = { navController.popBackStack() })
         }
         composable(
             Screen.ServerStatus.route,

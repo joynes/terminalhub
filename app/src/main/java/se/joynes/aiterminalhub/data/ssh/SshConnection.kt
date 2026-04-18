@@ -7,6 +7,7 @@ import com.trilead.ssh2.Session
 import com.trilead.ssh2.crypto.PEMDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -26,12 +27,14 @@ import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogEvent
 import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.model.Server
+import se.joynes.aiterminalhub.data.settings.AppSettingsRepository
 import java.io.IOException
 import java.io.OutputStream
 import javax.inject.Inject
 
 class SshConnection @Inject constructor(
-    private val logger: AppLogger
+    private val logger: AppLogger,
+    private val settingsRepository: AppSettingsRepository
 ) {
     private var connection: Connection? = null
     private var shellSession: Session? = null
@@ -51,6 +54,7 @@ class SshConnection @Inject constructor(
     private val instanceId = System.identityHashCode(this)
     private var serverLabel: String = "unknown"
     private var connectAttempt = 0
+    private var keepaliveJob: Job? = null
     @Volatile private var createdAtMs = System.currentTimeMillis()
     @Volatile private var connectedAtMs: Long? = null
     @Volatile private var lastRxAtMs: Long? = null
@@ -110,6 +114,7 @@ class SshConnection @Inject constructor(
                 disconnectReason = null
                 _connected.value = true
                 logger.log(LogLevel.INFO, TAG, "Connected to $serverLabel")
+                startKeepaliveLoop(conn)
                 readOutput(sess)
             } catch (e: Exception) {
                 logger.log(LogLevel.ERROR, TAG, "Connection failed to $serverLabel: ${e.message}")
@@ -335,6 +340,8 @@ class SshConnection @Inject constructor(
     fun disconnect() {
         disconnectReason = "disconnect()"
         _connected.value = false
+        keepaliveJob?.cancel()
+        keepaliveJob = null
         scope.launch {
             logger.log(LogLevel.INFO, TAG, "Disconnecting from $serverLabel")
             try {
@@ -354,6 +361,22 @@ class SshConnection @Inject constructor(
             connection = null
             outputStream = null
             logger.log(LogLevel.INFO, TAG, "Disconnected from $serverLabel")
+        }
+    }
+
+    private fun startKeepaliveLoop(conn: Connection) {
+        keepaliveJob?.cancel()
+        keepaliveJob = scope.launch {
+            while (_connected.value) {
+                delay(30_000)
+                if (!_connected.value) break
+                if (!settingsRepository.settings.value.sshKeepaliveEnabled) continue
+                try {
+                    conn.sendIgnorePacket()
+                } catch (e: Exception) {
+                    logger.log(LogLevel.WARN, TAG, "Keepalive failed: ${e.javaClass.simpleName}: ${e.message}")
+                }
+            }
         }
     }
 

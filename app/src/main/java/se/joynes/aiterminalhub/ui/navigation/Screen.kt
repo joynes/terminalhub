@@ -20,6 +20,7 @@ sealed class Screen(val route: String) {
     object FileUpload : Screen("file_upload?serverId={serverId}") {
         fun createRoute(serverId: Long) = "file_upload?serverId=$serverId"
     }
+    object Settings : Screen("settings")
     object SessionLog : Screen("session_log")
     object AppLog : Screen("app_log")
 }
