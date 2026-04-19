@@ -47,6 +47,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val settings by viewModel.settings.collectAsState()
+    val runtimeState by viewModel.runtimeState.collectAsState()
     val powerManager = context.getSystemService(PowerManager::class.java)
     val packageName = context.packageName
     val batteryOptimizationIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -96,6 +97,21 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                item {
+                    SettingsCard(
+                        title = "BACKGROUND STATUS",
+                        description = "Shows the runtime state the app will use to explain the next reconnect. If the process was killed in background, or if SSH transport dropped while the process stayed alive, that reason is stored here and in the app logs."
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SettingsValue("Foreground service", if (runtimeState.foregroundServiceRunning) "Running" else "Not running")
+                            SettingsValue("App state", if (runtimeState.appInForeground) "Foreground" else "Background/unknown")
+                            SettingsValue("Tracked remote projects", runtimeState.remoteProjectIds.sorted().joinToString().ifBlank { "None" })
+                            SettingsValue("Recovery pending", if (runtimeState.recoveryPending) "Yes" else "No")
+                            SettingsValue("Last restart reason", runtimeState.lastProcessRestartReason ?: "None recorded")
+                            SettingsValue("Last SSH drop", runtimeState.lastSshDisconnectSummary ?: "None recorded")
+                        }
+                    }
+                }
                 item {
                     SettingsCard(
                         title = "FAST RESUME",
@@ -199,5 +215,14 @@ private fun SettingsCard(
             Spacer(Modifier.height(12.dp))
             content()
         }
+    }
+}
+
+@Composable
+private fun SettingsValue(label: String, value: String) {
+    Column {
+        Text(label, color = MegaDriveDim, fontFamily = MonoFontFamily, fontSize = 11.sp)
+        Spacer(Modifier.height(2.dp))
+        Text(value, color = MegaDriveOnSurface, fontFamily = MonoFontFamily, fontSize = 12.sp)
     }
 }

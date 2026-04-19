@@ -22,6 +22,7 @@ import se.joynes.aiterminalhub.data.model.ProjectTargetType
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
+import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.aiterminalhub.data.settings.AppSettingsRepository
 import se.joynes.aiterminalhub.data.ssh.SshManager
 import se.joynes.aiterminalhub.domain.ScriptTemplateEngine
@@ -38,8 +39,9 @@ import javax.inject.Inject
 data class ProjectTabState(
     val projectId: Long,
     val projectName: String,
-    val sessionId: TerminalSessionId?,   // null = connecting
+    val sessionId: TerminalSessionId?,
     val isConnected: Boolean,
+    val isConnecting: Boolean = false,
     val colorSeed: Int = 0,
     val usesTmux: Boolean = false,
     val targetType: ProjectTargetType = ProjectTargetType.SSH
@@ -56,7 +58,8 @@ class SessionHostViewModel @Inject constructor(
     private val engine: ScriptTemplateEngine,
     val sessionManager: TerminalSessionManager,
     private val textInputHistoryDao: TextInputHistoryDao,
-    private val settingsRepository: AppSettingsRepository
+    private val settingsRepository: AppSettingsRepository,
+    private val runtimeRepository: AppRuntimeRepository
 ) : ViewModel() {
     private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
     private val tabOrderKey = "project_tab_order"
@@ -67,13 +70,15 @@ class SessionHostViewModel @Inject constructor(
     private val _dbProjects = MutableStateFlow<List<Project>>(emptyList())
     private val _allDbProjects = MutableStateFlow<List<Project>>(emptyList())
     private val _projectOrder = MutableStateFlow(loadProjectOrder())
+    private val connectingProjectIds = MutableStateFlow<Set<Long>>(emptySet())
 
     /** Combined tab list: DB projects merged with live session state. */
     val projectTabs: StateFlow<List<ProjectTabState>> = combine(
         _dbProjects,
         sessionManager.sessions,
-        _projectOrder
-    ) { projects, sessions, projectOrder ->
+        _projectOrder,
+        connectingProjectIds
+    ) { projects, sessions, projectOrder, connectingIds ->
         val sessionByName = sessions.associateBy { it.projectName }
         projects
             .sortedByProjectOrder(projectOrder)
@@ -84,6 +89,7 @@ class SessionHostViewModel @Inject constructor(
                 projectName = p.name,
                 sessionId = session?.id,
                 isConnected = session?.isConnected ?: false,
+                isConnecting = p.id in connectingIds,
                 colorSeed = p.colorSeed,
                 usesTmux = p.targetType == ProjectTargetType.SSH && p.useTmux,
                 targetType = p.targetType
@@ -98,8 +104,7 @@ class SessionHostViewModel @Inject constructor(
         settingsRepository.settings
             .map { it.preferFastResume }
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.preferFastResume)
-
-    private val connectingProjectIds = mutableSetOf<Long>()
+    val runtimeState = runtimeRepository.state
     private val connectingJobs = mutableMapOf<Long, Job>()
 
     private val _serverId = MutableStateFlow<Long?>(null)
@@ -111,6 +116,9 @@ class SessionHostViewModel @Inject constructor(
         if (initialized) return
         initialized = true
         logger.log(LogLevel.INFO, "SessionHostViewModel", "init snapshot=${debugSnapshot()}")
+        runtimeRepository.state.value.lastProcessRestartReason?.let { reason ->
+            logger.log(LogLevel.WARN, "SessionRecovery", "SessionHost init after restart: $reason")
+        }
         if (BuildConfig.IS_DIAGNOSTIC) {
             viewModelScope.launch { ensureDiagnosticLocalProject() }
         }
@@ -119,12 +127,15 @@ class SessionHostViewModel @Inject constructor(
                 _allDbProjects.value = projects
                 syncProjectOrder(projects)
                 val visible = projects.filter { !sessionManager.isProjectClosed(it.id) }
+                val preferredActive = runtimeRepository.state.value.recoveryActiveProjectId
+                val orderedVisible = visible.sortedBy { if (it.id == preferredActive) 0 else 1 }
                 val prevIds = _dbProjects.value.map { it.id }.toSet()
                 val isFirstLoad = _dbProjects.value.isEmpty() && prevIds.isEmpty()
                 _dbProjects.value = visible
-                visible.forEach { project ->
+                orderedVisible.forEach { project ->
                     val isNewlyAdded = !isFirstLoad && project.id !in prevIds
-                    activateProject(project, autoSwitch = isNewlyAdded)
+                    val isRecoveryTarget = preferredActive != null && project.id == preferredActive
+                    activateProject(project, autoSwitch = isNewlyAdded || isRecoveryTarget)
                 }
             }
         }
@@ -154,10 +165,10 @@ class SessionHostViewModel @Inject constructor(
     }
 
     private fun activateProject(project: Project, autoSwitch: Boolean = false) {
-        if (project.id in connectingProjectIds) return
+        if (project.id in connectingProjectIds.value) return
         // Already registered as a session
         if (sessionManager.sessions.value.any { it.projectId == project.id }) return
-        connectingProjectIds.add(project.id)
+        connectingProjectIds.value = connectingProjectIds.value + project.id
 
         connectingJobs[project.id] = viewModelScope.launch {
             try {
@@ -167,12 +178,19 @@ class SessionHostViewModel @Inject constructor(
                 }
             } finally {
                 connectingJobs.remove(project.id)
-                connectingProjectIds.remove(project.id)
+                connectingProjectIds.value = connectingProjectIds.value - project.id
             }
         }
     }
 
     private suspend fun activateSshProject(project: Project, autoSwitch: Boolean) {
+        val reason = when {
+            runtimeRepository.state.value.recoveryPending &&
+                project.id in runtimeRepository.state.value.recoveryRemoteProjectIds -> "process-restart-recovery"
+            runtimeRepository.state.value.lastSshDisconnectProjectId == project.id -> "ssh-transport-recovery"
+            else -> "normal-activation"
+        }
+        logger.log(LogLevel.INFO, "SessionRecovery", "Activating SSH project=${project.name} reason=$reason")
         val srv = serverRepo.getById(project.serverId) ?: return
         val conn = connectToServer(srv)
         val setupCmd = engine.renderSetup(srv, project)
@@ -263,7 +281,7 @@ class SessionHostViewModel @Inject constructor(
         sessionManager.markProjectClosed(projectId)
         connectingJobs.remove(projectId)?.cancel()
         _dbProjects.value = _dbProjects.value.filter { it.id != projectId }
-        connectingProjectIds.remove(projectId)
+        connectingProjectIds.value = connectingProjectIds.value - projectId
         sessionId?.let { sessionManager.close(it, killTmuxSession = killTmuxSession) }
     }
 
@@ -339,8 +357,9 @@ class SessionHostViewModel @Inject constructor(
         val existingSessionId = sessionManager.sessions.value.firstOrNull { it.projectId == projectId }?.id
         existingSessionId?.let { sessionManager.close(it, killTmuxSession = false) }
         connectingJobs.remove(projectId)?.cancel()
-        connectingProjectIds.remove(projectId)
+        connectingProjectIds.value = connectingProjectIds.value - projectId
         sessionManager.markProjectOpen(projectId)
+        logger.log(LogLevel.INFO, "SessionRecovery", "Manual reconnect requested for projectId=$projectId")
         activateProject(project, autoSwitch = true)
     }
 
@@ -383,7 +402,7 @@ class SessionHostViewModel @Inject constructor(
         append(",activeId=").append(activeId.value?.value)
         append(",activeTerminal=").append(activeSession.value?.let { System.identityHashCode(it) })
         append(",dbProjects=").append(_dbProjects.value.size)
-        append(",connecting=").append(connectingProjectIds.joinToString(prefix = "[", postfix = "]"))
+        append(",connecting=").append(connectingProjectIds.value.joinToString(prefix = "[", postfix = "]"))
         append(",ssh={").append(sshManager.debugSnapshot()).append("}")
         append(",terminals={").append(sessionManager.debugSnapshot()).append("}")
     }

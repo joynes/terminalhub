@@ -5,11 +5,14 @@ import dagger.hilt.android.HiltAndroidApp
 import se.joynes.aiterminalhub.data.logging.AnrWatchdog
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.CrashReportStore
+import se.joynes.aiterminalhub.data.logging.LogLevel
+import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
 import javax.inject.Inject
 
 @HiltAndroidApp
 class AITerminalHubApplication : Application() {
     @Inject lateinit var appLogger: AppLogger
+    @Inject lateinit var runtimeRepository: AppRuntimeRepository
 
     override fun onCreate() {
         super.onCreate()
@@ -17,5 +20,16 @@ class AITerminalHubApplication : Application() {
         AnrWatchdog.install(this)
         CrashReportStore.flushPendingCrash(this, appLogger)
         AnrWatchdog.flushPendingAnr(this, appLogger)
+        val runtimeState = runtimeRepository.onProcessStarted()
+        val tag = "AppRuntime"
+        if (runtimeState.recoveryPending) {
+            appLogger.log(
+                LogLevel.WARN,
+                tag,
+                "Process restart detected; ${runtimeState.lastProcessRestartReason}"
+            )
+        } else {
+            appLogger.log(LogLevel.INFO, tag, "Process started cleanly")
+        }
     }
 }

@@ -56,6 +56,7 @@ fun SessionTabBar(
             val bg = tabColor(tab.colorSeed, isSelected)
             val textColor = when {
                 isSelected      -> Color.White
+                tab.isConnecting -> MegaDrivePrimary
                 tab.isConnected -> Color.White.copy(alpha = 0.65f)
                 else            -> Color.White.copy(alpha = 0.28f)
             }

@@ -20,6 +20,7 @@ import se.joynes.aiterminalhub.MainActivity
 import se.joynes.aiterminalhub.R
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogLevel
+import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.aiterminalhub.data.ssh.SshManager
 import se.joynes.aiterminalhub.domain.TerminalSessionManager
 import javax.inject.Inject
@@ -28,6 +29,7 @@ import javax.inject.Inject
 class SshSessionService : Service() {
 
     @Inject lateinit var logger: AppLogger
+    @Inject lateinit var runtimeRepository: AppRuntimeRepository
     @Inject lateinit var sshManager: SshManager
     @Inject lateinit var terminalSessionManager: TerminalSessionManager
 
@@ -38,6 +40,7 @@ class SshSessionService : Service() {
         super.onCreate()
         ensureChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
+        runtimeRepository.noteForegroundServiceRunning(true)
         logger.log(LogLevel.INFO, TAG, "Service created; snapshot=${debugSnapshot()}")
         notificationJob = scope.launch {
             sshManager.sessions.collectLatest {
@@ -53,13 +56,14 @@ class SshSessionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         logger.log(LogLevel.INFO, TAG, "onStartCommand flags=$flags startId=$startId snapshot=${debugSnapshot()}")
         maybeStopIfIdle()
-        return START_NOT_STICKY
+        return if (sshManager.sessions.value.isEmpty()) START_NOT_STICKY else START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         notificationJob?.cancel()
+        runtimeRepository.noteForegroundServiceRunning(false)
         logger.log(LogLevel.INFO, TAG, "Service destroyed; snapshot=${debugSnapshot()}")
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()

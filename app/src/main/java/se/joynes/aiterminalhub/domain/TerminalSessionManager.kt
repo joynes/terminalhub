@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogLevel
+import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.aiterminalhub.data.ssh.SshConnection
 import se.joynes.aiterminalhub.data.ssh.SshManager
 import se.joynes.aiterminalhub.data.ssh.TerminalSessionClientImpl
@@ -56,7 +57,8 @@ private data class SessionEntry(
 class TerminalSessionManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sshManager: SshManager,
-    private val logger: AppLogger
+    private val logger: AppLogger,
+    private val runtimeRepository: AppRuntimeRepository
 ) {
     private val prefs = context.getSharedPreferences("session_manager", Context.MODE_PRIVATE)
     private val _sessions = MutableStateFlow<List<TerminalSessionMeta>>(emptyList())
@@ -136,6 +138,10 @@ class TerminalSessionManager @Inject constructor(
                 if (connected) {
                     wasConnected = true
                 } else if (wasConnected && terminalSession.isRunning) {
+                    runtimeRepository.noteSshDisconnect(
+                        projectId = projectId,
+                        summary = "project=$projectName snapshot=${conn.debugSnapshot()}"
+                    )
                     logger.log(LogLevel.WARN, TAG, "SSH lost: $projectName — notifying terminal")
                     terminalSession.notifyRemoteProcessExit(0)
                 }
@@ -289,9 +295,15 @@ class TerminalSessionManager @Inject constructor(
     }
 
     private fun publishSessions() {
-        _sessions.value = entries.values.map { entry ->
+        val published = entries.values.map { entry ->
             entry.meta.copy(isConnected = entry.conn?.connected?.value ?: entry.terminalSession.isRunning)
         }
+        _sessions.value = published
+        runtimeRepository.noteSessions(
+            remoteProjectIds = published.filter { it.id.value in entries.keys && entries[it.id.value]?.conn != null }.map { it.projectId }.toSet(),
+            localProjectIds = published.filter { it.id.value in entries.keys && entries[it.id.value]?.conn == null }.map { it.projectId }.toSet(),
+            activeProjectId = published.firstOrNull { it.id == _activeId.value }?.projectId
+        )
     }
 
     private fun shouldSuppressTerminalReply(data: ByteArray, offset: Int, count: Int): Boolean {

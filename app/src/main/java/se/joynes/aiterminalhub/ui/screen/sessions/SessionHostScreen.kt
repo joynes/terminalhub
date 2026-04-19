@@ -73,6 +73,7 @@ fun SessionHostScreen(
     val activeId by viewModel.activeId.collectAsState()
     val session by viewModel.activeSession.collectAsState()
     val serverId by viewModel.serverId.collectAsState()
+    val runtimeState by viewModel.runtimeState.collectAsState()
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
     val clipboardManager = LocalClipboardManager.current
@@ -129,6 +130,11 @@ fun SessionHostScreen(
     }
     val activeTab = remember(activeProjectId, projectTabs) {
         activeProjectId?.let { projectId -> projectTabs.firstOrNull { it.projectId == projectId } }
+    }
+    val restoringTab = remember(projectTabs, runtimeState.recoveryActiveProjectId) {
+        val recoveryId = runtimeState.recoveryActiveProjectId
+        projectTabs.firstOrNull { it.projectId == recoveryId && it.isConnecting }
+            ?: projectTabs.firstOrNull { it.isConnecting }
     }
     val canReconnectActiveTab = activeTab != null &&
         activeTab.targetType == se.joynes.aiterminalhub.data.model.ProjectTargetType.SSH
@@ -660,6 +666,24 @@ fun SessionHostScreen(
                                 )
                             }
 
+                        } else if (restoringTab != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MegaDriveBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    if (runtimeState.recoveryPending) {
+                                        "RESTORING ${restoringTab.projectName.uppercase()}..."
+                                    } else {
+                                        "CONNECTING..."
+                                    },
+                                    color = MegaDrivePrimary,
+                                    fontSize = 12.sp,
+                                    fontFamily = MonoFontFamily
+                                )
+                            }
                         } else {
                             Box(
                                 modifier = Modifier
@@ -668,8 +692,8 @@ fun SessionHostScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    "CONNECTING...",
-                                    color = MegaDrivePrimary,
+                                    "NO ACTIVE SESSION",
+                                    color = MegaDriveDim,
                                     fontSize = 12.sp,
                                     fontFamily = MonoFontFamily
                                 )
