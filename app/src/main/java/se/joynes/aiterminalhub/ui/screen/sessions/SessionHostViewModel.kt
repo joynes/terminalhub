@@ -106,6 +106,7 @@ class SessionHostViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.preferFastResume)
     val runtimeState = runtimeRepository.state
     private val connectingJobs = mutableMapOf<Long, Job>()
+    private var deferredRecoveryScheduled = false
 
     private val _serverId = MutableStateFlow<Long?>(null)
     val serverId: StateFlow<Long?> = _serverId.asStateFlow()
@@ -128,14 +129,47 @@ class SessionHostViewModel @Inject constructor(
                 syncProjectOrder(projects)
                 val visible = projects.filter { !sessionManager.isProjectClosed(it.id) }
                 val preferredActive = runtimeRepository.state.value.recoveryActiveProjectId
-                val orderedVisible = visible.sortedBy { if (it.id == preferredActive) 0 else 1 }
                 val prevIds = _dbProjects.value.map { it.id }.toSet()
                 val isFirstLoad = _dbProjects.value.isEmpty() && prevIds.isEmpty()
                 _dbProjects.value = visible
-                orderedVisible.forEach { project ->
-                    val isNewlyAdded = !isFirstLoad && project.id !in prevIds
-                    val isRecoveryTarget = preferredActive != null && project.id == preferredActive
-                    activateProject(project, autoSwitch = isNewlyAdded || isRecoveryTarget)
+                val recoveryPending = runtimeRepository.state.value.recoveryPending
+                if (recoveryPending) {
+                    val recoveryRemoteIds = runtimeRepository.state.value.recoveryRemoteProjectIds
+                    val recoveryRemoteProjects = visible.filter {
+                        it.targetType == ProjectTargetType.SSH && it.id in recoveryRemoteIds
+                    }
+                    val primaryRecoveryProject = recoveryRemoteProjects.firstOrNull { it.id == preferredActive }
+                        ?: recoveryRemoteProjects.firstOrNull()
+
+                    visible.filter { it.targetType == ProjectTargetType.LOCAL }.forEach { localProject ->
+                        activateProject(localProject, autoSwitch = primaryRecoveryProject == null && localProject.id == preferredActive)
+                    }
+
+                    primaryRecoveryProject?.let { project ->
+                        activateProject(project, autoSwitch = true)
+                    }
+
+                    if (!deferredRecoveryScheduled) {
+                        deferredRecoveryScheduled = true
+                        val deferredProjects = recoveryRemoteProjects.filterNot { it.id == primaryRecoveryProject?.id }
+                        viewModelScope.launch {
+                            if (primaryRecoveryProject != null) delay(1500)
+                            deferredProjects.forEach { project ->
+                                logger.log(
+                                    LogLevel.INFO,
+                                    "SessionRecovery",
+                                    "Deferred recovery activation project=${project.name} reason=process-restart-followup"
+                                )
+                                activateProject(project, autoSwitch = false)
+                                delay(1200)
+                            }
+                        }
+                    }
+                } else {
+                    visible.forEach { project ->
+                        val isNewlyAdded = !isFirstLoad && project.id !in prevIds
+                        activateProject(project, autoSwitch = isNewlyAdded)
+                    }
                 }
             }
         }

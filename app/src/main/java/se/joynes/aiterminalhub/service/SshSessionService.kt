@@ -35,12 +35,14 @@ class SshSessionService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var notificationJob: Job? = null
+    private var explicitStopReason: String? = null
 
     override fun onCreate() {
         super.onCreate()
         ensureChannel()
         startForeground(NOTIFICATION_ID, buildNotification())
-        runtimeRepository.noteForegroundServiceRunning(true)
+        explicitStopReason = null
+        runtimeRepository.noteForegroundServiceStarted()
         logger.log(LogLevel.INFO, TAG, "Service created; snapshot=${debugSnapshot()}")
         notificationJob = scope.launch {
             sshManager.sessions.collectLatest {
@@ -63,8 +65,10 @@ class SshSessionService : Service() {
 
     override fun onDestroy() {
         notificationJob?.cancel()
-        runtimeRepository.noteForegroundServiceRunning(false)
-        logger.log(LogLevel.INFO, TAG, "Service destroyed; snapshot=${debugSnapshot()}")
+        val snapshot = debugSnapshot()
+        val stopReason = explicitStopReason ?: "destroy-without-explicit-stop"
+        runtimeRepository.noteForegroundServiceStopped(stopReason, snapshot)
+        logger.log(LogLevel.INFO, TAG, "Service destroyed; reason=$stopReason snapshot=$snapshot")
         stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
@@ -76,6 +80,7 @@ class SshSessionService : Service() {
 
     private fun maybeStopIfIdle() {
         if (sshManager.sessions.value.isEmpty()) {
+            explicitStopReason = "idle-no-ssh-sessions"
             logger.log(LogLevel.INFO, TAG, "Stopping idle service; snapshot=${debugSnapshot()}")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()

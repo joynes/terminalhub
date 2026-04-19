@@ -39,6 +39,9 @@ import se.joynes.aiterminalhub.ui.theme.MegaDriveOnSurface
 import se.joynes.aiterminalhub.ui.theme.MegaDrivePrimary
 import se.joynes.aiterminalhub.ui.theme.MegaDriveSurface
 import se.joynes.aiterminalhub.ui.theme.MonoFontFamily
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun SettingsScreen(
@@ -55,6 +58,9 @@ fun SettingsScreen(
     } else {
         true
     }
+    val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+    fun formatTs(value: Long?): String =
+        value?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(timeFormatter) } ?: "None"
 
     fun openBatteryOptimizationRequest() {
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -108,6 +114,8 @@ fun SettingsScreen(
                             SettingsValue("Tracked remote projects", runtimeState.remoteProjectIds.sorted().joinToString().ifBlank { "None" })
                             SettingsValue("Recovery pending", if (runtimeState.recoveryPending) "Yes" else "No")
                             SettingsValue("Last restart reason", runtimeState.lastProcessRestartReason ?: "None recorded")
+                            SettingsValue("Last service stop", runtimeState.lastServiceStopReason ?: "None recorded")
+                            SettingsValue("Last service stop at", formatTs(runtimeState.lastServiceStopAt))
                             SettingsValue("Last SSH drop", runtimeState.lastSshDisconnectSummary ?: "None recorded")
                         }
                     }

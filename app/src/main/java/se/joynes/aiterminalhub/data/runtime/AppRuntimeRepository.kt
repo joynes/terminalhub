@@ -19,6 +19,10 @@ data class AppRuntimeState(
     val localProjectIds: Set<Long> = emptySet(),
     val activeProjectId: Long? = null,
     val foregroundServiceRunning: Boolean = false,
+    val lastServiceStartedAt: Long? = null,
+    val lastServiceStopAt: Long? = null,
+    val lastServiceStopReason: String? = null,
+    val lastServiceStopSnapshot: String? = null,
     val recoveryPending: Boolean = false,
     val recoveryRemoteProjectIds: Set<Long> = emptySet(),
     val recoveryLocalProjectIds: Set<Long> = emptySet(),
@@ -51,6 +55,8 @@ class AppRuntimeRepository @Inject constructor(
                 append(" localProjects=").append(previous.localProjectIds.sorted())
                 append(" activeProject=").append(previous.activeProjectId)
                 append(" lastBackgroundAt=").append(previous.lastBackgroundAt)
+                append(" lastServiceStopReason=").append(previous.lastServiceStopReason)
+                append(" lastServiceStopAt=").append(previous.lastServiceStopAt)
             }
         } else {
             null
@@ -82,6 +88,26 @@ class AppRuntimeRepository @Inject constructor(
 
     fun noteForegroundServiceRunning(running: Boolean) {
         update(_state.value.copy(foregroundServiceRunning = running))
+    }
+
+    fun noteForegroundServiceStarted() {
+        update(
+            _state.value.copy(
+                foregroundServiceRunning = true,
+                lastServiceStartedAt = System.currentTimeMillis()
+            )
+        )
+    }
+
+    fun noteForegroundServiceStopped(reason: String, snapshot: String?) {
+        update(
+            _state.value.copy(
+                foregroundServiceRunning = false,
+                lastServiceStopAt = System.currentTimeMillis(),
+                lastServiceStopReason = reason,
+                lastServiceStopSnapshot = snapshot
+            )
+        )
     }
 
     fun noteSessions(
@@ -126,6 +152,10 @@ class AppRuntimeRepository @Inject constructor(
             .putStringSet(KEY_LOCAL_PROJECT_IDS, next.localProjectIds.map { it.toString() }.toSet())
             .putLong(KEY_ACTIVE_PROJECT_ID, next.activeProjectId ?: -1L)
             .putBoolean(KEY_FOREGROUND_SERVICE_RUNNING, next.foregroundServiceRunning)
+            .putLong(KEY_LAST_SERVICE_STARTED_AT, next.lastServiceStartedAt ?: -1L)
+            .putLong(KEY_LAST_SERVICE_STOP_AT, next.lastServiceStopAt ?: -1L)
+            .putString(KEY_LAST_SERVICE_STOP_REASON, next.lastServiceStopReason)
+            .putString(KEY_LAST_SERVICE_STOP_SNAPSHOT, next.lastServiceStopSnapshot)
             .putBoolean(KEY_RECOVERY_PENDING, next.recoveryPending)
             .putStringSet(KEY_RECOVERY_REMOTE_PROJECT_IDS, next.recoveryRemoteProjectIds.map { it.toString() }.toSet())
             .putStringSet(KEY_RECOVERY_LOCAL_PROJECT_IDS, next.recoveryLocalProjectIds.map { it.toString() }.toSet())
@@ -148,6 +178,10 @@ class AppRuntimeRepository @Inject constructor(
             localProjectIds = prefs.getStringSet(KEY_LOCAL_PROJECT_IDS, emptySet()).orEmpty().mapNotNull { it.toLongOrNull() }.toSet(),
             activeProjectId = prefs.getLong(KEY_ACTIVE_PROJECT_ID, -1L).takeIf { it >= 0 },
             foregroundServiceRunning = prefs.getBoolean(KEY_FOREGROUND_SERVICE_RUNNING, false),
+            lastServiceStartedAt = prefs.getLong(KEY_LAST_SERVICE_STARTED_AT, -1L).takeIf { it >= 0 },
+            lastServiceStopAt = prefs.getLong(KEY_LAST_SERVICE_STOP_AT, -1L).takeIf { it >= 0 },
+            lastServiceStopReason = prefs.getString(KEY_LAST_SERVICE_STOP_REASON, null),
+            lastServiceStopSnapshot = prefs.getString(KEY_LAST_SERVICE_STOP_SNAPSHOT, null),
             recoveryPending = prefs.getBoolean(KEY_RECOVERY_PENDING, false),
             recoveryRemoteProjectIds = prefs.getStringSet(KEY_RECOVERY_REMOTE_PROJECT_IDS, emptySet()).orEmpty().mapNotNull { it.toLongOrNull() }.toSet(),
             recoveryLocalProjectIds = prefs.getStringSet(KEY_RECOVERY_LOCAL_PROJECT_IDS, emptySet()).orEmpty().mapNotNull { it.toLongOrNull() }.toSet(),
@@ -168,6 +202,10 @@ class AppRuntimeRepository @Inject constructor(
         private const val KEY_LOCAL_PROJECT_IDS = "local_project_ids"
         private const val KEY_ACTIVE_PROJECT_ID = "active_project_id"
         private const val KEY_FOREGROUND_SERVICE_RUNNING = "foreground_service_running"
+        private const val KEY_LAST_SERVICE_STARTED_AT = "last_service_started_at"
+        private const val KEY_LAST_SERVICE_STOP_AT = "last_service_stop_at"
+        private const val KEY_LAST_SERVICE_STOP_REASON = "last_service_stop_reason"
+        private const val KEY_LAST_SERVICE_STOP_SNAPSHOT = "last_service_stop_snapshot"
         private const val KEY_RECOVERY_PENDING = "recovery_pending"
         private const val KEY_RECOVERY_REMOTE_PROJECT_IDS = "recovery_remote_project_ids"
         private const val KEY_RECOVERY_LOCAL_PROJECT_IDS = "recovery_local_project_ids"
