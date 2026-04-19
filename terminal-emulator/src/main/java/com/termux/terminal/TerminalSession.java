@@ -414,8 +414,9 @@ public final class TerminalSession extends TerminalOutput {
         @Override
         public void handleMessage(Message msg) {
             int bytesRead = mProcessToTerminalIOQueue.read(mReceiveBuffer, false);
-            if (bytesRead > 0) {
-                mEmulator.append(mReceiveBuffer, bytesRead);
+            TerminalEmulator emulator = mEmulator;
+            if (bytesRead > 0 && emulator != null) {
+                emulator.append(mReceiveBuffer, bytesRead);
                 notifyScreenUpdate();
             }
 
@@ -434,7 +435,8 @@ public final class TerminalSession extends TerminalOutput {
                 exitDescription += " - press Enter]";
 
                 byte[] bytesToWrite = exitDescription.getBytes(StandardCharsets.UTF_8);
-                mEmulator.append(bytesToWrite, bytesToWrite.length);
+                TerminalEmulator exitEmulator = mEmulator;
+                if (exitEmulator != null) exitEmulator.append(bytesToWrite, bytesToWrite.length);
                 notifyScreenUpdate();
 
                 mClient.onSessionFinished(TerminalSession.this);
