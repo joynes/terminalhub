@@ -136,7 +136,7 @@ class SshConnection @Inject constructor(
                 val stdout = session.stdout
                 val stderr = session.stderr
                 val buf = ByteArray(1024)
-                while (true) {
+                fun drainStreams() {
                     while ((stdout?.available() ?: 0) > 0) {
                         val n = stdout?.read(buf) ?: 0
                         if (n > 0) stdoutText.append(String(buf, 0, n))
@@ -145,14 +145,30 @@ class SshConnection @Inject constructor(
                         val n = stderr?.read(buf) ?: 0
                         if (n > 0) logger.log(LogLevel.WARN, TAG, "Setup stderr: ${String(buf, 0, n)}")
                     }
+                }
+                while (true) {
+                    drainStreams()
                     val conditions = session.waitForCondition(
                         ChannelCondition.EOF or ChannelCondition.CLOSED or ChannelCondition.EXIT_STATUS,
                         50
                     )
-                    if ((conditions and (ChannelCondition.EOF or ChannelCondition.CLOSED)) != 0) break
+                    if ((conditions and ChannelCondition.EXIT_STATUS) != 0) break
+                    if ((conditions and (ChannelCondition.EOF or ChannelCondition.CLOSED)) != 0) {
+                        repeat(10) {
+                            if (session.exitStatus != null) return@repeat
+                            session.waitForCondition(ChannelCondition.EXIT_STATUS, 50)
+                            delay(50)
+                        }
+                        break
+                    }
                     delay(50)
                 }
-                if (session.exitStatus != 0) logger.log(LogLevel.WARN, TAG, "Silent exec exit ${session.exitStatus}: $command")
+                drainStreams()
+                val exitStatus = session.exitStatus
+                when {
+                    exitStatus == null -> logger.log(LogLevel.DEBUG, TAG, "Silent exec closed without exit status: $command")
+                    exitStatus != 0 -> logger.log(LogLevel.WARN, TAG, "Silent exec exit $exitStatus: $command")
+                }
             } catch (e: Exception) {
                 logger.log(LogLevel.WARN, TAG, "Silent exec failed: ${e.message}")
             } finally {
