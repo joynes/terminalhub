@@ -76,6 +76,7 @@ class TerminalSessionManager @Inject constructor(
     private val _activeSession = MutableStateFlow<TerminalSession?>(null)
     private val _screenUpdates = MutableSharedFlow<TerminalSession>(extraBufferCapacity = 64)
     val screenUpdates: SharedFlow<TerminalSession> = _screenUpdates.asSharedFlow()
+    private var lastServiceStartRequestAt: Long? = null
 
     // LinkedHashMap preserves insertion order (tab bar order)
     private val entries = LinkedHashMap<String, SessionEntry>()
@@ -110,7 +111,6 @@ class TerminalSessionManager @Inject constructor(
         tmuxSessionName: String? = null
     ) {
         if (entries.containsKey(sessionId)) return
-        ensureSshServiceStarted()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         val terminalClient = TerminalSessionClientImpl(context) { changedSession ->
@@ -163,6 +163,7 @@ class TerminalSessionManager @Inject constructor(
         entries[sessionId] = SessionEntry(meta, conn, terminalSession, scope, tmuxSessionName)
         publishSessions()
         logger.log(LogLevel.INFO, TAG, "Session registered: $projectName")
+        ensureSshServiceStarted(projectName)
 
         if (_activeId.value == null) switchTo(TerminalSessionId(sessionId))
     }
@@ -337,14 +338,67 @@ class TerminalSessionManager @Inject constructor(
     }
 
     private fun ensureSshServiceStarted() {
-        ContextCompat.startForegroundService(context, Intent(context, SshSessionService::class.java))
+        ensureSshServiceStarted("unknown")
+    }
+
+    private fun ensureSshServiceStarted(projectName: String) {
+        val runtimeState = runtimeRepository.state.value
+        if (runtimeState.foregroundServiceRunning) {
+            lastServiceStartRequestAt = null
+            logger.log(
+                LogLevel.DEBUG,
+                TAG,
+                "SSH service already running; skip start project=$projectName snapshot=${debugServiceStartSnapshot(runtimeState.appInForeground)}"
+            )
+            return
+        }
+
+        val now = System.currentTimeMillis()
+        val lastRequestAt = lastServiceStartRequestAt
+        if (lastRequestAt != null && now - lastRequestAt < SERVICE_START_DEDUP_MS) {
+            logger.log(
+                LogLevel.DEBUG,
+                TAG,
+                "SSH service start already requested recently; skip duplicate project=$projectName sinceMs=${now - lastRequestAt} snapshot=${debugServiceStartSnapshot(runtimeState.appInForeground)}"
+            )
+            return
+        }
+
+        lastServiceStartRequestAt = now
+        val intent = Intent(context, SshSessionService::class.java)
+        if (runtimeState.appInForeground) {
+            logger.log(
+                LogLevel.INFO,
+                TAG,
+                "Starting SSH service with startService project=$projectName snapshot=${debugServiceStartSnapshot(true)}"
+            )
+            context.startService(intent)
+        } else {
+            logger.log(
+                LogLevel.INFO,
+                TAG,
+                "Starting SSH service with startForegroundService project=$projectName snapshot=${debugServiceStartSnapshot(false)}"
+            )
+            ContextCompat.startForegroundService(context, intent)
+        }
     }
 
     private fun maybeStopSshService() {
         if (entries.values.none { it.conn != null }) {
+            lastServiceStartRequestAt = null
             context.stopService(Intent(context, SshSessionService::class.java))
         }
     }
 
-    companion object { private const val TAG = "TerminalSessionManager" }
+    private fun debugServiceStartSnapshot(appInForeground: Boolean): String = buildString {
+        append("appInForeground=").append(appInForeground)
+        append(",sshEntries=").append(entries.values.count { it.conn != null })
+        append(",sshManagerSessions=").append(sshManager.sessions.value.size)
+        append(",runtimeServiceRunning=").append(runtimeRepository.state.value.foregroundServiceRunning)
+    }
+
+    companion object {
+        private const val TAG = "TerminalSessionManager"
+        private const val SERVICE_START_DEDUP_MS = 5_000L
+    }
 }
