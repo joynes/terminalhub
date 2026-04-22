@@ -3,7 +3,6 @@ package se.joynes.aiterminalhub.ui.screen.sessions
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.*
@@ -61,14 +60,11 @@ fun FloatingTextInputDialog(
         }
     }
 
-    // Full-size overlay so tapping outside dismisses
+    // Full-size overlay so the panel can float over the terminal without creating a new window.
+    // Intentionally do not intercept taps outside the panel: the user should be able to keep
+    // scrolling or interacting with the terminal while the text input stays open.
     BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                // detectTapGestures respects consumed events — won't fire if the panel consumed the tap
-                detectTapGestures { onDismiss() }
-            }
+        modifier = Modifier.fillMaxSize()
     ) {
         val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
         val imeBottomPx = WindowInsets.ime.getBottom(density).toFloat()
