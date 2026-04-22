@@ -1,5 +1,6 @@
 package se.joynes.aiterminalhub.ui.screen.settings
 
+import android.app.ActivityManager
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroCard
@@ -52,40 +54,77 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val runtimeState by viewModel.runtimeState.collectAsState()
     val powerManager = context.getSystemService(PowerManager::class.java)
+    val activityManager = context.getSystemService(ActivityManager::class.java)
     val packageName = context.packageName
     val batteryOptimizationIgnored = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         powerManager?.isIgnoringBatteryOptimizations(packageName) == true
     } else {
         true
     }
+    val backgroundRestricted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        activityManager?.isBackgroundRestricted == true
+    } else {
+        false
+    }
+    val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
     val timeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
     fun formatTs(value: Long?): String =
         value?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(timeFormatter) } ?: "None"
 
-    fun openBatteryOptimizationRequest() {
-        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val pm = context.getSystemService(PowerManager::class.java)
-            if (pm?.isIgnoringBatteryOptimizations(packageName) == true) {
-                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-            } else {
-                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                    data = Uri.parse("package:$packageName")
-                }
+    fun openIntent(vararg candidates: Intent) {
+        val launched = candidates.firstOrNull { intent ->
+            runCatching {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(intent)
+            }.isSuccess
+        }
+        if (launched == null) {
+            val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-        } else {
+            context.startActivity(fallback)
+        }
+    }
+
+    fun openBatteryOptimizationRequest() {
+        val requestIntent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:$packageName")
+        }
+        val generalIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+        openIntent(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !batteryOptimizationIgnored) requestIntent else generalIntent,
+            generalIntent
+        )
+    }
+
+    fun openAppInfo() {
+        openIntent(
             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                 data = Uri.parse("package:$packageName")
             }
-        }
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(intent) }
-            .onFailure {
-                val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.parse("package:$packageName")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(fallback)
+        )
+    }
+
+    fun openNotificationSettings() {
+        openIntent(
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                putExtra("app_package", packageName)
+                putExtra("app_uid", context.applicationInfo.uid)
+            },
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.parse("package:$packageName")
             }
+        )
+    }
+
+    fun openGeneralBatterySettings() {
+        openIntent(
+            Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS),
+            Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
     }
 
     Scaffold(
@@ -168,14 +207,62 @@ fun SettingsScreen(
                 }
                 item {
                     SettingsCard(
+                        title = "SYSTEM PROTECTION",
+                        description = "These Android system settings have the biggest effect on whether AITerminalHub survives in background. They do not guarantee no cold starts, but they materially reduce the chance."
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            SettingsValue(
+                                "Battery optimization",
+                                if (batteryOptimizationIgnored) "Ignored for this app" else "Still optimized"
+                            )
+                            SettingsValue(
+                                "Background restriction",
+                                if (backgroundRestricted) "Restricted by system" else "Not reported as restricted"
+                            )
+                            SettingsValue(
+                                "Notifications",
+                                if (notificationsEnabled) "Enabled" else "Disabled"
+                            )
+                            SettingsValue(
+                                "Why this matters",
+                                "Foreground service, battery policy and notification visibility all affect whether Android keeps the app alive long enough to resume sessions."
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            RetroButton(
+                                text = if (batteryOptimizationIgnored) "OPEN BATTERY SETTINGS" else "ALLOW BATTERY EXEMPTION",
+                                onClick = ::openBatteryOptimizationRequest,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            RetroButton(
+                                text = "OPEN APP INFO",
+                                onClick = ::openAppInfo,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            RetroButton(
+                                text = "OPEN NOTIFICATION SETTINGS",
+                                onClick = ::openNotificationSettings,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            RetroButton(
+                                text = "OPEN GENERAL BATTERY SETTINGS",
+                                onClick = ::openGeneralBatterySettings,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+                item {
+                    SettingsCard(
                         title = "BATTERY OPTIMIZATION",
-                        description = "Android vendor battery controls can still stop the app or network in the background. Excluding AITerminalHub from battery optimization improves the chance that sessions stay reachable when you switch apps."
+                        description = "Direct shortcut for requesting battery optimization exclusion. On many phones this is the single most important setting if you want fewer cold starts."
                     ) {
                         Text(
                             if (batteryOptimizationIgnored) {
                                 "Status: Not optimized for battery"
                             } else {
-                                "Status: Battery optimization may stop background activity"
+                                "Status: Battery optimization may still stop background activity"
                             },
                             color = if (batteryOptimizationIgnored) MegaDrivePrimary else MaterialTheme.colorScheme.error,
                             fontFamily = MonoFontFamily,
