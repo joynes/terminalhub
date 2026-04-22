@@ -44,8 +44,10 @@ fun AppLogScreen(
     val selectedLevel by viewModel.selectedLevel.collectAsState()
     val autoScroll by viewModel.autoScroll.collectAsState()
     var selectedEntry by remember { mutableStateOf<AppLogEntry?>(null) }
+    var showSelectionDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val clipboardManager = LocalClipboardManager.current
+    val selectedLogsText = remember(logs) { formatLogsForClipboard(logs, maxChars = 500_000) }
 
     LaunchedEffect(logs.size, autoScroll) {
         if (autoScroll && logs.isNotEmpty()) {
@@ -59,6 +61,9 @@ fun AppLogScreen(
                 title = "APP LOG",
                 onBack = onBack,
                 actions = {
+                    IconButton(onClick = { showSelectionDialog = true }) {
+                        Text("SEL", color = MegaDrivePrimary, fontSize = 10.sp, fontFamily = MonoFontFamily)
+                    }
                     IconButton(onClick = {
                         clipboardManager.setText(AnnotatedString(formatLogsForClipboard(logs)))
                     }) {
@@ -137,6 +142,13 @@ fun AppLogScreen(
             onDismiss = { selectedEntry = null }
         )
     }
+
+    if (showSelectionDialog) {
+        LogSelectionDialog(
+            text = selectedLogsText,
+            onDismiss = { showSelectionDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -203,6 +215,52 @@ private fun LogEntryDialog(
             SelectionContainer {
                 Text(
                     text = fullText,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                    color = MegaDriveOnSurface,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 11.sp
+                )
+            }
+        },
+        containerColor = MegaDriveSurface
+    )
+}
+
+@Composable
+private fun LogSelectionDialog(
+    text: String,
+    onDismiss: () -> Unit
+) {
+    val clipboardManager = LocalClipboardManager.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = {
+                clipboardManager.setText(AnnotatedString(text))
+            }) {
+                Text("COPY ALL", fontFamily = MonoFontFamily, color = MegaDrivePrimary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CLOSE", fontFamily = MonoFontFamily, color = MegaDriveDim)
+            }
+        },
+        title = {
+            Text(
+                text = "SELECT LOGS",
+                color = MegaDrivePrimary,
+                fontFamily = MonoFontFamily,
+                fontSize = 12.sp
+            )
+        },
+        text = {
+            SelectionContainer {
+                Text(
+                    text = text.ifBlank { "[no logs]" },
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 420.dp)
