@@ -3,9 +3,9 @@ package se.joynes.aiterminalhub.ui.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -32,7 +32,7 @@ private fun tabColor(seed: Int, active: Boolean): Color {
         Color.hsl(hue, saturation = 0.30f, lightness = 0.12f)
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun SessionTabBar(
     tabs: List<ProjectTabState>,
@@ -45,13 +45,14 @@ fun SessionTabBar(
 ) {
     var menuTabIndex by remember { mutableStateOf<Int?>(null) }
 
-    LazyRow(
+    FlowRow(
         modifier = modifier
             .background(MegaDriveSurface)
-            .height(28.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .heightIn(min = 28.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalArrangement = Arrangement.Start
     ) {
-        itemsIndexed(tabs) { index, tab ->
+        tabs.forEachIndexed { index, tab ->
             val isSelected = tab.sessionId != null && tab.sessionId == activeId
             val bg = tabColor(tab.colorSeed, isSelected)
             val textColor = when {
@@ -64,7 +65,7 @@ fun SessionTabBar(
                 Row(
                     modifier = Modifier
                         .width(TAB_WIDTH_DP.dp)
-                        .fillMaxHeight()
+                        .height(28.dp)
                         .background(bg)
                         .combinedClickable(
                             onClick = { tab.sessionId?.let { onSelect(it) } },
@@ -127,16 +128,14 @@ fun SessionTabBar(
                 }
             }
         }
-        item {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .clickable { onAddProject() }
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("+", color = MegaDriveAccent, fontSize = 14.sp)
-            }
+        Box(
+            modifier = Modifier
+                .height(28.dp)
+                .clickable { onAddProject() }
+                .padding(horizontal = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("+", color = MegaDriveAccent, fontSize = 14.sp)
         }
     }
 }

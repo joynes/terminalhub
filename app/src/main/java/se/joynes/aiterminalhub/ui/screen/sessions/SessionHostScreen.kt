@@ -389,13 +389,12 @@ fun SessionHostScreen(
             .imePadding()
             .background(MegaDriveBg)
     ) {
-            Row(
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(28.dp)
+                    .heightIn(min = 28.dp)
                     .background(MegaDriveSurface)
-                    .zIndex(1f),
-                verticalAlignment = Alignment.CenterVertically
+                    .zIndex(1f)
             ) {
                 if (projectTabs.isNotEmpty()) {
                     SessionTabBar(
@@ -416,19 +415,22 @@ fun SessionHostScreen(
                         },
                         onMove = { fromIndex, toIndex -> viewModel.moveSession(fromIndex, toIndex) },
                         onAddProject = onAddProject,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 32.dp)
                     )
                 } else {
                     Spacer(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
+                            .fillMaxWidth()
+                            .height(28.dp)
                     )
                 }
 
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight()
+                        .align(Alignment.TopEnd)
+                        .height(28.dp)
                         .width(32.dp)
                         .background(MegaDriveSurface)
                         .border(1.dp, MegaDriveBg.copy(alpha = 0.35f))
