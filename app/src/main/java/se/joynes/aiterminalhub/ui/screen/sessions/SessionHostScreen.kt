@@ -217,21 +217,12 @@ fun SessionHostScreen(
 
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    LaunchedEffect(viewModel, lifecycleOwner, preferFastResume) {
-        if (preferFastResume) {
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             viewModel.screenUpdates.collect { changedSession ->
                 val tv = terminalViewRef.value ?: return@collect
                 if (tv.mTermSession === changedSession) {
                     tv.onScreenUpdated()
-                }
-            }
-        } else {
-            lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.screenUpdates.collect { changedSession ->
-                    val tv = terminalViewRef.value ?: return@collect
-                    if (tv.mTermSession === changedSession) {
-                        tv.onScreenUpdated()
-                    }
                 }
             }
         }
@@ -242,10 +233,10 @@ fun SessionHostScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             val tv = terminalViewRef.value
-            if (event == Lifecycle.Event.ON_RESUME && currentSession != null) {
+            if (event == Lifecycle.Event.ON_RESUME && currentSession != null && preferFastResume) {
                 keyboardVisible = true
                 tv?.requestFocus()
-            } else if (event == Lifecycle.Event.ON_STOP && !preferFastResume) {
+            } else if (event == Lifecycle.Event.ON_STOP) {
                 keyboardVisible = false
                 hideKeyboard()
                 tv?.clearFocus()

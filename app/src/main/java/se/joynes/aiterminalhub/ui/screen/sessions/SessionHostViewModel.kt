@@ -227,6 +227,7 @@ class SessionHostViewModel @Inject constructor(
         logger.log(LogLevel.INFO, "SessionRecovery", "Activating SSH project=${project.name} reason=$reason")
         val srv = serverRepo.getById(project.serverId) ?: return
         val conn = connectToServer(srv)
+        conn.bindProject(project.id, project.name)
         val setupCmd = engine.renderSetup(srv, project)
         val attachCmd = engine.renderAttach(srv, project)
         val customScript = engine.renderCustomScript(srv, project)
@@ -365,6 +366,7 @@ class SessionHostViewModel @Inject constructor(
                 val server = serverRepo.getById(project.serverId) ?: return
                 val existingConn = sessionId?.let { sessionManager.getConnectionForProject(project.id) }
                 val conn = existingConn ?: connectToServer(server)
+                conn.bindProject(project.id, project.name)
                 conn.connected.first { it }
                 if (killTmuxSession && project.useTmux) {
                     conn.runSilent("tmux kill-session -t '${engine.sessionName(project).replace("'", "'\\''")}' 2>/dev/null || true")

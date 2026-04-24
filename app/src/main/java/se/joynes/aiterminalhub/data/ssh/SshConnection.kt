@@ -27,14 +27,18 @@ import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogEvent
 import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.model.Server
+import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.aiterminalhub.data.settings.AppSettingsRepository
+import se.joynes.aiterminalhub.data.settings.BackgroundKeepaliveProfile
+import se.joynes.aiterminalhub.data.settings.BackgroundKeepaliveScope
 import java.io.IOException
 import java.io.OutputStream
 import javax.inject.Inject
 
 class SshConnection @Inject constructor(
     private val logger: AppLogger,
-    private val settingsRepository: AppSettingsRepository
+    private val settingsRepository: AppSettingsRepository,
+    private val runtimeRepository: AppRuntimeRepository
 ) {
     private var connection: Connection? = null
     private var shellSession: Session? = null
@@ -55,6 +59,8 @@ class SshConnection @Inject constructor(
     private var serverLabel: String = "unknown"
     private var connectAttempt = 0
     private var keepaliveJob: Job? = null
+    @Volatile private var projectId: Long? = null
+    @Volatile private var projectName: String? = null
     @Volatile private var createdAtMs = System.currentTimeMillis()
     @Volatile private var connectedAtMs: Long? = null
     @Volatile private var lastRxAtMs: Long? = null
@@ -75,6 +81,11 @@ class SshConnection @Inject constructor(
         override fun removeServerHostKey(host: String?, port: Int, algorithm: String?, hostKey: ByteArray?) {}
 
         override fun addServerHostKey(hostname: String?, port: Int, algorithm: String?, hostKey: ByteArray?) {}
+    }
+
+    fun bindProject(projectId: Long, projectName: String) {
+        this.projectId = projectId
+        this.projectName = projectName
     }
 
     fun connect(server: Server, password: String?, privateKeyPem: String? = null) {
@@ -384,9 +395,11 @@ class SshConnection @Inject constructor(
         keepaliveJob?.cancel()
         keepaliveJob = scope.launch {
             while (_connected.value) {
-                delay(30_000)
+                delay(nextKeepaliveDelayMs())
                 if (!_connected.value) break
-                if (!settingsRepository.settings.value.sshKeepaliveEnabled) continue
+                val settings = settingsRepository.settings.value
+                if (!settings.sshKeepaliveEnabled) continue
+                if (!shouldSendKeepalive(settings.backgroundKeepaliveScope)) continue
                 try {
                     conn.sendIgnorePacket()
                 } catch (e: Exception) {
@@ -396,11 +409,32 @@ class SshConnection @Inject constructor(
         }
     }
 
+    private fun nextKeepaliveDelayMs(): Long {
+        val runtimeState = runtimeRepository.state.value
+        if (runtimeState.appInForeground) return FOREGROUND_KEEPALIVE_MS
+        return when (settingsRepository.settings.value.backgroundKeepaliveProfile) {
+            BackgroundKeepaliveProfile.AGGRESSIVE -> 30_000L
+            BackgroundKeepaliveProfile.BALANCED -> 120_000L
+            BackgroundKeepaliveProfile.BATTERY_SAVER -> 300_000L
+        }
+    }
+
+    private fun shouldSendKeepalive(scope: BackgroundKeepaliveScope): Boolean {
+        val runtimeState = runtimeRepository.state.value
+        if (runtimeState.appInForeground) return true
+        return when (scope) {
+            BackgroundKeepaliveScope.ALL_SESSIONS -> true
+            BackgroundKeepaliveScope.ACTIVE_TAB_ONLY -> projectId != null && projectId == runtimeState.activeProjectId
+        }
+    }
+
     fun debugSnapshot(): String {
         val now = System.currentTimeMillis()
         return buildString {
             append("instance=").append(instanceId)
             append(",sessionId=").append(sessionId)
+            append(",projectId=").append(projectId)
+            append(",projectName=").append(projectName)
             append(",server=").append(serverLabel)
             append(",connected=").append(_connected.value)
             append(",connection=").append(connection?.let { System.identityHashCode(it) })
@@ -432,5 +466,8 @@ class SshConnection @Inject constructor(
         return labels.joinToString("|")
     }
 
-    companion object { private const val TAG = "SshConnection" }
+    companion object {
+        private const val TAG = "SshConnection"
+        private const val FOREGROUND_KEEPALIVE_MS = 30_000L
+    }
 }

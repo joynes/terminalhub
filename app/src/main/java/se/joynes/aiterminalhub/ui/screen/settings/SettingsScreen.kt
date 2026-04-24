@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import se.joynes.aiterminalhub.data.settings.BackgroundKeepaliveProfile
+import se.joynes.aiterminalhub.data.settings.BackgroundKeepaliveScope
 import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.components.RetroCard
 import se.joynes.aiterminalhub.ui.components.RetroTopBar
@@ -162,7 +164,7 @@ fun SettingsScreen(
                 item {
                     SettingsCard(
                         title = "FAST RESUME",
-                        description = "Keeps terminal redraw and focus behavior more active while the app is open, so returning to the app feels closer to the older behavior. This helps the terminal come back faster, but it does not keep Android from killing the process."
+                        description = "Keeps terminal focus and redraw behavior snappier when the app returns to foreground. It no longer stays active in background, so it should not keep burning battery while the app is hidden."
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -185,7 +187,7 @@ fun SettingsScreen(
                 item {
                     SettingsCard(
                         title = "SSH KEEPALIVE",
-                        description = "Sends a lightweight keepalive packet roughly every 30 seconds while an SSH connection is open. This reduces silent disconnects when routers, mobile networks or the phone idle out quiet connections."
+                        description = "Sends SSH keepalive traffic to reduce silent disconnects. Foreground stays fast at roughly every 30 seconds. Background behavior below controls how aggressively the app keeps multiple sessions alive."
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -201,6 +203,71 @@ fun SettingsScreen(
                             Switch(
                                 checked = settings.sshKeepaliveEnabled,
                                 onCheckedChange = viewModel::setSshKeepaliveEnabled
+                            )
+                        }
+                    }
+                }
+                item {
+                    SettingsCard(
+                        title = "BACKGROUND KEEPALIVE PROFILE",
+                        description = "Controls how often background SSH sessions send keepalive packets. Aggressive protects sessions best but costs more battery. Battery saver sends far fewer packets."
+                    ) {
+                        SettingsValue(
+                            "Current profile",
+                            when (settings.backgroundKeepaliveProfile) {
+                                BackgroundKeepaliveProfile.AGGRESSIVE -> "Aggressive"
+                                BackgroundKeepaliveProfile.BALANCED -> "Balanced"
+                                BackgroundKeepaliveProfile.BATTERY_SAVER -> "Battery saver"
+                            }
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            RetroButton(
+                                text = "AGGRESSIVE",
+                                onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.AGGRESSIVE) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.AGGRESSIVE
+                            )
+                            RetroButton(
+                                text = "BALANCED",
+                                onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.BALANCED) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.BALANCED
+                            )
+                            RetroButton(
+                                text = "BATTERY SAVER",
+                                onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.BATTERY_SAVER) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.BATTERY_SAVER
+                            )
+                        }
+                    }
+                }
+                item {
+                    SettingsCard(
+                        title = "BACKGROUND KEEPALIVE SCOPE",
+                        description = "Controls how many SSH tabs get background protection. Protecting only the active tab usually cuts battery use sharply when many projects are open."
+                    ) {
+                        SettingsValue(
+                            "Current scope",
+                            when (settings.backgroundKeepaliveScope) {
+                                BackgroundKeepaliveScope.ALL_SESSIONS -> "All SSH sessions"
+                                BackgroundKeepaliveScope.ACTIVE_TAB_ONLY -> "Active tab only"
+                            }
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            RetroButton(
+                                text = "ACTIVE TAB ONLY",
+                                onClick = { viewModel.setBackgroundKeepaliveScope(BackgroundKeepaliveScope.ACTIVE_TAB_ONLY) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = settings.backgroundKeepaliveScope != BackgroundKeepaliveScope.ACTIVE_TAB_ONLY
+                            )
+                            RetroButton(
+                                text = "ALL SESSIONS",
+                                onClick = { viewModel.setBackgroundKeepaliveScope(BackgroundKeepaliveScope.ALL_SESSIONS) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = settings.backgroundKeepaliveScope != BackgroundKeepaliveScope.ALL_SESSIONS
                             )
                         }
                     }

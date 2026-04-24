@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.aiterminalhub.data.settings.AppSettingsRepository
+import se.joynes.aiterminalhub.data.settings.BackgroundKeepaliveProfile
+import se.joynes.aiterminalhub.data.settings.BackgroundKeepaliveScope
 import javax.inject.Inject
 
 @HiltViewModel
@@ -20,5 +22,13 @@ class SettingsViewModel @Inject constructor(
 
     fun setSshKeepaliveEnabled(enabled: Boolean) {
         settingsRepository.setSshKeepaliveEnabled(enabled)
+    }
+
+    fun setBackgroundKeepaliveProfile(profile: BackgroundKeepaliveProfile) {
+        settingsRepository.setBackgroundKeepaliveProfile(profile)
+    }
+
+    fun setBackgroundKeepaliveScope(scope: BackgroundKeepaliveScope) {
+        settingsRepository.setBackgroundKeepaliveScope(scope)
     }
 }
