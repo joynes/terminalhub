@@ -20,15 +20,4 @@ fun rememberBlinkState(periodMs: Int = 600): State<Boolean> {
 }
 
 @Composable
-fun rememberScanlineAlpha(): State<Float> {
-    val infiniteTransition = rememberInfiniteTransition(label = "scanline")
-    return infiniteTransition.animateFloat(
-        initialValue = 0.03f,
-        targetValue = 0.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scanlineAlpha"
-    )
-}
+fun rememberScanlineAlpha(): State<Float> = remember { mutableStateOf(0.05f) }

@@ -416,6 +416,7 @@ class SshConnection @Inject constructor(
             BackgroundKeepaliveProfile.AGGRESSIVE -> 30_000L
             BackgroundKeepaliveProfile.BALANCED -> 120_000L
             BackgroundKeepaliveProfile.BATTERY_SAVER -> 300_000L
+            BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER -> 600_000L
         }
     }
 
@@ -468,6 +469,6 @@ class SshConnection @Inject constructor(
 
     companion object {
         private const val TAG = "SshConnection"
-        private const val FOREGROUND_KEEPALIVE_MS = 30_000L
+        private const val FOREGROUND_KEEPALIVE_MS = 60_000L
     }
 }

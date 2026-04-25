@@ -29,11 +29,11 @@ object AnrWatchdog {
         val mainHandler = Handler(Looper.getMainLooper())
 
         fun scheduleBeat() {
-            mainHandler.post {
+            mainHandler.postDelayed({
                 lastMainThreadBeat.set(SystemClock.uptimeMillis())
                 reportedForCurrentFreeze = false
                 scheduleBeat()
-            }
+            }, 500)
         }
 
         lastMainThreadBeat.set(SystemClock.uptimeMillis())

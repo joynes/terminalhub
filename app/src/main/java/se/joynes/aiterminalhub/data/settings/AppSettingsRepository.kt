@@ -18,7 +18,8 @@ data class AppSettings(
 enum class BackgroundKeepaliveProfile {
     AGGRESSIVE,
     BALANCED,
-    BATTERY_SAVER
+    BATTERY_SAVER,
+    ULTRA_BATTERY_SAVER
 }
 
 enum class BackgroundKeepaliveScope {

@@ -187,7 +187,7 @@ fun SettingsScreen(
                 item {
                     SettingsCard(
                         title = "SSH KEEPALIVE",
-                        description = "Sends SSH keepalive traffic to reduce silent disconnects. Foreground stays fast at roughly every 30 seconds. Background behavior below controls how aggressively the app keeps multiple sessions alive."
+                        description = "Sends SSH keepalive traffic to reduce silent disconnects. Foreground sends every 60 seconds. Background behavior below controls how aggressively the app keeps multiple sessions alive."
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -210,35 +210,42 @@ fun SettingsScreen(
                 item {
                     SettingsCard(
                         title = "BACKGROUND KEEPALIVE PROFILE",
-                        description = "Controls how often background SSH sessions send keepalive packets. Aggressive protects sessions best but costs more battery. Battery saver sends far fewer packets."
+                        description = "Controls how often background SSH sessions send keepalive packets. Aggressive (30s) protects sessions best. Ultra battery saver (10 min) keeps sessions alive on most networks while using almost no power."
                     ) {
                         SettingsValue(
                             "Current profile",
                             when (settings.backgroundKeepaliveProfile) {
-                                BackgroundKeepaliveProfile.AGGRESSIVE -> "Aggressive"
-                                BackgroundKeepaliveProfile.BALANCED -> "Balanced"
-                                BackgroundKeepaliveProfile.BATTERY_SAVER -> "Battery saver"
+                                BackgroundKeepaliveProfile.AGGRESSIVE -> "Aggressive (30s)"
+                                BackgroundKeepaliveProfile.BALANCED -> "Balanced (2 min)"
+                                BackgroundKeepaliveProfile.BATTERY_SAVER -> "Battery saver (5 min)"
+                                BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER -> "Ultra battery saver (10 min)"
                             }
                         )
                         Spacer(Modifier.height(12.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             RetroButton(
-                                text = "AGGRESSIVE",
+                                text = "AGGRESSIVE (30s)",
                                 onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.AGGRESSIVE) },
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.AGGRESSIVE
                             )
                             RetroButton(
-                                text = "BALANCED",
+                                text = "BALANCED (2 MIN)",
                                 onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.BALANCED) },
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.BALANCED
                             )
                             RetroButton(
-                                text = "BATTERY SAVER",
+                                text = "BATTERY SAVER (5 MIN)",
                                 onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.BATTERY_SAVER) },
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.BATTERY_SAVER
+                            )
+                            RetroButton(
+                                text = "ULTRA BATTERY SAVER (10 MIN)",
+                                onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER) },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER
                             )
                         }
                     }
