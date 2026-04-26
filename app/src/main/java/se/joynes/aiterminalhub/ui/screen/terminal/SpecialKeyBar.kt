@@ -25,7 +25,7 @@ import se.joynes.aiterminalhub.ui.theme.*
 private val KEY_H   = 34.dp
 private val ESC_W   = 42.dp  // ESC slightly wider
 private val KEY_W   = 28.dp  // ⇥ : / @ 1 2 3 ↑
-private val RET_W   = 34.dp  // ↵
+private val RET_W   = 38.dp  // ↵
 private val MOD_W   = 40.dp  // CTRL ALT ⇧
 private val ACT_W   = 50.dp  // ⌨ pen + (action keys, row 2 center)
 private val ARROW_W = 30.dp  // ← ↓ →
@@ -103,7 +103,7 @@ fun SpecialKeyBar(
             TermKey("3",   KEY_W) { onKey(modified("3")) }
             Spacer(Modifier.weight(1f))
             TermKey("↑",   KEY_W) { onKey(arrowKey('A')) }
-            TermKey("↵",   RET_W) { modifierManager.clearTransients(); onKey("\r") }
+            TermKey("↵",   RET_W, fontSize = 18.sp) { modifierManager.clearTransients(); onKey("\r") }
         }
 
         // Row 2: CTRL  ALT  SHIFT  [spacer]  ⌨  ✎  +  [spacer]  ←  ↓  →
