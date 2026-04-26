@@ -21,7 +21,7 @@ import se.joynes.aiterminalhub.domain.TerminalSessionId
 import se.joynes.aiterminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.aiterminalhub.ui.theme.*
 
-private const val TAB_WIDTH_DP = 76
+private const val TAB_WIDTH_DP = 70
 
 /** Deterministic hue from seed → dark background colour that reads well against light text. */
 private fun tabColor(seed: Int, active: Boolean): Color {

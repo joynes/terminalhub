@@ -774,8 +774,17 @@ fun SessionHostScreen(
                     ) {
                         SpecialKeyBar(
                             modifierManager = modifierManager,
-                            onKey = {
-                                viewModel.sendBytesToActive(it.toByteArray(Charsets.UTF_8))
+                            onKey = { keyStr ->
+                                if (activeTextInputVisible && activeProjectId != null) {
+                                    val printable = (keyStr.length == 1 && keyStr[0] >= ' ' && keyStr[0] != '\u007F')
+                                        || keyStr == "\t"
+                                    if (printable) {
+                                        textInputDraftByProject[activeProjectId] =
+                                            textInputDraftByProject[activeProjectId].orEmpty() + keyStr
+                                    }
+                                } else {
+                                    viewModel.sendBytesToActive(keyStr.toByteArray(Charsets.UTF_8))
+                                }
                             },
                             onPaste = {
                                 val text = clipboardManager.getText()?.text ?: return@SpecialKeyBar
