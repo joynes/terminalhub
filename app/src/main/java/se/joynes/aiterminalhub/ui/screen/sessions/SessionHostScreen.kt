@@ -776,11 +776,21 @@ fun SessionHostScreen(
                             modifierManager = modifierManager,
                             onKey = { keyStr ->
                                 if (activeTextInputVisible && activeProjectId != null) {
-                                    val printable = (keyStr.length == 1 && keyStr[0] >= ' ' && keyStr[0] != '\u007F')
-                                        || keyStr == "\t"
-                                    if (printable) {
-                                        textInputDraftByProject[activeProjectId] =
-                                            textInputDraftByProject[activeProjectId].orEmpty() + keyStr
+                                    when {
+                                        keyStr == "\r" -> {
+                                            val draft = textInputDraftByProject[activeProjectId].orEmpty()
+                                            if (draft.isNotEmpty()) {
+                                                viewModel.saveTextInput(activeProjectId, draft)
+                                                val payload = if (draft.endsWith("\n") || draft.endsWith("\r")) draft else "$draft\r"
+                                                viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
+                                                textInputDraftByProject[activeProjectId] = ""
+                                                textInputVisibleByProject[activeProjectId] = false
+                                            }
+                                        }
+                                        (keyStr.length == 1 && keyStr[0] >= ' ' && keyStr[0] != '\u007F') || keyStr == "\t" -> {
+                                            textInputDraftByProject[activeProjectId] =
+                                                textInputDraftByProject[activeProjectId].orEmpty() + keyStr
+                                        }
                                     }
                                 } else {
                                     viewModel.sendBytesToActive(keyStr.toByteArray(Charsets.UTF_8))
