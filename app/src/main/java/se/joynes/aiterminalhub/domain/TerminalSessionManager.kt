@@ -242,11 +242,22 @@ class TerminalSessionManager @Inject constructor(
         _closedSessions.value = (_closedSessions.value + closedMeta).takeLast(50)
         entry.scope.coroutineContext[Job]?.cancel()
         if (killTmuxSession && entry.conn != null && entry.meta.isTmux && !entry.tmuxSessionName.isNullOrBlank()) {
-            val tmuxSession = entry.tmuxSessionName
-            entry.conn.send("tmux kill-session -t '${tmuxSession.replace("'", "'\\''")}'\n")
-            logger.log(LogLevel.INFO, TAG, "Requested tmux kill for close: sessionId=${id.value} tmuxSession=$tmuxSession")
-        }
-        if (entry.conn != null) {
+            val tmuxSession = entry.tmuxSessionName!!
+            val conn = entry.conn
+            val sessionIdValue = id.value
+            // runSilent opens its own exec channel — must complete before destroySession closes the connection
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    conn.runSilent("tmux kill-session -t '${tmuxSession.replace("'", "'\\''")}' 2>/dev/null || true")
+                    logger.log(LogLevel.INFO, TAG, "Tmux session killed: sessionId=$sessionIdValue tmuxSession=$tmuxSession")
+                } catch (e: Exception) {
+                    logger.log(LogLevel.WARN, TAG, "Tmux kill failed: ${e.message}")
+                } finally {
+                    sshManager.destroySession(sessionIdValue)
+                    maybeStopSshService()
+                }
+            }
+        } else if (entry.conn != null) {
             sshManager.destroySession(id.value)
             maybeStopSshService()
         } else {
