@@ -26,6 +26,9 @@ class ProjectRepository @Inject constructor(
 
     suspend fun delete(project: Project) = dao.delete(project.toEntity())
 
+    suspend fun updateLastOpenedAt(projectId: Long, timestamp: Long) =
+        dao.updateLastOpenedAt(projectId, timestamp)
+
     private fun ProjectEntity.toModel() = Project(
         id = id,
         serverId = serverId,
@@ -35,7 +38,8 @@ class ProjectRepository @Inject constructor(
         customScript = customScript,
         aiCommand = aiCommand,
         colorSeed = colorSeed,
-        gitUrl = gitUrl
+        gitUrl = gitUrl,
+        lastOpenedAt = lastOpenedAt
     )
 
     private fun Project.toEntity() = ProjectEntity(
@@ -47,7 +51,8 @@ class ProjectRepository @Inject constructor(
         customScript = customScript,
         aiCommand = aiCommand,
         colorSeed = colorSeed,
-        gitUrl = gitUrl
+        gitUrl = gitUrl,
+        lastOpenedAt = lastOpenedAt
     )
 
     private fun Project.withColorSeed(): Project {

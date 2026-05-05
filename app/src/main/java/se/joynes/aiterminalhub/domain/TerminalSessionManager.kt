@@ -108,7 +108,8 @@ class TerminalSessionManager @Inject constructor(
         projectName: String,
         projectId: Long = 0L,
         isTmux: Boolean = false,
-        tmuxSessionName: String? = null
+        tmuxSessionName: String? = null,
+        lastOpenedAt: Long = 0L
     ) {
         if (entries.containsKey(sessionId)) return
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -157,7 +158,7 @@ class TerminalSessionManager @Inject constructor(
             isConnected = conn.connected.value,
             hasUnreadOutput = false,
             previewLines = emptyList(),
-            lastOpenedAt = now,
+            lastOpenedAt = if (lastOpenedAt > 0L) lastOpenedAt else now,
             createdAt = now
         )
         entries[sessionId] = SessionEntry(meta, conn, terminalSession, scope, tmuxSessionName)
@@ -171,7 +172,8 @@ class TerminalSessionManager @Inject constructor(
     fun registerLocal(
         projectName: String,
         projectId: Long = 0L,
-        startupCommands: List<String> = emptyList()
+        startupCommands: List<String> = emptyList(),
+        lastOpenedAt: Long = 0L
     ) {
         if (entries.values.any { it.meta.projectId == projectId }) return
         val sessionId = "local-${projectId}-${UUID.randomUUID()}"
@@ -205,7 +207,7 @@ class TerminalSessionManager @Inject constructor(
             isConnected = true,
             hasUnreadOutput = false,
             previewLines = emptyList(),
-            lastOpenedAt = now,
+            lastOpenedAt = if (lastOpenedAt > 0L) lastOpenedAt else now,
             createdAt = now
         )
         entries[sessionId] = SessionEntry(meta, null, terminalSession, scope, null)

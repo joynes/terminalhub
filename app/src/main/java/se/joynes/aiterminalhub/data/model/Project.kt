@@ -16,7 +16,8 @@ data class Project(
     val customScript: String = "cd {{PROJECT_PATH}}",
     val aiCommand: String = "",
     val colorSeed: Int = 0,
-    val gitUrl: String = ""
+    val gitUrl: String = "",
+    val lastOpenedAt: Long = 0L
 ) {
     val isLocal: Boolean get() = targetType == ProjectTargetType.LOCAL
 }

@@ -257,7 +257,8 @@ class SessionHostViewModel @Inject constructor(
                 project.name,
                 project.id,
                 isTmux = project.useTmux,
-                tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null
+                tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null,
+                lastOpenedAt = project.lastOpenedAt
             )
             if (autoSwitch) sessionManager.switchTo(TerminalSessionId(conn.sessionId))
         } else {
@@ -297,7 +298,8 @@ class SessionHostViewModel @Inject constructor(
         sessionManager.registerLocal(
             projectName = project.name,
             projectId = project.id,
-            startupCommands = startupCommands
+            startupCommands = startupCommands,
+            lastOpenedAt = project.lastOpenedAt
         )
         if (autoSwitch) {
             sessionManager.sessions.value.firstOrNull { it.projectId == project.id }?.id?.let { sessionManager.switchTo(it) }
@@ -310,6 +312,9 @@ class SessionHostViewModel @Inject constructor(
         _serverId.value = _allDbProjects.value.firstOrNull {
             it.id == projectId && it.targetType == ProjectTargetType.SSH
         }?.serverId
+        if (projectId != null) {
+            viewModelScope.launch { projectRepo.updateLastOpenedAt(projectId, System.currentTimeMillis()) }
+        }
     }
 
     fun closeSession(projectId: Long, sessionId: TerminalSessionId?, killTmuxSession: Boolean = false) {
@@ -385,6 +390,7 @@ class SessionHostViewModel @Inject constructor(
         if (_dbProjects.value.none { it.id == projectId }) {
             _dbProjects.value = _dbProjects.value + project
         }
+        viewModelScope.launch { projectRepo.updateLastOpenedAt(projectId, System.currentTimeMillis()) }
         activateProject(project)
     }
 
@@ -396,6 +402,7 @@ class SessionHostViewModel @Inject constructor(
         connectingProjectIds.value = connectingProjectIds.value - projectId
         sessionManager.markProjectOpen(projectId)
         logger.log(LogLevel.INFO, "SessionRecovery", "Manual reconnect requested for projectId=$projectId")
+        viewModelScope.launch { projectRepo.updateLastOpenedAt(projectId, System.currentTimeMillis()) }
         activateProject(project, autoSwitch = true)
     }
 

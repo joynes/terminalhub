@@ -14,5 +14,6 @@ data class ProjectEntity(
     val aiCommand: String = "",
     val colorSeed: Int = (Math.random() * Int.MAX_VALUE).toInt(),
     val createdAt: Long = System.currentTimeMillis(),
-    val gitUrl: String = ""
+    val gitUrl: String = "",
+    val lastOpenedAt: Long = 0L
 )

@@ -23,4 +23,7 @@ interface ProjectDao {
 
     @Delete
     suspend fun delete(entity: ProjectEntity)
+
+    @Query("UPDATE projects SET lastOpenedAt = :timestamp WHERE id = :id")
+    suspend fun updateLastOpenedAt(id: Long, timestamp: Long)
 }
