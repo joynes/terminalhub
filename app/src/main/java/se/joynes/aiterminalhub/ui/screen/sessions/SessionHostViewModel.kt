@@ -312,9 +312,6 @@ class SessionHostViewModel @Inject constructor(
         _serverId.value = _allDbProjects.value.firstOrNull {
             it.id == projectId && it.targetType == ProjectTargetType.SSH
         }?.serverId
-        if (projectId != null) {
-            viewModelScope.launch { projectRepo.updateLastOpenedAt(projectId, System.currentTimeMillis()) }
-        }
     }
 
     fun closeSession(projectId: Long, sessionId: TerminalSessionId?, killTmuxSession: Boolean = false) {
