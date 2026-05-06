@@ -46,6 +46,7 @@ import se.joynes.aiterminalhub.ui.components.RetroButton
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
 import se.joynes.aiterminalhub.ui.screen.terminal.MutableModifierManager
 import se.joynes.aiterminalhub.ui.screen.terminal.SpecialKeyBar
+import se.joynes.aiterminalhub.ui.screen.terminal.TerminalSearchOverlay
 import se.joynes.aiterminalhub.ui.screen.terminal.TerminalViewClientImpl
 import se.joynes.aiterminalhub.ui.theme.*
 
@@ -91,6 +92,8 @@ fun SessionHostScreen(
     val fileUploadVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     val fileUploadSelectedUriByProject = remember { mutableStateMapOf<Long, Uri?>() }
     val fileUploadSelectedNameByProject = remember { mutableStateMapOf<Long, String>() }
+    var searchVisible by remember { mutableStateOf(false) }
+    var searchInitialQuery by remember { mutableStateOf("") }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
     val exportImportState by exportImportViewModel.state.collectAsState()
@@ -605,6 +608,10 @@ fun SessionHostScreen(
                                         onTerminalTap = {
                                             keyboardVisible = true
                                             showKeyboard()
+                                        },
+                                        onSearch = { text ->
+                                            searchInitialQuery = text
+                                            searchVisible = true
                                         }
                                     )
                                 }
@@ -762,6 +769,18 @@ fun SessionHostScreen(
                                     fileUploadVisibleByProject[activeProjectId] = false
                                     terminalViewRef.value?.requestFocus()
                                 }
+                            )
+                        }
+
+                        if (searchVisible) {
+                            TerminalSearchOverlay(
+                                initialQuery = searchInitialQuery,
+                                terminalViewRef = terminalViewRef.value,
+                                onDismiss = {
+                                    searchVisible = false
+                                    terminalViewRef.value?.requestFocus()
+                                },
+                                modifier = Modifier.align(Alignment.TopStart)
                             )
                         }
                     }

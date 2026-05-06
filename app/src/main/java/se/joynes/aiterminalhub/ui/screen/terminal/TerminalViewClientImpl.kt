@@ -16,7 +16,8 @@ import com.termux.view.TerminalViewClient
 class TerminalViewClientImpl(
     private val modifierManager: MutableModifierManager,
     val onSendToSsh: (ByteArray) -> Unit,
-    private val onTerminalTap: () -> Unit
+    private val onTerminalTap: () -> Unit,
+    private val onSearch: (String) -> Unit = {}
 ) : TerminalViewClient {
 
     // ── Modifier state ────────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ class TerminalViewClientImpl(
     override fun isTerminalViewSelected()             = true
     override fun copyModeChanged(copyMode: Boolean)  {}
     override fun onEmulatorSet()                     {}
+    override fun onSearchRequested(selectedText: String) = onSearch(selectedText)
 
     // ── Logging (no-op) ───────────────────────────────────────────────────────
     override fun logError(tag: String?, message: String?) {}

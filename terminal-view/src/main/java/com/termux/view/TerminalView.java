@@ -1477,6 +1477,14 @@ public final class TerminalView extends View {
         }
     }
 
+    /** Scroll the terminal view so that [row] is visible (row 0 = bottom, negative = scrollback). */
+    public void scrollToRow(int row) {
+        if (mEmulator == null) return;
+        int minTopRow = -mEmulator.getScreen().getActiveTranscriptRows();
+        mTopRow = Math.max(minTopRow, Math.min(0, row));
+        invalidate();
+    }
+
     private void decrementYTextSelectionCursors(int decrement) {
         if (mTextSelectionCursorController != null) {
             mTextSelectionCursorController.decrementYTextSelectionCursors(decrement);

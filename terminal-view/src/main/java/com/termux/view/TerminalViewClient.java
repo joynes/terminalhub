@@ -65,6 +65,8 @@ public interface TerminalViewClient {
 
     void onEmulatorSet();
 
+    default void onSearchRequested(String selectedText) {}
+
 
     void logError(String tag, String message);
 

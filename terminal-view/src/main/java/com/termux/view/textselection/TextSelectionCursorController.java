@@ -33,6 +33,7 @@ public class TextSelectionCursorController implements CursorController {
     public final int ACTION_COPY = 1;
     public final int ACTION_PASTE = 2;
     public final int ACTION_MORE = 3;
+    public final int ACTION_SEARCH = 4;
 
     public TextSelectionCursorController(TerminalView terminalView) {
         this.terminalView = terminalView;
@@ -116,6 +117,7 @@ public class TextSelectionCursorController implements CursorController {
                 ClipboardManager clipboard = (ClipboardManager) terminalView.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
                 menu.add(Menu.NONE, ACTION_COPY, Menu.NONE, R.string.copy_text).setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_PASTE, Menu.NONE, R.string.paste_text).setEnabled(clipboard != null && clipboard.hasPrimaryClip()).setShowAsAction(show);
+                menu.add(Menu.NONE, ACTION_SEARCH, Menu.NONE, R.string.search_text).setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_MORE, Menu.NONE, R.string.text_selection_more);
                 return true;
             }
@@ -141,6 +143,11 @@ public class TextSelectionCursorController implements CursorController {
                     case ACTION_PASTE:
                         terminalView.stopTextSelectionMode();
                         terminalView.mTermSession.onPasteTextFromClipboard();
+                        break;
+                    case ACTION_SEARCH:
+                        String searchText = getSelectedText();
+                        terminalView.stopTextSelectionMode();
+                        terminalView.mClient.onSearchRequested(searchText != null ? searchText.trim() : "");
                         break;
                     case ACTION_MORE:
                         // We first store the selected text in case TerminalViewClient needs the
