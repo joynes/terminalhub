@@ -52,6 +52,29 @@ fun FloatingFileUploadDialog(
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
 
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            onSelectedUriChange(uri)
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) onSelectedNameChange(cursor.getString(idx) ?: uri.lastPathSegment ?: "file")
+                }
+            }
+            if (selectedName.isBlank()) onSelectedNameChange(uri.lastPathSegment ?: "file")
+        } else {
+            // User cancelled picker with no file pre-selected → dismiss dialog
+            if (selectedUri == null) onDismiss()
+        }
+    }
+
+    // Auto-open picker when dialog appears (skip if a file is already provided via share intent)
+    LaunchedEffect(Unit) {
+        if (selectedUri == null && initialUri == null) {
+            filePicker.launch("*/*")
+        }
+    }
+
     // Pre-populate from share intent
     LaunchedEffect(initialUri) {
         if (initialUri != null && selectedUri == null) {
@@ -66,17 +89,11 @@ fun FloatingFileUploadDialog(
         }
     }
 
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            onSelectedUriChange(uri)
-            // Resolve display name immediately for the label
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (idx >= 0) onSelectedNameChange(cursor.getString(idx) ?: uri.lastPathSegment ?: "file")
-                }
-            }
-            if (selectedName.isBlank()) onSelectedNameChange(uri.lastPathSegment ?: "file")
+    // Auto-start upload as soon as a file is selected (or re-selected after error)
+    LaunchedEffect(selectedUri) {
+        val uri = selectedUri ?: return@LaunchedEffect
+        if (uploadState !is UploadState.Uploading) {
+            viewModel.startUpload(serverId, projectId, uri, context)
         }
     }
 
@@ -142,12 +159,6 @@ fun FloatingFileUploadDialog(
                 val isDone      = uploadState is UploadState.Done
                 val isError     = uploadState is UploadState.Error
 
-                RetroButton(
-                    text = "CHOOSE FILE",
-                    onClick = { if (!isUploading) filePicker.launch("*/*") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
                 if (selectedName.isNotBlank()) {
                     Text(
                         text = selectedName,
@@ -156,6 +167,9 @@ fun FloatingFileUploadDialog(
                         fontFamily = MonoFontFamily,
                         maxLines = 2
                     )
+                } else if (!isUploading && !isDone && !isError) {
+                    // Still waiting for picker / file not yet chosen
+                    Text("Selecting file...", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
                 }
 
                 when {
@@ -198,18 +212,20 @@ fun FloatingFileUploadDialog(
                             fontSize = 11.sp,
                             fontFamily = MonoFontFamily
                         )
+                        RetroButton(
+                            text = "CHOOSE FILE",
+                            onClick = { filePicker.launch("*/*") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
 
-                if (!isDone && !isUploading) {
+                // Manual re-pick only shown when idle with a file already chosen (re-select)
+                if (!isDone && !isUploading && !isError && selectedUri != null) {
                     RetroButton(
-                        text = "UPLOAD",
-                        onClick = {
-                            val uri = selectedUri ?: return@RetroButton
-                            viewModel.startUpload(serverId, projectId, uri, context)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = selectedUri != null
+                        text = "CHOOSE DIFFERENT FILE",
+                        onClick = { filePicker.launch("*/*") },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
