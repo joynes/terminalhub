@@ -389,8 +389,9 @@ public final class TerminalView extends View {
             public boolean finishComposingText() {
                 if (TERMINAL_VIEW_KEY_LOGGING_ENABLED) mClient.logInfo(LOG_TAG, "IME: finishComposingText()");
                 super.finishComposingText();
-
-                sendTextToTerminal(getEditable());
+                // Do NOT send here — voice/dictation IMEs call finishComposingText() immediately
+                // before commitText(), which would cause the same text to be sent twice.
+                // All committed text arrives via commitText(); focus-change finishes are ignored.
                 getEditable().clear();
                 return true;
             }
@@ -404,9 +405,10 @@ public final class TerminalView extends View {
 
                 if (mEmulator == null) return true;
 
-                Editable content = getEditable();
-                sendTextToTerminal(content);
-                content.clear();
+                // Send the committed text directly rather than reading the full Editable, so that
+                // stale content left by a preceding finishComposingText() call cannot be re-sent.
+                sendTextToTerminal(text);
+                getEditable().clear();
                 return true;
             }
 
