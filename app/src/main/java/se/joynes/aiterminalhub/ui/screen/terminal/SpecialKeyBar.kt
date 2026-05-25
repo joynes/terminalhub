@@ -8,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -37,6 +38,7 @@ fun SpecialKeyBar(
     onPaste: () -> Unit = {},
     onTextInput: () -> Unit = {},
     onFileUpload: () -> Unit = {},
+    onSearch: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {},
     onPrevTab: () -> Unit = {},
     onNextTab: () -> Unit = {}
@@ -117,8 +119,9 @@ fun SpecialKeyBar(
             TermKey("⇧",     MOD_W, active = shiftActive, fontSize = 16.sp) { modifierManager.toggleShift() }
             Spacer(Modifier.weight(1f))
             TermKey("⌨", ACT_W, fontSize = 18.sp) { onKeyboardToggle() }
-            IconTermKey(Icons.Default.Edit, "text input",  ACT_W, onClick = onTextInput)
-            IconTermKey(Icons.Default.Add,  "file upload", ACT_W, onClick = onFileUpload)
+            IconTermKey(Icons.Default.Edit,   "text input",  ACT_W, onClick = onTextInput)
+            IconTermKey(Icons.Default.Add,    "file upload", ACT_W, onClick = onFileUpload)
+            IconTermKey(Icons.Default.Search, "search",      ACT_W, onClick = onSearch)
             Spacer(Modifier.weight(1f))
             TermKey("←", ARROW_W) { onKey(arrowKey('D')) }
             TermKey("↓", ARROW_W) { onKey(arrowKey('B')) }
