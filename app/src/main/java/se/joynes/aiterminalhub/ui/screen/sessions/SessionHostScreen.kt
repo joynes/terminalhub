@@ -705,6 +705,10 @@ fun SessionHostScreen(
                             !activeTab.isConnected &&
                             activeTab.sessionId != null
                         ) {
+                            val disconnectedCount = projectTabs.count { tab ->
+                                tab.targetType == se.joynes.aiterminalhub.data.model.ProjectTargetType.SSH &&
+                                !tab.isConnected && !tab.isConnecting
+                            }
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.TopCenter)
@@ -727,6 +731,12 @@ fun SessionHostScreen(
                                         text = "RECONNECT",
                                         onClick = { viewModel.reconnectProject(activeTab.projectId) }
                                     )
+                                    if (disconnectedCount > 1) {
+                                        RetroButton(
+                                            text = "RECONNECT ALL ($disconnectedCount)",
+                                            onClick = { viewModel.reconnectAllDisconnected() }
+                                        )
+                                    }
                                 }
                             }
                         }

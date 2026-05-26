@@ -403,6 +403,13 @@ class SessionHostViewModel @Inject constructor(
         activateProject(project, autoSwitch = true)
     }
 
+    fun reconnectAllDisconnected() {
+        val disconnected = projectTabs.value.filter { tab ->
+            tab.targetType == ProjectTargetType.SSH && !tab.isConnected && !tab.isConnecting
+        }
+        disconnected.forEach { tab -> reconnectProject(tab.projectId) }
+    }
+
     fun moveSession(fromIndex: Int, toIndex: Int) {
         val visibleTabs = projectTabs.value
         if (fromIndex !in visibleTabs.indices || toIndex !in visibleTabs.indices) return
