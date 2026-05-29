@@ -838,6 +838,9 @@ fun SessionHostScreen(
                             onFileUpload = {
                                 activeProjectId?.let { projectId ->
                                     textInputVisibleByProject[projectId] = false
+                                    fileUploadSelectedUriByProject[projectId] = null
+                                    fileUploadSelectedNameByProject[projectId] = ""
+                                    fileUploadViewModel.reset(projectId)
                                     fileUploadVisibleByProject[projectId] = true
                                 }
                             },
