@@ -52,23 +52,36 @@ fun FloatingFileUploadDialog(
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
 
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            onSelectedUriChange(uri)
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (idx >= 0) onSelectedNameChange(cursor.getString(idx) ?: uri.lastPathSegment ?: "file")
-                }
+    // Multi-file queue: files waiting after the current one
+    var uploadQueue by remember { mutableStateOf<List<Pair<android.net.Uri, String>>>(emptyList()) }
+    var totalFiles by remember { mutableStateOf(0) }
+    var fileIndex by remember { mutableStateOf(0) }  // 0-indexed current file
+
+    fun resolveFileName(uri: android.net.Uri): String {
+        var name = uri.lastPathSegment ?: "file"
+        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                if (idx >= 0) name = cursor.getString(idx) ?: name
             }
-            if (selectedName.isBlank()) onSelectedNameChange(uri.lastPathSegment ?: "file")
+        }
+        return name
+    }
+
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.isNotEmpty()) {
+            val resolved = uris.map { it to resolveFileName(it) }
+            totalFiles = resolved.size
+            fileIndex = 0
+            onSelectedUriChange(resolved.first().first)
+            onSelectedNameChange(resolved.first().second)
+            uploadQueue = resolved.drop(1)
         } else {
-            // User cancelled picker with no file pre-selected → dismiss dialog
             if (selectedUri == null) onDismiss()
         }
     }
 
-    // Auto-open picker when dialog appears (skip if a file is already provided via share intent)
+    // Auto-open picker when dialog appears
     LaunchedEffect(Unit) {
         if (selectedUri == null && initialUri == null) {
             filePicker.launch("*/*")
@@ -79,21 +92,29 @@ fun FloatingFileUploadDialog(
     LaunchedEffect(initialUri) {
         if (initialUri != null && selectedUri == null) {
             onSelectedUriChange(initialUri)
-            context.contentResolver.query(initialUri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val idx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                    if (idx >= 0) onSelectedNameChange(cursor.getString(idx) ?: initialUri.lastPathSegment ?: "file")
-                }
-            }
-            if (selectedName.isBlank()) onSelectedNameChange(initialUri.lastPathSegment ?: "file")
+            onSelectedNameChange(resolveFileName(initialUri))
+            totalFiles = 1
+            fileIndex = 0
         }
     }
 
-    // Auto-start upload as soon as a file is selected (or re-selected after error)
+    // Auto-start upload as soon as current URI is set
     LaunchedEffect(selectedUri) {
         val uri = selectedUri ?: return@LaunchedEffect
         if (uploadState !is UploadState.Uploading) {
             viewModel.startUpload(serverId, projectId, uri, context)
+        }
+    }
+
+    // Advance to next file in queue when current finishes
+    LaunchedEffect(uploadState) {
+        if (uploadState is UploadState.Done && uploadQueue.isNotEmpty()) {
+            val next = uploadQueue.first()
+            uploadQueue = uploadQueue.drop(1)
+            fileIndex += 1
+            viewModel.reset(projectId)
+            onSelectedUriChange(next.first)
+            onSelectedNameChange(next.second)
         }
     }
 
@@ -105,6 +126,9 @@ fun FloatingFileUploadDialog(
             onDismiss()
         }
     }
+
+    val allDone = uploadState is UploadState.Done && uploadQueue.isEmpty() && totalFiles > 0
+    val fileLabel = if (totalFiles > 1) " (${fileIndex + 1}/$totalFiles)" else ""
 
     Box(
         modifier = Modifier
@@ -168,7 +192,6 @@ fun FloatingFileUploadDialog(
                         maxLines = 2
                     )
                 } else if (!isUploading && !isDone && !isError) {
-                    // Still waiting for picker / file not yet chosen
                     Text("Selecting file...", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
                 }
 
@@ -177,33 +200,47 @@ fun FloatingFileUploadDialog(
                         val state = uploadState as UploadState.Uploading
                         PixelProgressBar(
                             progress = state.progress,
-                            label = "UPLOADING...",
+                            label = "UPLOADING$fileLabel...",
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    isDone -> {
+                    allDone -> {
                         val doneState = uploadState as UploadState.Done
-                        Text(
-                            if (copied) "COPIED ✓" else "DONE ✓  ${doneState.fileName}",
-                            color = MegaDrivePrimary,
-                            fontSize = 11.sp,
-                            fontFamily = MonoFontFamily
-                        )
-                        Text(
-                            doneState.remotePath,
-                            color = MegaDriveDim,
-                            fontSize = 10.sp,
-                            fontFamily = MonoFontFamily,
-                            maxLines = 2
-                        )
-                        RetroButton(
-                            text = if (copied) "COPIED!" else "COPY PATH",
-                            onClick = {
-                                clipboard.setText(AnnotatedString(doneState.remotePath))
-                                copied = true
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        if (totalFiles > 1) {
+                            Text(
+                                "DONE ✓  $totalFiles files uploaded",
+                                color = MegaDrivePrimary,
+                                fontSize = 11.sp,
+                                fontFamily = MonoFontFamily
+                            )
+                            RetroButton(
+                                text = "CLOSE",
+                                onClick = { viewModel.reset(projectId); onDismiss() },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            Text(
+                                if (copied) "COPIED ✓" else "DONE ✓  ${doneState.fileName}",
+                                color = MegaDrivePrimary,
+                                fontSize = 11.sp,
+                                fontFamily = MonoFontFamily
+                            )
+                            Text(
+                                doneState.remotePath,
+                                color = MegaDriveDim,
+                                fontSize = 10.sp,
+                                fontFamily = MonoFontFamily,
+                                maxLines = 2
+                            )
+                            RetroButton(
+                                text = if (copied) "COPIED!" else "COPY PATH",
+                                onClick = {
+                                    clipboard.setText(AnnotatedString(doneState.remotePath))
+                                    copied = true
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                     isError -> {
                         Text(
@@ -213,18 +250,18 @@ fun FloatingFileUploadDialog(
                             fontFamily = MonoFontFamily
                         )
                         RetroButton(
-                            text = "CHOOSE FILE",
+                            text = "CHOOSE FILES",
                             onClick = { filePicker.launch("*/*") },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
 
-                // Manual re-pick only shown when idle with a file already chosen (re-select)
+                // Re-pick only when idle with file already chosen
                 if (!isDone && !isUploading && !isError && selectedUri != null) {
                     RetroButton(
-                        text = "CHOOSE DIFFERENT FILE",
-                        onClick = { filePicker.launch("*/*") },
+                        text = "CHOOSE DIFFERENT FILES",
+                        onClick = { uploadQueue = emptyList(); filePicker.launch("*/*") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
