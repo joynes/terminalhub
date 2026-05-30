@@ -36,6 +36,7 @@ fun SessionHistorySheet(
 
     val sorted = sessions.sortedByDescending { it.lastOpenedAt }.also { tick.let {} }
     val sortedClosed = closedSessions.sortedByDescending { it.lastOpenedAt }.also { tick.let {} }
+    var selectedIds by remember { mutableStateOf(emptySet<Long>()) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -95,11 +96,30 @@ fun SessionHistorySheet(
                     items(sortedClosed) { meta ->
                         ClosedSessionItem(
                             meta = meta,
+                            selected = meta.projectId in selectedIds,
+                            onToggle = {
+                                selectedIds = if (meta.projectId in selectedIds)
+                                    selectedIds - meta.projectId
+                                else
+                                    selectedIds + meta.projectId
+                            },
                             onReopen = { onReopen(meta.projectId); onDismiss() }
                         )
                         HorizontalDivider(color = MegaDriveDim.copy(alpha = 0.3f))
                     }
                 }
+            }
+            if (selectedIds.isNotEmpty()) {
+                se.joynes.aiterminalhub.ui.components.RetroButton(
+                    text = "↩ REOPEN SELECTED (${selectedIds.size})",
+                    onClick = {
+                        selectedIds.forEach { onReopen(it) }
+                        onDismiss()
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
             Spacer(Modifier.height(24.dp))
         }
@@ -144,22 +164,34 @@ private fun SessionHistoryItem(
 @Composable
 private fun ClosedSessionItem(
     meta: TerminalSessionMeta,
+    selected: Boolean,
+    onToggle: () -> Unit,
     onReopen: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(MegaDriveSurface)
+            .background(if (selected) MegaDriveBg else MegaDriveSurface)
+            .clickable(onClick = onToggle)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("○", color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily)
+        Checkbox(
+            checked = selected,
+            onCheckedChange = { onToggle() },
+            colors = CheckboxDefaults.colors(
+                checkedColor = MegaDrivePrimary,
+                uncheckedColor = MegaDriveDim,
+                checkmarkColor = MegaDriveBg
+            ),
+            modifier = Modifier.size(20.dp)
+        )
         Spacer(Modifier.width(8.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 meta.projectName.uppercase(),
                 fontFamily = MonoFontFamily,
-                color = MegaDriveDim,
+                color = if (selected) MegaDrivePrimary else MegaDriveDim,
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
