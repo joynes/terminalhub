@@ -70,6 +70,10 @@ public final class TerminalView extends View {
     /** The top row of text to display. Ranges from -activeTranscriptRows to 0. */
     int mTopRow;
     int[] mDefaultSelectors = new int[]{-1,-1,-1,-1};
+
+    private String mSearchQuery = null;
+    private final android.graphics.Paint mSearchHighlightPaint = new android.graphics.Paint();
+    private final android.graphics.Paint mSearchCurrentPaint = new android.graphics.Paint();
     private int mCanvasBackgroundColor = 0xFF0D0D1A;
     private int mViewBackgroundColor = 0xFF0D0D1A;
 
@@ -264,6 +268,11 @@ public final class TerminalView extends View {
         mScroller = new Scroller(context);
         AccessibilityManager am = (AccessibilityManager) context.getSystemService(Context.ACCESSIBILITY_SERVICE);
         mAccessibilityEnabled = am.isEnabled();
+
+        mSearchHighlightPaint.setColor(0x66FFD700);
+        mSearchHighlightPaint.setStyle(android.graphics.Paint.Style.FILL);
+        mSearchCurrentPaint.setColor(0xAAFF6600);
+        mSearchCurrentPaint.setStyle(android.graphics.Paint.Style.FILL);
     }
 
 
@@ -1072,6 +1081,7 @@ public final class TerminalView extends View {
             }
 
             mRenderer.render(mEmulator, canvas, mTopRow, sel[0], sel[1], sel[2], sel[3]);
+            drawSearchHighlights(canvas);
 
             // render the text selection handles
             renderTextSelection();
@@ -1485,6 +1495,39 @@ public final class TerminalView extends View {
         int minTopRow = -mEmulator.getScreen().getActiveTranscriptRows();
         mTopRow = Math.max(minTopRow, Math.min(0, row));
         invalidate();
+    }
+
+    /** Set the search query to highlight in the terminal. Pass null or empty to clear. */
+    public void setSearchHighlight(String query, int currentRow) {
+        mSearchQuery = (query != null && !query.isEmpty()) ? query.toLowerCase() : null;
+        mSearchCurrentRow = currentRow;
+        invalidate();
+    }
+
+    private int mSearchCurrentRow = Integer.MIN_VALUE;
+
+    private void drawSearchHighlights(Canvas canvas) {
+        String query = mSearchQuery;
+        if (query == null || mEmulator == null || mRenderer == null) return;
+        com.termux.terminal.TerminalBuffer screen = mEmulator.getScreen();
+        int cols = mEmulator.mColumns;
+        int endRow = mTopRow + mEmulator.mRows;
+        for (int row = mTopRow; row < endRow; row++) {
+            String lineText = screen.getSelectedText(0, row, cols, row + 1);
+            if (lineText == null || lineText.isEmpty()) continue;
+            String lineLower = lineText.toLowerCase();
+            int idx = 0;
+            int r = row - mTopRow;
+            float bottom = mRenderer.mFontLineSpacingAndAscent + (r + 1) * (float) mRenderer.mFontLineSpacing;
+            float top    = bottom - mRenderer.mFontLineSpacing;
+            while ((idx = lineLower.indexOf(query, idx)) != -1) {
+                float left  = idx * mRenderer.mFontWidth;
+                float right = (idx + query.length()) * mRenderer.mFontWidth;
+                android.graphics.Paint paint = (row == mSearchCurrentRow) ? mSearchCurrentPaint : mSearchHighlightPaint;
+                canvas.drawRect(left, top, right, bottom, paint);
+                idx += query.length();
+            }
+        }
     }
 
     private void decrementYTextSelectionCursors(int decrement) {

@@ -36,6 +36,10 @@ fun TerminalSearchOverlay(
     var currentIndex by remember { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
 
+    fun updateHighlight(q: String, matchRow: Int) {
+        terminalViewRef?.setSearchHighlight(q.trim(), matchRow)
+    }
+
     fun runSearch(q: String) {
         val tv = terminalViewRef ?: return
         val emulator = tv.mEmulator ?: return
@@ -53,6 +57,7 @@ fun TerminalSearchOverlay(
         }
         matches = found
         currentIndex = if (found.isNotEmpty()) found.indices.last else 0
+        updateHighlight(q, found.lastOrNull()?.row ?: Int.MIN_VALUE)
     }
 
     fun scrollToMatch(index: Int) {
@@ -60,6 +65,11 @@ fun TerminalSearchOverlay(
         val emulator = tv.mEmulator ?: return
         val match = matches.getOrNull(index) ?: return
         tv.scrollToRow(match.row - emulator.mRows / 2)
+        updateHighlight(query, match.row)
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { terminalViewRef?.setSearchHighlight(null, Int.MIN_VALUE) }
     }
 
     LaunchedEffect(Unit) {
@@ -94,7 +104,6 @@ fun TerminalSearchOverlay(
                 onValueChange = { q ->
                     query = q
                     runSearch(q)
-                    currentIndex = if (matches.isNotEmpty()) matches.indices.last else 0
                 },
                 singleLine = true,
                 textStyle = TextStyle(
