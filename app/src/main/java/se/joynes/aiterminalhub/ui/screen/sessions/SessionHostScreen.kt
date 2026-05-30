@@ -33,6 +33,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.aiterminalhub.R
 import se.joynes.aiterminalhub.BuildConfig
@@ -94,6 +96,7 @@ fun SessionHostScreen(
     val fileUploadSelectedNameByProject = remember { mutableStateMapOf<Long, String>() }
     var searchVisible by remember { mutableStateOf(false) }
     var searchInitialQuery by remember { mutableStateOf("") }
+    var isTerminalAtBottom by remember { mutableStateOf(true) }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
     val exportImportState by exportImportViewModel.state.collectAsState()
@@ -158,6 +161,14 @@ fun SessionHostScreen(
 
     // Reference to the live TerminalView for direct IMM calls
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
+
+    // Poll scroll position to show/hide scroll-to-bottom button
+    LaunchedEffect(terminalViewRef.value) {
+        while (true) {
+            kotlinx.coroutines.delay(200)
+            isTerminalAtBottom = terminalViewRef.value?.isAtBottom() ?: true
+        }
+    }
     var lastSyncedCols by remember { mutableIntStateOf(-1) }
     var lastSyncedRows by remember { mutableIntStateOf(-1) }
     var lastViewWidth by remember { mutableIntStateOf(-1) }
@@ -793,6 +804,18 @@ fun SessionHostScreen(
                                 modifier = Modifier.align(Alignment.TopStart)
                             )
                         }
+
+                        if (!isTerminalAtBottom) {
+                            ScrollToBottomButton(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(bottom = 6.dp, end = 8.dp),
+                                onClick = {
+                                    terminalViewRef.value?.scrollToBottom()
+                                    terminalViewRef.value?.requestFocus()
+                                }
+                            )
+                        }
                     }
 
                     Box(
@@ -876,5 +899,19 @@ fun SessionHostScreen(
                     }
                 }
             }
+    }
+}
+
+@Composable
+private fun ScrollToBottomButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(MegaDrivePrimary.copy(alpha = 0.85f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("↓", color = MegaDriveBg, fontSize = 18.sp, fontFamily = MonoFontFamily)
     }
 }

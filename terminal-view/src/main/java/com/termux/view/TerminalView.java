@@ -74,6 +74,8 @@ public final class TerminalView extends View {
     private String mSearchQuery = null;
     private final android.graphics.Paint mSearchHighlightPaint = new android.graphics.Paint();
     private final android.graphics.Paint mSearchCurrentPaint = new android.graphics.Paint();
+    /** True while search overlay is active — prevents onScreenUpdated from snapping back to bottom. */
+    private boolean mScrollLocked = false;
     private int mCanvasBackgroundColor = 0xFF0D0D1A;
     private int mViewBackgroundColor = 0xFF0D0D1A;
 
@@ -537,7 +539,7 @@ public final class TerminalView extends View {
             }
         }
 
-        if (!skipScrolling && mTopRow != 0) {
+        if (!skipScrolling && mTopRow != 0 && !mScrollLocked) {
             // Scroll down if not already there.
             if (mTopRow < -3) {
                 // Awaken scroll bars only if scrolling a noticeable amount
@@ -1501,7 +1503,20 @@ public final class TerminalView extends View {
     public void setSearchHighlight(String query, int currentRow) {
         mSearchQuery = (query != null && !query.isEmpty()) ? query.toLowerCase() : null;
         mSearchCurrentRow = currentRow;
+        mScrollLocked = (mSearchQuery != null);
         invalidate();
+    }
+
+    /** Scroll to the bottom of the terminal output and unlock scroll-lock. */
+    public void scrollToBottom() {
+        mScrollLocked = false;
+        mTopRow = 0;
+        invalidate();
+    }
+
+    /** True when the terminal is not scrolled back into the transcript. */
+    public boolean isAtBottom() {
+        return mTopRow == 0;
     }
 
     private int mSearchCurrentRow = Integer.MIN_VALUE;
