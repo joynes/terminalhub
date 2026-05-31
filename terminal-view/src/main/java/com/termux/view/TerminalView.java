@@ -1494,6 +1494,7 @@ public final class TerminalView extends View {
     /** Scroll the terminal view so that [row] is visible (row 0 = bottom, negative = scrollback). */
     public void scrollToRow(int row) {
         if (mEmulator == null) return;
+        mScroller.abortAnimation();
         int minTopRow = -mEmulator.getScreen().getActiveTranscriptRows();
         mTopRow = Math.max(minTopRow, Math.min(0, row));
         invalidate();
@@ -1510,6 +1511,7 @@ public final class TerminalView extends View {
     /** Scroll to the bottom of the terminal output and unlock scroll-lock. */
     public void scrollToBottom() {
         mScrollLocked = false;
+        mScroller.abortAnimation();
         mTopRow = 0;
         invalidate();
     }
