@@ -3,4 +3,5 @@
   <string name="copy_text">Copy</string>
   <string name="text_selection_more">More…</string>
   <string name="search_text">Search</string>
+  <string name="open_url_text">Open</string>
 </resources>

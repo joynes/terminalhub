@@ -34,6 +34,7 @@ public class TextSelectionCursorController implements CursorController {
     public final int ACTION_PASTE = 2;
     public final int ACTION_MORE = 3;
     public final int ACTION_SEARCH = 4;
+    public final int ACTION_OPEN_URL = 5;
 
     public TextSelectionCursorController(TerminalView terminalView) {
         this.terminalView = terminalView;
@@ -118,13 +119,18 @@ public class TextSelectionCursorController implements CursorController {
                 menu.add(Menu.NONE, ACTION_COPY, Menu.NONE, R.string.copy_text).setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_PASTE, Menu.NONE, R.string.paste_text).setEnabled(clipboard != null && clipboard.hasPrimaryClip()).setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_SEARCH, Menu.NONE, R.string.search_text).setShowAsAction(show);
+                menu.add(Menu.NONE, ACTION_OPEN_URL, Menu.NONE, R.string.open_url_text).setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_MORE, Menu.NONE, R.string.text_selection_more);
                 return true;
             }
 
             @Override
             public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-                return false;
+                MenuItem openItem = menu.findItem(ACTION_OPEN_URL);
+                if (openItem != null) {
+                    openItem.setVisible(isUrl(getSelectedText()));
+                }
+                return true;
             }
 
             @Override
@@ -148,6 +154,19 @@ public class TextSelectionCursorController implements CursorController {
                         String searchText = getSelectedText();
                         terminalView.stopTextSelectionMode();
                         terminalView.mClient.onSearchRequested(searchText != null ? searchText.trim() : "");
+                        break;
+                    case ACTION_OPEN_URL:
+                        String urlText = getSelectedText();
+                        terminalView.stopTextSelectionMode();
+                        if (urlText != null) {
+                            String url = urlText.trim();
+                            if (!url.startsWith("http://") && !url.startsWith("https://")) url = "https://" + url;
+                            try {
+                                android.content.Intent intent = new android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url));
+                                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                                terminalView.getContext().startActivity(intent);
+                            } catch (Exception ignored) {}
+                        }
                         break;
                     case ACTION_MORE:
                         // We first store the selected text in case TerminalViewClient needs the
@@ -184,7 +203,7 @@ public class TextSelectionCursorController implements CursorController {
 
             @Override
             public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-                return false;
+                return callback.onPrepareActionMode(mode, menu);
             }
 
             @Override
@@ -340,6 +359,12 @@ public class TextSelectionCursorController implements CursorController {
             }
         }
         return cx;
+    }
+
+    private boolean isUrl(String text) {
+        if (text == null) return false;
+        String t = text.trim();
+        return t.startsWith("http://") || t.startsWith("https://") || t.startsWith("www.");
     }
 
     public void decrementYTextSelectionCursors(int decrement) {
