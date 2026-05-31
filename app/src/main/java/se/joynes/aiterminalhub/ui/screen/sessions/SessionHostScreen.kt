@@ -867,10 +867,6 @@ fun SessionHostScreen(
                                     fileUploadVisibleByProject[projectId] = true
                                 }
                             },
-                            onSearch = {
-                                searchInitialQuery = ""
-                                searchVisible = true
-                            },
                             onKeyboardToggle = {
                                 keyboardVisible = !keyboardVisible
                                 if (keyboardVisible) showKeyboard() else hideKeyboard()
