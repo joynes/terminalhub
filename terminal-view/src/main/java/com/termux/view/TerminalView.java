@@ -1530,7 +1530,8 @@ public final class TerminalView extends View {
         int cols = mEmulator.mColumns;
         int endRow = mTopRow + mEmulator.mRows;
         for (int row = mTopRow; row < endRow; row++) {
-            String lineText = screen.getSelectedText(0, row, cols, row + 1);
+            // Read this row only (selY1 == selY2 reads one row).
+            String lineText = screen.getSelectedText(0, row, cols, row);
             if (lineText == null || lineText.isEmpty()) continue;
             String lineLower = lineText.toLowerCase();
             int idx = 0;

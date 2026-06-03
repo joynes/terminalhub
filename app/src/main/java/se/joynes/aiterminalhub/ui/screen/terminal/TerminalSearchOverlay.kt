@@ -50,14 +50,26 @@ fun TerminalSearchOverlay(
         val found = mutableListOf<SearchMatch>()
         val term = q.trim()
         if (term.isNotEmpty()) {
+            // Read each row exactly once (selY1 == selY2 reads one row).
+            // Also probe row + next row to catch terms that wrap a line boundary.
             for (row in -transcriptRows until rows) {
-                val line = screen.getSelectedText(0, row, cols, row + 1)?.trim() ?: continue
-                if (line.contains(term, ignoreCase = true)) found.add(SearchMatch(row))
+                val current = screen.getSelectedText(0, row, cols, row) ?: ""
+                if (current.contains(term, ignoreCase = true)) {
+                    found.add(SearchMatch(row))
+                    continue
+                }
+                if (row + 1 < rows) {
+                    val next = screen.getSelectedText(0, row + 1, cols, row + 1) ?: ""
+                    if ((current + next).contains(term, ignoreCase = true)) {
+                        found.add(SearchMatch(row))
+                    }
+                }
             }
         }
         matches = found
-        currentIndex = if (found.isNotEmpty()) found.indices.last else 0
-        updateHighlight(q, found.lastOrNull()?.row ?: Int.MIN_VALUE)
+        // Default to the FIRST (highest-up) match so the user sees the top-most hit.
+        currentIndex = 0
+        updateHighlight(q, found.firstOrNull()?.row ?: Int.MIN_VALUE)
     }
 
     fun scrollToMatch(index: Int) {
