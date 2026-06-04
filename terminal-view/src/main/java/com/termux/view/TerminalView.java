@@ -78,6 +78,10 @@ public final class TerminalView extends View {
     private boolean mScrollLocked = false;
     /** True after the user manually scrolled into the scrollback — preserves their view across new output. */
     private boolean mUserScrolledUp = false;
+    /** Net wheel-up scrolls forwarded to a mouse-tracking app (e.g. tmux copy mode), used to drive the scroll-to-bottom button. */
+    private int mAltModeUpScrolls = 0;
+    /** Tracks transitions out of alternate-buffer mode so we can drop a stale {@link #mAltModeUpScrolls}. */
+    private boolean mWasAlternateBufferActive = false;
     private Runnable mOnTopRowChangedListener;
     private int mCanvasBackgroundColor = 0xFF0D0D1A;
     private int mViewBackgroundColor = 0xFF0D0D1A;
@@ -350,6 +354,8 @@ public final class TerminalView extends View {
         if (session == mTermSession) return false;
         mTopRow = 0;
         mUserScrolledUp = false;
+        mAltModeUpScrolls = 0;
+        mWasAlternateBufferActive = false;
         notifyTopRowChanged();
 
         mTermSession = session;
@@ -520,6 +526,14 @@ public final class TerminalView extends View {
     public void onScreenUpdated(boolean skipScrolling) {
         if (mEmulator == null) return;
 
+        boolean altActive = mEmulator.isAlternateBufferActive();
+        if (mWasAlternateBufferActive && !altActive && mAltModeUpScrolls > 0) {
+            // Left tmux / alt-buffer app — counter is no longer meaningful.
+            mAltModeUpScrolls = 0;
+            notifyTopRowChanged();
+        }
+        mWasAlternateBufferActive = altActive;
+
         int rowsInHistory = mEmulator.getScreen().getActiveTranscriptRows();
         if (mTopRow < -rowsInHistory) mTopRow = -rowsInHistory;
 
@@ -642,6 +656,9 @@ public final class TerminalView extends View {
         for (int i = 0; i < amount; i++) {
             if (mEmulator.isMouseTrackingActive()) {
                 sendMouseEventCode(event, up ? TerminalEmulator.MOUSE_WHEELUP_BUTTON : TerminalEmulator.MOUSE_WHEELDOWN_BUTTON, true);
+                if (up) mAltModeUpScrolls++;
+                else if (mAltModeUpScrolls > 0) mAltModeUpScrolls--;
+                notifyTopRowChanged();
             } else if (mEmulator.isAlternateBufferActive()) {
                 // Match upstream Termux behaviour for full-screen apps when mouse tracking is off.
                 handleKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
@@ -1067,6 +1084,8 @@ public final class TerminalView extends View {
 
             mTopRow = 0;
             mUserScrolledUp = false;
+            mAltModeUpScrolls = 0;
+            mWasAlternateBufferActive = false;
             notifyTopRowChanged();
             scrollTo(0, 0);
             invalidate();
@@ -1525,13 +1544,25 @@ public final class TerminalView extends View {
         mUserScrolledUp = false;
         mScroller.abortAnimation();
         mTopRow = 0;
+        if (mEmulator != null && mEmulator.isMouseTrackingActive() && mAltModeUpScrolls > 0) {
+            // tmux / mouse-tracking apps own the scrollback — replay enough wheel-down events
+            // to undo the user's wheel-up scrolls and exit copy mode.
+            int wheelDowns = mAltModeUpScrolls + 1;
+            for (int i = 0; i < wheelDowns; i++) {
+                mEmulator.sendMouseEvent(TerminalEmulator.MOUSE_WHEELDOWN_BUTTON, 1, 1, true);
+            }
+        }
+        mAltModeUpScrolls = 0;
         notifyTopRowChanged();
         invalidate();
     }
 
     /** True when the terminal is not scrolled back into the transcript. */
     public boolean isAtBottom() {
-        return mTopRow == 0;
+        if (mAltModeUpScrolls > 0 && (mEmulator == null || !mEmulator.isMouseTrackingActive())) {
+            mAltModeUpScrolls = 0;
+        }
+        return mTopRow == 0 && mAltModeUpScrolls == 0;
     }
 
     /** Listener invoked whenever the visible top row changes (scroll, output, session switch). */
