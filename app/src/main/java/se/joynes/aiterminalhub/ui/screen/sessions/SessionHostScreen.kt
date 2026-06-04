@@ -162,11 +162,14 @@ fun SessionHostScreen(
     // Reference to the live TerminalView for direct IMM calls
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
 
-    // Poll scroll position to show/hide scroll-to-bottom button
+    // Refresh scroll-to-bottom button visibility whenever the view's top row changes.
     LaunchedEffect(terminalViewRef.value) {
-        while (true) {
-            kotlinx.coroutines.delay(200)
-            isTerminalAtBottom = terminalViewRef.value?.isAtBottom() ?: true
+        val tv = terminalViewRef.value
+        if (tv != null) {
+            isTerminalAtBottom = tv.isAtBottom()
+            tv.setOnTopRowChangedListener { isTerminalAtBottom = tv.isAtBottom() }
+        } else {
+            isTerminalAtBottom = true
         }
     }
     var lastSyncedCols by remember { mutableIntStateOf(-1) }

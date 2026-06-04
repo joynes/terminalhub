@@ -76,6 +76,9 @@ public final class TerminalView extends View {
     private final android.graphics.Paint mSearchCurrentPaint = new android.graphics.Paint();
     /** True while search overlay is active — prevents onScreenUpdated from snapping back to bottom. */
     private boolean mScrollLocked = false;
+    /** True after the user manually scrolled into the scrollback — preserves their view across new output. */
+    private boolean mUserScrolledUp = false;
+    private Runnable mOnTopRowChangedListener;
     private int mCanvasBackgroundColor = 0xFF0D0D1A;
     private int mViewBackgroundColor = 0xFF0D0D1A;
 
@@ -346,6 +349,8 @@ public final class TerminalView extends View {
     public boolean attachSession(TerminalSession session) {
         if (session == mTermSession) return false;
         mTopRow = 0;
+        mUserScrolledUp = false;
+        notifyTopRowChanged();
 
         mTermSession = session;
         mEmulator = null;
@@ -518,9 +523,9 @@ public final class TerminalView extends View {
         int rowsInHistory = mEmulator.getScreen().getActiveTranscriptRows();
         if (mTopRow < -rowsInHistory) mTopRow = -rowsInHistory;
 
-        if (isSelectingText() || mEmulator.isAutoScrollDisabled()) {
+        if (isSelectingText() || mEmulator.isAutoScrollDisabled() || mUserScrolledUp) {
 
-            // Do not scroll when selecting text.
+            // Do not scroll when selecting text or when user has scrolled into the scrollback.
             int rowShift = mEmulator.getScrollCounter();
             if (-mTopRow + rowShift > rowsInHistory) {
                 // .. unless we're hitting the end of history transcript, in which
@@ -528,7 +533,7 @@ public final class TerminalView extends View {
                 if (isSelectingText())
                     stopTextSelectionMode();
 
-                if (mEmulator.isAutoScrollDisabled()) {
+                if (mEmulator.isAutoScrollDisabled() || mUserScrolledUp) {
                     mTopRow = -rowsInHistory;
                     skipScrolling = true;
                 }
@@ -642,6 +647,8 @@ public final class TerminalView extends View {
                 handleKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
             } else {
                 mTopRow = Math.min(0, Math.max(-(mEmulator.getScreen().getActiveTranscriptRows()), mTopRow + (up ? -1 : 1)));
+                mUserScrolledUp = mTopRow < 0;
+                notifyTopRowChanged();
                 if (!awakenScrollBars()) invalidate();
             }
         }
@@ -1059,6 +1066,8 @@ public final class TerminalView extends View {
                 mTerminalCursorBlinkerRunnable.setEmulator(mEmulator);
 
             mTopRow = 0;
+            mUserScrolledUp = false;
+            notifyTopRowChanged();
             scrollTo(0, 0);
             invalidate();
         }
@@ -1497,6 +1506,8 @@ public final class TerminalView extends View {
         mScroller.abortAnimation();
         int minTopRow = -mEmulator.getScreen().getActiveTranscriptRows();
         mTopRow = Math.max(minTopRow, Math.min(0, row));
+        mUserScrolledUp = mTopRow < 0;
+        notifyTopRowChanged();
         invalidate();
     }
 
@@ -1511,14 +1522,25 @@ public final class TerminalView extends View {
     /** Scroll to the bottom of the terminal output and unlock scroll-lock. */
     public void scrollToBottom() {
         mScrollLocked = false;
+        mUserScrolledUp = false;
         mScroller.abortAnimation();
         mTopRow = 0;
+        notifyTopRowChanged();
         invalidate();
     }
 
     /** True when the terminal is not scrolled back into the transcript. */
     public boolean isAtBottom() {
         return mTopRow == 0;
+    }
+
+    /** Listener invoked whenever the visible top row changes (scroll, output, session switch). */
+    public void setOnTopRowChangedListener(Runnable listener) {
+        mOnTopRowChangedListener = listener;
+    }
+
+    private void notifyTopRowChanged() {
+        if (mOnTopRowChangedListener != null) mOnTopRowChangedListener.run();
     }
 
     private int mSearchCurrentRow = Integer.MIN_VALUE;
