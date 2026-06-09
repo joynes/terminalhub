@@ -62,6 +62,7 @@ private data class PendingTabClose(
 
 @Composable
 fun SessionHostScreen(
+    requestedServerId: Long? = null,
     onOpenServers: () -> Unit,
     onAddServer: () -> Unit,
     onAddProject: () -> Unit,
@@ -230,7 +231,10 @@ fun SessionHostScreen(
         }
     }
 
-    LaunchedEffect(Unit) { viewModel.init() }
+    LaunchedEffect(requestedServerId) {
+        viewModel.selectServer(requestedServerId)
+        viewModel.init()
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
 

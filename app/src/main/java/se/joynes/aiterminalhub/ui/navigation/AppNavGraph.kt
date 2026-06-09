@@ -30,7 +30,7 @@ fun AppNavGraph(
     NavHost(navController = navController, startDestination = Screen.Splash.route) {
         composable(Screen.Splash.route) {
             SplashScreen(onAuthSuccess = {
-                navController.navigate(Screen.SessionHost.route) {
+                navController.navigate(Screen.SessionHost.createRoute()) {
                     popUpTo(Screen.Splash.route) { inclusive = true }
                 }
             })
@@ -46,8 +46,8 @@ fun AppNavGraph(
             ServerListScreen(
                 onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
                 onEditServer = { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) },
-                onOpenTerminal = {
-                    navController.navigate(Screen.SessionHost.route) {
+                onOpenTerminal = { id ->
+                    navController.navigate(Screen.SessionHost.createRoute(id)) {
                         launchSingleTop = true
                     }
                 },
@@ -68,10 +68,15 @@ fun AppNavGraph(
             val serverId = backStackEntry.arguments?.getLong("serverId")?.takeIf { it >= 0 }
             AddEditProjectScreen(serverId = serverId, projectId = projectId, onBack = { navController.popBackStack() })
         }
-        composable(Screen.SessionHost.route) {
+        composable(
+            Screen.SessionHost.route,
+            arguments = listOf(navArgument("serverId") { type = NavType.LongType; defaultValue = -1L })
+        ) { backStackEntry ->
+            val requestedServerId = backStackEntry.arguments?.getLong("serverId")?.takeIf { it >= 0 }
             val viewModel = androidx.hilt.navigation.compose.hiltViewModel<se.joynes.aiterminalhub.ui.screen.sessions.SessionHostViewModel>()
             val serverId by viewModel.serverId.collectAsState()
             SessionHostScreen(
+                requestedServerId = requestedServerId,
                 viewModel = viewModel,
                 sharedUri = sharedUri,
                 onConsumeSharedUri = onConsumeSharedUri,

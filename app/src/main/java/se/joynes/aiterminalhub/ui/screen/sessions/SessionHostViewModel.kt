@@ -110,8 +110,16 @@ class SessionHostViewModel @Inject constructor(
 
     private val _serverId = MutableStateFlow<Long?>(null)
     val serverId: StateFlow<Long?> = _serverId.asStateFlow()
+    private var selectedServerId: Long? = null
 
     private var initialized = false
+
+    fun selectServer(serverId: Long?) {
+        selectedServerId = serverId
+        if (activeId.value == null) {
+            _serverId.value = serverId
+        }
+    }
 
     fun init() {
         if (initialized) return
@@ -174,11 +182,14 @@ class SessionHostViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            combine(activeId, _allDbProjects) { activeSessionId, projects ->
-                val activeProjectId = sessionManager.sessions.value.firstOrNull { it.id == activeSessionId }?.projectId
-                projects.firstOrNull { it.id == activeProjectId && it.targetType == ProjectTargetType.SSH }?.serverId
-            }.collect { activeServerId ->
-                _serverId.value = activeServerId
+            combine(activeId, sessionManager.sessions, _allDbProjects) { activeSessionId, sessions, projects ->
+                val activeProjectId = sessions.firstOrNull { it.id == activeSessionId }?.projectId
+                val activeServerId = projects.firstOrNull {
+                    it.id == activeProjectId && it.targetType == ProjectTargetType.SSH
+                }?.serverId
+                activeSessionId to activeServerId
+            }.collect { (activeSessionId, activeServerId) ->
+                _serverId.value = if (activeSessionId == null) selectedServerId else activeServerId
             }
         }
     }
