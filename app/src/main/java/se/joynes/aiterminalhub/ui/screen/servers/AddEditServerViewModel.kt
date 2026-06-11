@@ -3,7 +3,7 @@ package se.joynes.aiterminalhub.ui.screen.servers
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -124,13 +124,23 @@ class AddEditServerViewModel @Inject constructor(
             val privateKey = editingId?.let { securePrefs.getPrivateKey(it) }
             val conn = sshManager.createSession(server, password, privateKey)
             try {
-                val connected = withTimeoutOrNull(8_000) {
-                    conn.connected.first { it }
-                    true
+                var failureMessage: String? = null
+                val connected = withTimeoutOrNull<Boolean>(8_000) {
+                    while (true) {
+                        if (conn.connected.value) return@withTimeoutOrNull true
+                        val error = conn.lastErrorMessage.value
+                        if (!error.isNullOrBlank()) {
+                            failureMessage = error
+                            return@withTimeoutOrNull false
+                        }
+                        delay(100)
+                    }
+                    false
                 } ?: false
+                val message = failureMessage ?: "SSH connection timed out. Check Tailscale, host, port, and firewall."
                 _state.value = _state.value.copy(
                     sshTestStatus = if (connected) SshTestStatus.Success else SshTestStatus.Failure,
-                    sshTestMessage = if (connected) "SSH connection works" else "SSH connection failed"
+                    sshTestMessage = if (connected) "SSH connection works" else message
                 )
             } finally {
                 sshManager.destroySession(conn.sessionId)

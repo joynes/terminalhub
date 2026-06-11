@@ -33,6 +33,8 @@ import se.joynes.aiterminalhub.data.settings.BackgroundKeepaliveProfile
 import se.joynes.aiterminalhub.data.settings.BackgroundKeepaliveScope
 import java.io.IOException
 import java.io.OutputStream
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 import javax.inject.Inject
 
 class SshConnection @Inject constructor(
@@ -53,6 +55,8 @@ class SshConnection @Inject constructor(
 
     private val _connected = MutableStateFlow(false)
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
+    private val _lastErrorMessage = MutableStateFlow<String?>(null)
+    val lastErrorMessage: StateFlow<String?> = _lastErrorMessage.asStateFlow()
 
     val sessionId = java.util.UUID.randomUUID().toString()
     private val instanceId = System.identityHashCode(this)
@@ -93,6 +97,7 @@ class SshConnection @Inject constructor(
             try {
                 connectAttempt += 1
                 serverLabel = "${server.username}@${server.host}:${server.port}"
+                _lastErrorMessage.value = null
                 logger.log(
                     LogLevel.INFO,
                     TAG,
@@ -128,10 +133,36 @@ class SshConnection @Inject constructor(
                 startKeepaliveLoop(conn)
                 readOutput(sess)
             } catch (e: Exception) {
-                logger.log(LogLevel.ERROR, TAG, "Connection failed to $serverLabel: ${e.message}")
+                val message = describeConnectionError(e)
+                _lastErrorMessage.value = message
+                logger.log(LogLevel.ERROR, TAG, "Connection failed to $serverLabel: $message")
                 disconnectReason = "connect-failed:${e.javaClass.simpleName}"
                 _connected.value = false
             }
+        }
+    }
+
+    private fun describeConnectionError(error: Exception): String {
+        var cause: Throwable = error
+        while (cause.cause != null) {
+            cause = cause.cause!!
+        }
+        val raw = cause.message ?: error.message
+        return when (cause) {
+            is UnknownHostException -> "Host name could not be resolved. Check Tailscale/MagicDNS or use the 100.x Tailscale IP."
+            is SocketTimeoutException -> "Connection timed out. Check Tailscale, network, firewall, and SSH port."
+            is IOException -> when {
+                raw?.contains("authentication", ignoreCase = true) == true ->
+                    "SSH authentication failed. Check username, password, or key."
+                raw?.contains("Connection refused", ignoreCase = true) == true ->
+                    "Connection refused. SSH is not listening on this host/port."
+                raw?.contains("No route", ignoreCase = true) == true ->
+                    "No route to host. Check that Tailscale is active on both devices."
+                raw?.contains("Network is unreachable", ignoreCase = true) == true ->
+                    "Network is unreachable. Check phone network and Tailscale."
+                else -> raw ?: "SSH connection failed."
+            }
+            else -> raw ?: "SSH connection failed."
         }
     }
 
