@@ -49,6 +49,38 @@ fun AddEditServerScreen(
             RetroTextField(state.port, { viewModel.update { copy(port = it) } }, "Port (default 22)", Modifier.fillMaxWidth())
             RetroTextField(state.username, { viewModel.update { copy(username = it) } }, "Username *", Modifier.fillMaxWidth())
             RetroTextField(state.password, { viewModel.update { copy(password = it) } }, "Password", Modifier.fillMaxWidth(), isPassword = true)
+            Text("PRIVATE KEY", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+            OutlinedTextField(
+                value = state.privateKey,
+                onValueChange = { viewModel.update { copy(privateKey = it) } },
+                placeholder = {
+                    Text(
+                        if (state.hasSavedPrivateKey) "Private key saved. Paste a new PEM key to replace it." else "Paste PEM private key (optional)",
+                        color = MegaDriveDim,
+                        fontSize = 11.sp,
+                        fontFamily = MonoFontFamily
+                    )
+                },
+                modifier = Modifier.fillMaxWidth().height(120.dp),
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    fontFamily = MonoFontFamily,
+                    fontSize = 11.sp,
+                    color = MegaDriveOnSurface
+                ),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MegaDrivePrimary,
+                    unfocusedBorderColor = MegaDriveDim,
+                    focusedTextColor = MegaDriveOnSurface,
+                    unfocusedTextColor = MegaDriveOnSurface,
+                    cursorColor = MegaDrivePrimary
+                )
+            )
+            if (state.privateKey.isNotBlank() || state.hasSavedPrivateKey) {
+                NeonStatusBadge(
+                    text = if (state.privateKey.isNotBlank()) "KEY READY" else "KEY SAVED",
+                    color = MegaDriveGreen
+                )
+            }
             RetroTextField(state.projectsFolder, { viewModel.update { copy(projectsFolder = it) } }, "Projects Folder", Modifier.fillMaxWidth())
 
             Row(

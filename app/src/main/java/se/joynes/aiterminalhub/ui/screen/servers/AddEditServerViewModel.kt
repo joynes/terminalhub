@@ -29,6 +29,8 @@ data class AddEditServerState(
     val port: String = "22",
     val username: String = "",
     val password: String = "",
+    val privateKey: String = "",
+    val hasSavedPrivateKey: Boolean = false,
     val projectsFolder: String = "~/aiterminalhub",
     val setupScript: String = ServerEntity.DEFAULT_SETUP_SCRIPT,
     val sshTestStatus: SshTestStatus = SshTestStatus.Idle,
@@ -58,6 +60,7 @@ class AddEditServerViewModel @Inject constructor(
                 port = server.port.toString(),
                 username = server.username,
                 password = securePrefs.getPassword(id) ?: "",
+                hasSavedPrivateKey = !securePrefs.getPrivateKey(id).isNullOrBlank(),
                 projectsFolder = server.projectsFolder,
                 setupScript = server.setupScript
             )
@@ -79,6 +82,7 @@ class AddEditServerViewModel @Inject constructor(
                 host = s.host,
                 port = s.port.toIntOrNull() ?: 22,
                 username = s.username,
+                authType = if (s.privateKey.isNotBlank() || s.hasSavedPrivateKey) "key" else "password",
                 projectsFolder = s.projectsFolder,
                 setupScript = s.setupScript
             )
@@ -87,12 +91,16 @@ class AddEditServerViewModel @Inject constructor(
             if (editingId != null && s.password.isNotBlank()) {
                 securePrefs.savePassword(editingId!!, s.password)
             }
+            if (editingId != null && s.privateKey.isNotBlank()) {
+                securePrefs.savePrivateKey(editingId!!, s.privateKey.trim())
+            }
             val savedId = if (editingId != null) {
                 repo.update(server); editingId!!
             } else {
                 // New server: DB generates the ID, save credentials immediately after.
                 val id = repo.save(server)
                 if (s.password.isNotBlank()) securePrefs.savePassword(id, s.password)
+                if (s.privateKey.isNotBlank()) securePrefs.savePrivateKey(id, s.privateKey.trim())
                 id
             }
             _state.value = _state.value.copy(saved = true)
@@ -121,8 +129,14 @@ class AddEditServerViewModel @Inject constructor(
             val password = s.password.ifBlank {
                 editingId?.let { securePrefs.getPassword(it) }.orEmpty()
             }
-            val privateKey = editingId?.let { securePrefs.getPrivateKey(it) }
-            val conn = sshManager.createSession(server, password, privateKey)
+            val privateKey = s.privateKey.ifBlank {
+                editingId?.let { securePrefs.getPrivateKey(it) }.orEmpty()
+            }
+            val conn = sshManager.createSession(
+                server = server,
+                password = password.takeIf { privateKey.isBlank() },
+                privateKeyPem = privateKey.takeIf { it.isNotBlank() }
+            )
             try {
                 var failureMessage: String? = null
                 val connected = withTimeoutOrNull<Boolean>(8_000) {

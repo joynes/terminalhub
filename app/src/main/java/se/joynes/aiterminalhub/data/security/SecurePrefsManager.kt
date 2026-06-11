@@ -82,6 +82,11 @@ class SecurePrefsManager @Inject constructor(
             ?: context.getSharedPreferences(TEST_PREFS, Context.MODE_PRIVATE)
                 .getString("pk_$serverId", null)
 
+    fun deletePrivateKey(serverId: Long) {
+        prefs.edit().remove("pk_$serverId").apply()
+        logger.log(LogLevel.DEBUG, TAG, "Private key deleted for server $serverId")
+    }
+
     fun savePassphrase(keyAlias: String, passphrase: String) {
         prefs.edit().putString("pp_$keyAlias", passphrase).apply()
     }
