@@ -3,15 +3,25 @@ package se.joynes.aiterminalhub.ui.screen.servers
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import se.joynes.aiterminalhub.data.db.entity.ServerEntity
 import se.joynes.aiterminalhub.data.model.Server
 import se.joynes.aiterminalhub.data.repository.ServerRepository
 import se.joynes.aiterminalhub.data.security.SecurePrefsManager
+import se.joynes.aiterminalhub.data.ssh.SshManager
 import javax.inject.Inject
+
+enum class SshTestStatus {
+    Idle,
+    Testing,
+    Success,
+    Failure
+}
 
 data class AddEditServerState(
     val name: String = "",
@@ -21,13 +31,16 @@ data class AddEditServerState(
     val password: String = "",
     val projectsFolder: String = "~/aiterminalhub",
     val setupScript: String = ServerEntity.DEFAULT_SETUP_SCRIPT,
+    val sshTestStatus: SshTestStatus = SshTestStatus.Idle,
+    val sshTestMessage: String = "",
     val saved: Boolean = false
 )
 
 @HiltViewModel
 class AddEditServerViewModel @Inject constructor(
     private val repo: ServerRepository,
-    private val securePrefs: SecurePrefsManager
+    private val securePrefs: SecurePrefsManager,
+    private val sshManager: SshManager
 ) : ViewModel() {
     private val _state = MutableStateFlow(AddEditServerState())
     val state: StateFlow<AddEditServerState> = _state.asStateFlow()
@@ -52,7 +65,9 @@ class AddEditServerViewModel @Inject constructor(
     }
 
     fun update(block: AddEditServerState.() -> AddEditServerState) {
-        _state.value = _state.value.block()
+        _state.value = _state.value
+            .block()
+            .copy(sshTestStatus = SshTestStatus.Idle, sshTestMessage = "")
     }
 
     fun save() {
@@ -81,6 +96,45 @@ class AddEditServerViewModel @Inject constructor(
                 id
             }
             _state.value = _state.value.copy(saved = true)
+        }
+    }
+
+    fun testSshConnection() {
+        val s = _state.value
+        if (s.host.isBlank() || s.username.isBlank()) return
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                sshTestStatus = SshTestStatus.Testing,
+                sshTestMessage = "Testing SSH..."
+            )
+
+            val server = Server(
+                id = editingId ?: 0L,
+                name = s.name.ifBlank { s.host },
+                host = s.host.trim(),
+                port = s.port.toIntOrNull() ?: 22,
+                username = s.username.trim(),
+                projectsFolder = s.projectsFolder,
+                setupScript = s.setupScript
+            )
+            val password = s.password.ifBlank {
+                editingId?.let { securePrefs.getPassword(it) }.orEmpty()
+            }
+            val privateKey = editingId?.let { securePrefs.getPrivateKey(it) }
+            val conn = sshManager.createSession(server, password, privateKey)
+            try {
+                val connected = withTimeoutOrNull(8_000) {
+                    conn.connected.first { it }
+                    true
+                } ?: false
+                _state.value = _state.value.copy(
+                    sshTestStatus = if (connected) SshTestStatus.Success else SshTestStatus.Failure,
+                    sshTestMessage = if (connected) "SSH connection works" else "SSH connection failed"
+                )
+            } finally {
+                sshManager.destroySession(conn.sessionId)
+            }
         }
     }
 }

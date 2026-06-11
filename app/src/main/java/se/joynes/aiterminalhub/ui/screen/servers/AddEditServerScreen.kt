@@ -51,6 +51,40 @@ fun AddEditServerScreen(
             RetroTextField(state.password, { viewModel.update { copy(password = it) } }, "Password", Modifier.fillMaxWidth(), isPassword = true)
             RetroTextField(state.projectsFolder, { viewModel.update { copy(projectsFolder = it) } }, "Projects Folder", Modifier.fillMaxWidth())
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                RetroButton(
+                    text = if (state.sshTestStatus == SshTestStatus.Testing) "[ TESTING SSH ]" else "[ TEST SSH ]",
+                    onClick = { viewModel.testSshConnection() },
+                    modifier = Modifier.weight(1f),
+                    enabled = state.host.isNotBlank() &&
+                        state.username.isNotBlank() &&
+                        state.sshTestStatus != SshTestStatus.Testing
+                )
+                when (state.sshTestStatus) {
+                    SshTestStatus.Success -> NeonStatusBadge("SSH OK", MegaDriveGreen)
+                    SshTestStatus.Failure -> NeonStatusBadge("SSH FAIL", MegaDriveError)
+                    SshTestStatus.Testing -> NeonStatusBadge("TESTING", MegaDriveWarning)
+                    SshTestStatus.Idle -> NeonStatusBadge("NOT TESTED", MegaDriveDim)
+                }
+            }
+            if (state.sshTestMessage.isNotBlank()) {
+                Text(
+                    state.sshTestMessage,
+                    color = when (state.sshTestStatus) {
+                        SshTestStatus.Success -> MegaDriveGreen
+                        SshTestStatus.Failure -> MegaDriveError
+                        SshTestStatus.Testing -> MegaDriveWarning
+                        SshTestStatus.Idle -> MegaDriveDim
+                    },
+                    fontSize = 10.sp,
+                    fontFamily = MonoFontFamily
+                )
+            }
+
             Spacer(Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
