@@ -201,7 +201,7 @@ private fun RemoteFileList(
     onDownload: (RemoteFileEntry) -> Unit
 ) {
     if (files.isEmpty()) {
-        Text("No files in remote project folder.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
+        Text("No files in SSH start folder.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
         return
     }
 

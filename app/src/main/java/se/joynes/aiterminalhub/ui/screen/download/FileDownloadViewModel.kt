@@ -10,12 +10,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
 import se.joynes.aiterminalhub.data.security.SecurePrefsManager
 import se.joynes.aiterminalhub.data.ssh.RemoteFileEntry
 import se.joynes.aiterminalhub.data.ssh.ScpDownloader
-import se.joynes.aiterminalhub.domain.ScriptTemplateEngine
 import javax.inject.Inject
 
 sealed interface DownloadState {
@@ -30,8 +28,6 @@ sealed interface DownloadState {
 @HiltViewModel
 class FileDownloadViewModel @Inject constructor(
     private val serverRepo: ServerRepository,
-    private val projectRepo: ProjectRepository,
-    private val engine: ScriptTemplateEngine,
     private val scpDownloader: ScpDownloader,
     private val securePrefs: SecurePrefsManager
 ) : ViewModel() {
@@ -52,13 +48,11 @@ class FileDownloadViewModel @Inject constructor(
             setState(projectId, DownloadState.LoadingList)
             try {
                 val server = serverRepo.getById(serverId) ?: error("Server not found")
-                val project = projectRepo.getById(projectId) ?: error("Project not found")
-                val remotePath = engine.projectPath(server, project)
                 val files = scpDownloader.listFiles(
                     server = server,
                     password = securePrefs.getPassword(server.id),
                     privateKeyPem = securePrefs.getPrivateKey(server.id),
-                    remoteDir = remotePath
+                    remoteDir = SSH_LOGIN_DIRECTORY
                 )
                 setState(projectId, DownloadState.Listed(files))
             } catch (e: Exception) {
@@ -72,8 +66,6 @@ class FileDownloadViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val server = serverRepo.getById(serverId) ?: error("Server not found")
-                val project = projectRepo.getById(projectId) ?: error("Project not found")
-                val remotePath = engine.projectPath(server, project)
                 val output = context.contentResolver.openOutputStream(uri) ?: error("Cannot open destination")
 
                 setState(projectId, DownloadState.Downloading(fileName, 0f))
@@ -82,7 +74,7 @@ class FileDownloadViewModel @Inject constructor(
                     server = server,
                     password = securePrefs.getPassword(server.id),
                     privateKeyPem = securePrefs.getPrivateKey(server.id),
-                    remoteDir = remotePath,
+                    remoteDir = SSH_LOGIN_DIRECTORY,
                     fileName = fileName,
                     outputStream = output
                 ).collect { progress ->
@@ -98,5 +90,9 @@ class FileDownloadViewModel @Inject constructor(
 
     private fun setState(projectId: Long, state: DownloadState) {
         states.update { it + (projectId to state) }
+    }
+
+    companion object {
+        private const val SSH_LOGIN_DIRECTORY = "."
     }
 }
