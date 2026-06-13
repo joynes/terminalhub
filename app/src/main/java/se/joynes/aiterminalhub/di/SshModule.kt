@@ -38,4 +38,7 @@ object SshModule {
 
     @Provides
     fun provideSftpUploader(logger: AppLogger): SftpUploader = SftpUploader(logger)
+
+    @Provides
+    fun provideScpDownloader(logger: AppLogger): ScpDownloader = ScpDownloader(logger)
 }

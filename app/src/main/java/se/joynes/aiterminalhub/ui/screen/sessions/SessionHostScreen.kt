@@ -40,6 +40,9 @@ import se.joynes.aiterminalhub.R
 import se.joynes.aiterminalhub.BuildConfig
 import se.joynes.aiterminalhub.ui.screen.export.ExportImportState
 import se.joynes.aiterminalhub.ui.screen.export.ExportImportViewModel
+import se.joynes.aiterminalhub.ui.screen.download.DownloadState
+import se.joynes.aiterminalhub.ui.screen.download.FileDownloadViewModel
+import se.joynes.aiterminalhub.ui.screen.download.FloatingFileDownloadDialog
 import se.joynes.aiterminalhub.ui.screen.upload.FileUploadViewModel
 import se.joynes.aiterminalhub.ui.screen.upload.FloatingFileUploadDialog
 import se.joynes.aiterminalhub.ui.screen.upload.UploadState
@@ -95,10 +98,12 @@ fun SessionHostScreen(
     val fileUploadVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     val fileUploadSelectedUriByProject = remember { mutableStateMapOf<Long, Uri?>() }
     val fileUploadSelectedNameByProject = remember { mutableStateMapOf<Long, String>() }
+    val fileDownloadVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     var searchVisible by remember { mutableStateOf(false) }
     var searchInitialQuery by remember { mutableStateOf("") }
     var isTerminalAtBottom by remember { mutableStateOf(true) }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
+    val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
     val exportImportState by exportImportViewModel.state.collectAsState()
 
@@ -150,12 +155,16 @@ fun SessionHostScreen(
     val activeFileUploadVisible = activeProjectId?.let { fileUploadVisibleByProject[it] == true } ?: false
     val activeFileUploadSelectedUri = activeProjectId?.let { fileUploadSelectedUriByProject[it] }
     val activeFileUploadSelectedName = activeProjectId?.let { fileUploadSelectedNameByProject[it].orEmpty() }.orEmpty()
+    val activeFileDownloadVisible = activeProjectId?.let { fileDownloadVisibleByProject[it] == true } ?: false
     val textInputHistory by remember(activeProjectId) {
         activeProjectId?.let { viewModel.textInputHistory(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
     }.collectAsState(initial = emptyList())
     val fileUploadState by remember(activeProjectId) {
         activeProjectId?.let { fileUploadViewModel.uploadState(it) } ?: kotlinx.coroutines.flow.flowOf(UploadState.Idle)
     }.collectAsState(initial = UploadState.Idle)
+    val fileDownloadState by remember(activeProjectId) {
+        activeProjectId?.let { fileDownloadViewModel.downloadState(it) } ?: kotlinx.coroutines.flow.flowOf(DownloadState.Idle)
+    }.collectAsState(initial = DownloadState.Idle)
 
     // Shared modifier manager: toggles in SpecialKeyBar are read by TerminalViewClientImpl
     val modifierManager = remember { MutableModifierManager() }
@@ -226,6 +235,7 @@ fun SessionHostScreen(
         if (sharedUri != null && projectId != null) {
             fileUploadSelectedUriByProject[projectId] = sharedUri
             textInputVisibleByProject[projectId] = false
+            fileDownloadVisibleByProject[projectId] = false
             fileUploadVisibleByProject[projectId] = true
             onConsumeSharedUri()
         }
@@ -800,6 +810,19 @@ fun SessionHostScreen(
                             )
                         }
 
+                        if (activeFileDownloadVisible && activeProjectId != null) {
+                            FloatingFileDownloadDialog(
+                                viewModel = fileDownloadViewModel,
+                                projectId = activeProjectId,
+                                serverId = serverId ?: 0L,
+                                downloadState = fileDownloadState,
+                                onDismiss = {
+                                    fileDownloadVisibleByProject[activeProjectId] = false
+                                    terminalViewRef.value?.requestFocus()
+                                }
+                            )
+                        }
+
                         if (searchVisible) {
                             TerminalSearchOverlay(
                                 initialQuery = searchInitialQuery,
@@ -862,16 +885,26 @@ fun SessionHostScreen(
                             onTextInput = {
                                 activeProjectId?.let { projectId ->
                                     fileUploadVisibleByProject[projectId] = false
+                                    fileDownloadVisibleByProject[projectId] = false
                                     textInputVisibleByProject[projectId] = true
                                 }
                             },
                             onFileUpload = {
                                 activeProjectId?.let { projectId ->
                                     textInputVisibleByProject[projectId] = false
+                                    fileDownloadVisibleByProject[projectId] = false
                                     fileUploadSelectedUriByProject[projectId] = null
                                     fileUploadSelectedNameByProject[projectId] = ""
                                     fileUploadViewModel.reset(projectId)
                                     fileUploadVisibleByProject[projectId] = true
+                                }
+                            },
+                            onFileDownload = {
+                                activeProjectId?.let { projectId ->
+                                    textInputVisibleByProject[projectId] = false
+                                    fileUploadVisibleByProject[projectId] = false
+                                    fileDownloadViewModel.reset(projectId)
+                                    fileDownloadVisibleByProject[projectId] = true
                                 }
                             },
                             onKeyboardToggle = {

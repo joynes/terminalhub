@@ -37,6 +37,7 @@ fun SpecialKeyBar(
     onPaste: () -> Unit = {},
     onTextInput: () -> Unit = {},
     onFileUpload: () -> Unit = {},
+    onFileDownload: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {},
     onPrevTab: () -> Unit = {},
     onNextTab: () -> Unit = {}
@@ -87,7 +88,7 @@ fun SpecialKeyBar(
             },
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        // Row 1: ESC  ⇥  :  /  @  1  2  3  [spacer]  ↑  ↵
+        // Row 1: ESC  ⇥  :  /  @  1  2  3  ⇩  [spacer]  ↑  ↵
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -101,6 +102,7 @@ fun SpecialKeyBar(
             TermKey("1",   KEY_W) { onKey(modified("1")) }
             TermKey("2",   KEY_W) { onKey(modified("2")) }
             TermKey("3",   KEY_W) { onKey(modified("3")) }
+            TermKey("⇩",   KEY_W, fontSize = 16.sp) { onFileDownload() }
             Spacer(Modifier.weight(1f))
             TermKey("↑",   KEY_W) { onKey(arrowKey('A')) }
             TermKey("↵",   RET_W, fontSize = 18.sp) { modifierManager.clearTransients(); onKey("\r") }
