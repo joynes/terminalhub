@@ -11,6 +11,8 @@ fun gitCommitCount(): Int = try {
         .inputStream.bufferedReader().readLine().trim().toInt()
 } catch (_: Exception) { 1 }
 
+fun legacyExportFixVersionCode(): Int = maxOf(gitCommitCount(), 200)
+
 android {
     namespace = "se.joynes.aiterminalhub"
     compileSdk = 36
@@ -20,8 +22,8 @@ android {
         applicationId = "se.joynes.aiterminalhub"
         minSdk = 24
         targetSdk = 36
-        versionCode = gitCommitCount()
-        versionName = "1.${gitCommitCount()}"
+        versionCode = legacyExportFixVersionCode()
+        versionName = "1.${legacyExportFixVersionCode()}"
 
         testInstrumentationRunner = "se.joynes.aiterminalhub.HiltTestRunner"
     }

@@ -2,6 +2,7 @@ package se.joynes.aiterminalhub.data.export
 
 import android.content.Context
 import android.net.Uri
+import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.flow.first
 import se.joynes.aiterminalhub.data.db.entity.ServerEntity
 import se.joynes.aiterminalhub.data.model.Project
@@ -22,11 +23,23 @@ class ExportImportManager @Inject constructor(
 
     suspend fun exportYaml(context: Context, uri: Uri) {
         val servers = serverRepo.getAll().first()
+        val yaml = buildYaml(servers) { server ->
+            projectRepo.getByServer(server.id).first()
+        }
+        val output = context.contentResolver.openOutputStream(uri, "wt")
+            ?: error("Cannot open export destination")
+        output.use { it.write(yaml.toByteArray(StandardCharsets.UTF_8)) }
+    }
+
+    private suspend fun buildYaml(
+        servers: List<Server>,
+        projectsForServer: suspend (Server) -> List<Project>
+    ): String {
         val sb = StringBuilder()
         sb.appendLine("version: 1")
         sb.appendLine("servers:")
         for (server in servers) {
-            val projects = projectRepo.getByServer(server.id).first()
+            val projects = projectsForServer(server)
             sb.appendLine("- name: ${ys(server.name)}")
             sb.appendLine("  host: ${ys(server.host)}")
             sb.appendLine("  port: ${server.port}")
@@ -49,7 +62,7 @@ class ExportImportManager @Inject constructor(
                 }
             }
         }
-        context.contentResolver.openOutputStream(uri)?.use { it.writer().write(sb.toString()) }
+        return sb.toString()
     }
 
     /** Double-quote a string value with escape sequences for newlines, quotes, backslashes. */
