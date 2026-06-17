@@ -10,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import com.termux.terminal.TerminalSession
 import java.io.File
 import se.joynes.aiterminalhub.BuildConfig
@@ -66,24 +67,24 @@ class SessionHostViewModel @Inject constructor(
 
     private val instanceId = System.identityHashCode(this)
 
-    // All projects from DB (shown immediately, even while connecting)
+    // Projects represented by currently open, connecting, or recovery tabs.
     private val _dbProjects = MutableStateFlow<List<Project>>(emptyList())
     private val _allDbProjects = MutableStateFlow<List<Project>>(emptyList())
     private val _projectOrder = MutableStateFlow(loadProjectOrder())
     private val connectingProjectIds = MutableStateFlow<Set<Long>>(emptySet())
 
-    /** Combined tab list: DB projects merged with live session state. */
+    /** Combined tab list: open project tabs merged with live session state. */
     val projectTabs: StateFlow<List<ProjectTabState>> = combine(
         _dbProjects,
         sessionManager.sessions,
         _projectOrder,
         connectingProjectIds
     ) { projects, sessions, projectOrder, connectingIds ->
-        val sessionByName = sessions.associateBy { it.projectName }
+        val sessionByProjectId = sessions.associateBy { it.projectId }
         projects
             .sortedByProjectOrder(projectOrder)
             .map { p ->
-            val session = sessionByName[p.name]
+            val session = sessionByProjectId[p.id]
             ProjectTabState(
                 projectId = p.id,
                 projectName = p.name,
@@ -133,12 +134,26 @@ class SessionHostViewModel @Inject constructor(
         }
         viewModelScope.launch {
             projectRepo.getAll().collect { projects ->
+                val previousProjectIds = _allDbProjects.value.map { it.id }.toSet()
                 _allDbProjects.value = projects
                 syncProjectOrder(projects)
-                val visible = projects.filter { !sessionManager.isProjectClosed(it.id) }
+                val runtimeState = runtimeRepository.state.value
+                val recoveryIds = if (runtimeState.recoveryPending) {
+                    runtimeState.recoveryRemoteProjectIds + runtimeState.recoveryLocalProjectIds
+                } else {
+                    emptySet()
+                }
+                val liveIds = sessionManager.sessions.value.map { it.projectId }.toSet()
+                val newlyAddedIds = if (previousProjectIds.isEmpty()) {
+                    emptySet()
+                } else {
+                    projects.map { it.id }.toSet() - previousProjectIds
+                }
+                val visibleIds = liveIds + connectingProjectIds.value + recoveryIds + newlyAddedIds
+                val visible = projects.filter {
+                    !sessionManager.isProjectClosed(it.id) && it.id in visibleIds
+                }
                 val preferredActive = runtimeRepository.state.value.recoveryActiveProjectId
-                val prevIds = _dbProjects.value.map { it.id }.toSet()
-                val isFirstLoad = _dbProjects.value.isEmpty() && prevIds.isEmpty()
                 _dbProjects.value = visible
                 val recoveryPending = runtimeRepository.state.value.recoveryPending
                 if (recoveryPending) {
@@ -174,9 +189,8 @@ class SessionHostViewModel @Inject constructor(
                         }
                     }
                 } else {
-                    visible.forEach { project ->
-                        val isNewlyAdded = !isFirstLoad && project.id !in prevIds
-                        activateProject(project, autoSwitch = isNewlyAdded)
+                    visible.filter { it.id in newlyAddedIds }.forEach { project ->
+                        activateProject(project, autoSwitch = true)
                     }
                 }
             }
@@ -243,7 +257,15 @@ class SessionHostViewModel @Inject constructor(
         val attachCmd = engine.renderAttach(srv, project)
         val customScript = engine.renderCustomScript(srv, project)
         val aiCmd = engine.renderAiCommand(project)
-        conn.connected.first { it }
+        val connected = withTimeoutOrNull(SSH_CONNECT_TIMEOUT_MS) {
+            conn.connected.first { it }
+            true
+        } == true
+        if (!connected) {
+            logger.log(LogLevel.WARN, "SessionRecovery", "SSH activation timed out project=${project.name}")
+            sshManager.destroySession(conn.sessionId)
+            return
+        }
         if (sessionManager.isProjectClosed(project.id)) {
             sshManager.destroySession(conn.sessionId)
             return
@@ -486,5 +508,9 @@ class SessionHostViewModel @Inject constructor(
     private fun List<Project>.sortedByProjectOrder(order: List<Long>): List<Project> {
         val orderIndex = order.withIndex().associate { it.value to it.index }
         return sortedWith(compareBy<Project> { orderIndex[it.id] ?: Int.MAX_VALUE }.thenBy { it.id })
+    }
+
+    private companion object {
+        const val SSH_CONNECT_TIMEOUT_MS = 30_000L
     }
 }
