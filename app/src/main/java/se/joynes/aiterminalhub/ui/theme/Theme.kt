@@ -19,7 +19,7 @@ private val RetroColorScheme = darkColorScheme(
 )
 
 @Composable
-fun AITerminalHubTheme(content: @Composable () -> Unit) {
+fun AITerminalTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = RetroColorScheme,
         typography = RetroTypography,

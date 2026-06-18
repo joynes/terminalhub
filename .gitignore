@@ -20,3 +20,8 @@ local.properties
 # APKs and app bundles
 *.apk
 *.aab
+
+# Local generated images/screenshots
+/Screenshot_*.jpg
+/app-icon-cut.png
+/file_*.png

@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.terminal.TerminalScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @RunWith(AndroidJUnit4::class)
 class TerminalScreenTest {
@@ -18,7 +18,7 @@ class TerminalScreenTest {
     @Test
     fun specialKeyBarIsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { TerminalScreen() }
+            AITerminalTheme { TerminalScreen() }
         }
         composeRule.onNodeWithText("ESC").assertIsDisplayed()
         composeRule.onNodeWithText("TAB").assertIsDisplayed()
@@ -28,7 +28,7 @@ class TerminalScreenTest {
     @Test
     fun fontSizeControlsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { TerminalScreen() }
+            AITerminalTheme { TerminalScreen() }
         }
         composeRule.onNodeWithText("A+").assertIsDisplayed()
         composeRule.onNodeWithText("A-").assertIsDisplayed()

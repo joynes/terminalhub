@@ -120,7 +120,7 @@ class ExportImportManager @Inject constructor(
                     username = serverMap["username"] ?: "",
                     authType = serverMap["authType"] ?: "password",
                     keyAlias = serverMap["keyAlias"]?.ifBlank { null },
-                    projectsFolder = serverMap["projectsFolder"] ?: "~/aiterminalhub",
+                    projectsFolder = serverMap["projectsFolder"] ?: "~/aiterminal",
                     setupScript = serverMap["setupScript"] ?: ServerEntity.DEFAULT_SETUP_SCRIPT
                 )
                 val serverId = serverRepo.save(server)

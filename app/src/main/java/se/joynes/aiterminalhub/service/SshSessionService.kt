@@ -99,14 +99,14 @@ class SshSessionService : Service() {
         )
 
         val text = if (sessionCount == 0) {
-            "AITerminalHub ready"
+            "AITerminal ready"
         } else {
             "$sessionCount active SSH session" + if (sessionCount == 1) "" else "s"
         }
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("AITerminalHub")
+            .setContentTitle("AITerminal")
             .setContentText(text)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -127,7 +127,7 @@ class SshSessionService : Service() {
                 "SSH Sessions",
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Keeps SSH sessions alive while AITerminalHub is running"
+                description = "Keeps SSH sessions alive while AITerminal is running"
             }
         )
     }

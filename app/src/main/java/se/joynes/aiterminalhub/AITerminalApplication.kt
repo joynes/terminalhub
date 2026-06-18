@@ -10,7 +10,7 @@ import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
 import javax.inject.Inject
 
 @HiltAndroidApp
-class AITerminalHubApplication : Application() {
+class AITerminalApplication : Application() {
     @Inject lateinit var appLogger: AppLogger
     @Inject lateinit var runtimeRepository: AppRuntimeRepository
 

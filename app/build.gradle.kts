@@ -11,7 +11,7 @@ fun gitCommitCount(): Int = try {
         .inputStream.bufferedReader().readLine().trim().toInt()
 } catch (_: Exception) { 1 }
 
-fun legacyExportFixVersionCode(): Int = maxOf(gitCommitCount(), 200)
+fun legacyExportFixVersionCode(): Int = maxOf(gitCommitCount(), 203)
 
 android {
     namespace = "se.joynes.aiterminalhub"

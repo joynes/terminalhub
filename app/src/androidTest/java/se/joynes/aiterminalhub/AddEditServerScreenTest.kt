@@ -11,7 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.servers.AddEditServerScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -24,7 +24,7 @@ class AddEditServerScreenTest {
     @Test
     fun saveButtonDisabledWhenFieldsEmpty() {
         composeRule.setContent {
-            AITerminalHubTheme { AddEditServerScreen(serverId = null, onBack = {}) }
+            AITerminalTheme { AddEditServerScreen(serverId = null, onBack = {}) }
         }
         composeRule.onNodeWithText("[ SAVE ]").assertIsNotEnabled()
     }
@@ -32,7 +32,7 @@ class AddEditServerScreenTest {
     @Test
     fun saveButtonEnabledWhenHostAndUserFilled() {
         composeRule.setContent {
-            AITerminalHubTheme { AddEditServerScreen(serverId = null, onBack = {}) }
+            AITerminalTheme { AddEditServerScreen(serverId = null, onBack = {}) }
         }
         composeRule.onNodeWithText("Hostname / IP *", useUnmergedTree = true)
             .performTextInput("192.168.1.1")

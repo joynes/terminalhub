@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.status.ServerStatusScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @RunWith(AndroidJUnit4::class)
 class ServerStatusScreenTest {
@@ -18,7 +18,7 @@ class ServerStatusScreenTest {
     @Test
     fun cpuGaugeIsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { ServerStatusScreen(serverId = 1L, onBack = {}) }
+            AITerminalTheme { ServerStatusScreen(serverId = 1L, onBack = {}) }
         }
         composeRule.onNodeWithText("CPU").assertIsDisplayed()
     }
@@ -26,7 +26,7 @@ class ServerStatusScreenTest {
     @Test
     fun ramGaugeIsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { ServerStatusScreen(serverId = 1L, onBack = {}) }
+            AITerminalTheme { ServerStatusScreen(serverId = 1L, onBack = {}) }
         }
         composeRule.onNodeWithText("RAM").assertIsDisplayed()
     }
@@ -34,7 +34,7 @@ class ServerStatusScreenTest {
     @Test
     fun diskGaugeIsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { ServerStatusScreen(serverId = 1L, onBack = {}) }
+            AITerminalTheme { ServerStatusScreen(serverId = 1L, onBack = {}) }
         }
         composeRule.onNodeWithText("DISK").assertIsDisplayed()
     }

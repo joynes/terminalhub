@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.sessionlog.SessionLogScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @RunWith(AndroidJUnit4::class)
 class SessionLogScreenTest {
@@ -18,7 +18,7 @@ class SessionLogScreenTest {
     @Test
     fun emptyStateShown() {
         composeRule.setContent {
-            AITerminalHubTheme { SessionLogScreen(onBack = {}) }
+            AITerminalTheme { SessionLogScreen(onBack = {}) }
         }
         composeRule.onNodeWithText("NO SESSION LOGS").assertIsDisplayed()
     }
@@ -26,7 +26,7 @@ class SessionLogScreenTest {
     @Test
     fun exportButtonVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { SessionLogScreen(onBack = {}) }
+            AITerminalTheme { SessionLogScreen(onBack = {}) }
         }
         composeRule.onNodeWithText("EXP").assertIsDisplayed()
     }

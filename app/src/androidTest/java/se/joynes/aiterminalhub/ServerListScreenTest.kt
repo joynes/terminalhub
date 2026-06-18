@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.servers.ServerListScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @RunWith(AndroidJUnit4::class)
 class ServerListScreenTest {
@@ -18,7 +18,7 @@ class ServerListScreenTest {
     @Test
     fun emptyStateIsShown() {
         composeRule.setContent {
-            AITerminalHubTheme {
+            AITerminalTheme {
                 ServerListScreen({}, {}, {}, {}, {}, {}, {})
             }
         }
@@ -28,7 +28,7 @@ class ServerListScreenTest {
     @Test
     fun addButtonIsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme {
+            AITerminalTheme {
                 ServerListScreen({}, {}, {}, {}, {}, {}, {})
             }
         }

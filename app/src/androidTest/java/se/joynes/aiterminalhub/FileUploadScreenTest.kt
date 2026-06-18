@@ -11,7 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.upload.FileUploadScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -24,7 +24,7 @@ class FileUploadScreenTest {
     @Test
     fun selectFilesButtonIsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { FileUploadScreen(serverId = 1L, onBack = {}) }
+            AITerminalTheme { FileUploadScreen(serverId = 1L, onBack = {}) }
         }
         composeRule.onNodeWithText("[ SELECT FILES ]").assertIsDisplayed()
     }

@@ -282,7 +282,7 @@ fun SettingsScreen(
                 item {
                     SettingsCard(
                         title = "SYSTEM PROTECTION",
-                        description = "These Android system settings have the biggest effect on whether AITerminalHub survives in background. They do not guarantee no cold starts, but they materially reduce the chance."
+                        description = "These Android system settings have the biggest effect on whether AITerminal survives in background. They do not guarantee no cold starts, but they materially reduce the chance."
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             SettingsValue(

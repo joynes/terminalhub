@@ -31,7 +31,7 @@ data class AddEditServerState(
     val password: String = "",
     val privateKey: String = "",
     val hasSavedPrivateKey: Boolean = false,
-    val projectsFolder: String = "~/aiterminalhub",
+    val projectsFolder: String = "~/aiterminal",
     val setupScript: String = ServerEntity.DEFAULT_SETUP_SCRIPT,
     val sshTestStatus: SshTestStatus = SshTestStatus.Idle,
     val sshTestMessage: String = "",

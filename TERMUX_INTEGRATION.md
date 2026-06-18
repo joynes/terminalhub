@@ -1,8 +1,8 @@
-# Termux Terminal Integration In AITerminalHub
+# Termux Terminal Integration In AITerminal
 
 Timestamp: 2026-03-23 19:32:19 CET
 
-AITerminalHub integrates the Termux terminal library as an embedded terminal widget layer, not as the full Termux app/runtime.
+AITerminal integrates the Termux terminal library as an embedded terminal widget layer, not as the full Termux app/runtime.
 
 ## Dependency Layer
 
@@ -11,7 +11,7 @@ The app pulls in the two published Termux modules from JitPack in `gradle/libs.v
 - `terminal-emulator`
 - `terminal-view`
 
-That means AITerminalHub reuses:
+That means AITerminal reuses:
 
 - `com.termux.terminal.TerminalSession`
 - `com.termux.view.TerminalView`
@@ -61,7 +61,7 @@ What it does:
 - Intercepts special keys in `onKeyDown(...)` and translates them to ANSI escape sequences.
 - Uses tap events only to trigger keyboard showing.
 
-The extra keys UI is not Termux's stock extra-keys view. AITerminalHub has its own Compose bar in `app/src/main/java/se/joynes/aiterminalhub/ui/screen/terminal/SpecialKeyBar.kt`, which emits escape sequences and modifier state into that same bridge.
+The extra keys UI is not Termux's stock extra-keys view. AITerminal has its own Compose bar in `app/src/main/java/se/joynes/aiterminalhub/ui/screen/terminal/SpecialKeyBar.kt`, which emits escape sequences and modifier state into that same bridge.
 
 ## Session Client Hooks
 
@@ -71,7 +71,7 @@ It mostly no-ops the Termux callbacks, except:
 
 - copy-to-clipboard support
 
-So AITerminalHub uses only the callback surface it needs.
+So AITerminal uses only the callback surface it needs.
 
 ## Compared With Real Termux
 
@@ -94,4 +94,4 @@ Different from Termux:
 
 ## Summary
 
-AITerminalHub integrated Termux correctly as a terminal widget/emulator library, then wrapped it with its own SSH transport, Compose UI, tabs, and special-key UX. It is not a fork of the Termux app; it is a custom SSH app using Termux's terminal engine as the rendering/input core.
+AITerminal integrated Termux correctly as a terminal widget/emulator library, then wrapped it with its own SSH transport, Compose UI, tabs, and special-key UX. It is not a fork of the Termux app; it is a custom SSH app using Termux's terminal engine as the rendering/input core.

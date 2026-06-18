@@ -552,7 +552,7 @@ fun SessionHostScreen(
                             },
                             onClick = {
                                 showSettingsMenu = false
-                                exportLauncher.launch("aiterminalhub_backup.yaml")
+                                exportLauncher.launch("aiterminal_backup.yaml")
                             }
                         )
                         DropdownMenuItem(

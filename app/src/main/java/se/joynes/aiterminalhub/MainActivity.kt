@@ -19,7 +19,7 @@ import se.joynes.aiterminalhub.data.logging.AppLogger
 import se.joynes.aiterminalhub.data.logging.LogLevel
 import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.aiterminalhub.ui.navigation.AppNavGraph
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 import se.joynes.aiterminalhub.ui.viewmodel.SharedIntentViewModel
 import javax.inject.Inject
 
@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
         window.decorView.setBackgroundColor(android.graphics.Color.parseColor("#0D0D1A"))
         setContent {
             val pendingUri by sharedIntentViewModel.pendingUri.collectAsState()
-            AITerminalHubTheme {
+            AITerminalTheme {
                 AppNavGraph(
                     sharedUri = pendingUri,
                     onConsumeSharedUri = { sharedIntentViewModel.consume() }

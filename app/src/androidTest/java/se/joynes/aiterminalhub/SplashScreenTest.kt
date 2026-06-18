@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.splash.SplashScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @RunWith(AndroidJUnit4::class)
 class SplashScreenTest {
@@ -18,7 +18,7 @@ class SplashScreenTest {
     @Test
     fun splashScreenShowsTitle() {
         composeRule.setContent {
-            AITerminalHubTheme { SplashScreen(onAuthSuccess = {}) }
+            AITerminalTheme { SplashScreen(onAuthSuccess = {}) }
         }
         composeRule.onNodeWithText("AI TERMINAL HUB").assertIsDisplayed()
     }
@@ -26,7 +26,7 @@ class SplashScreenTest {
     @Test
     fun authenticateButtonIsDisplayed() {
         composeRule.setContent {
-            AITerminalHubTheme { SplashScreen(onAuthSuccess = {}) }
+            AITerminalTheme { SplashScreen(onAuthSuccess = {}) }
         }
         composeRule.onNodeWithText("[ AUTHENTICATE ]").assertIsDisplayed()
     }

@@ -9,7 +9,7 @@ import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.domain.TerminalSessionId
 import se.joynes.aiterminalhub.ui.navigation.SessionTabBar
 import se.joynes.aiterminalhub.ui.screen.sessions.ProjectTabState
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @RunWith(AndroidJUnit4::class)
 class SessionTabSwipeTest {
@@ -28,7 +28,7 @@ class SessionTabSwipeTest {
     fun sessionTabBarShowsTabs() {
         val tabs = listOf(makeTab(1L, "session-1"), makeTab(2L, "session-2"))
         composeRule.setContent {
-            AITerminalHubTheme {
+            AITerminalTheme {
                 SessionTabBar(
                     tabs = tabs,
                     activeId = tabs.first().sessionId,
@@ -47,7 +47,7 @@ class SessionTabSwipeTest {
     fun sessionTabBarShowsAddButton() {
         val tabs = listOf(makeTab(1L, "session-1"))
         composeRule.setContent {
-            AITerminalHubTheme {
+            AITerminalTheme {
                 SessionTabBar(
                     tabs = tabs,
                     activeId = tabs.first().sessionId,

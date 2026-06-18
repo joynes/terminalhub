@@ -31,7 +31,7 @@ class BiometricAuthManager @Inject constructor(
 
     fun authenticate(
         activity: FragmentActivity,
-        title: String = "AITerminalHub",
+        title: String = "AITerminal",
         subtitle: String = "Authenticate to continue"
     ): Flow<AuthResult> = callbackFlow {
         val executor = ContextCompat.getMainExecutor(activity)

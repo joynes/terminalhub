@@ -10,6 +10,6 @@ data class Server(
     val username: String,
     val authType: String = "password",
     val keyAlias: String? = null,
-    val projectsFolder: String = "~/aiterminalhub",
+    val projectsFolder: String = "~/aiterminal",
     val setupScript: String = ServerEntity.DEFAULT_SETUP_SCRIPT
 )

@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.projects.ProjectListScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @RunWith(AndroidJUnit4::class)
 class ProjectListScreenTest {
@@ -18,7 +18,7 @@ class ProjectListScreenTest {
     @Test
     fun emptyStateIsShown() {
         composeRule.setContent {
-            AITerminalHubTheme {
+            AITerminalTheme {
                 ProjectListScreen(serverId = 1L, onAddProject = {}, onEditProject = {}, onConnect = {}, onBack = {})
             }
         }
@@ -28,7 +28,7 @@ class ProjectListScreenTest {
     @Test
     fun addProjectButtonVisible() {
         composeRule.setContent {
-            AITerminalHubTheme {
+            AITerminalTheme {
                 ProjectListScreen(serverId = 1L, onAddProject = {}, onEditProject = {}, onConnect = {}, onBack = {})
             }
         }

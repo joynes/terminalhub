@@ -11,7 +11,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.aiterminalhub.ui.screen.applog.AppLogScreen
-import se.joynes.aiterminalhub.ui.theme.AITerminalHubTheme
+import se.joynes.aiterminalhub.ui.theme.AITerminalTheme
 
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -24,7 +24,7 @@ class AppLogScreenTest {
     @Test
     fun logScreenShowsFilterChips() {
         composeRule.setContent {
-            AITerminalHubTheme {
+            AITerminalTheme {
                 AppLogScreen(onBack = {})
             }
         }
@@ -36,7 +36,7 @@ class AppLogScreenTest {
     @Test
     fun searchFieldIsVisible() {
         composeRule.setContent {
-            AITerminalHubTheme { AppLogScreen(onBack = {}) }
+            AITerminalTheme { AppLogScreen(onBack = {}) }
         }
         composeRule.onNodeWithText("Search logs...", useUnmergedTree = true).assertExists()
     }
@@ -44,7 +44,7 @@ class AppLogScreenTest {
     @Test
     fun clickingLevelFilterChangesSelection() {
         composeRule.setContent {
-            AITerminalHubTheme { AppLogScreen(onBack = {}) }
+            AITerminalTheme { AppLogScreen(onBack = {}) }
         }
         composeRule.onNodeWithText("ERROR").performClick()
         composeRule.onNodeWithText("ERROR").assertIsSelected()

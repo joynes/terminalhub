@@ -16,7 +16,7 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
         // Add new columns to servers (SQLite supports ADD COLUMN)
         val defaultScript = ServerEntity.DEFAULT_SETUP_SCRIPT
             .replace("'", "''") // escape single quotes for SQL
-        db.execSQL("ALTER TABLE servers ADD COLUMN projectsFolder TEXT NOT NULL DEFAULT '~/aiterminalhub'")
+        db.execSQL("ALTER TABLE servers ADD COLUMN projectsFolder TEXT NOT NULL DEFAULT '~/aiterminal'")
         db.execSQL("ALTER TABLE servers ADD COLUMN setupScript TEXT NOT NULL DEFAULT '$defaultScript'")
 
         // Recreate projects table without projectPath, sessionName, setupScript

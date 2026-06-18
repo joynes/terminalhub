@@ -305,7 +305,7 @@ class SessionHostViewModel @Inject constructor(
                 "SessionHostViewModel",
                 "Git clone failed for project=${project.name} url=${project.gitUrl}"
             )
-            conn.send("printf '\\n[AITerminalHub] Git clone failed for ${project.name}. Check git/network/path on the server.\\n'\n")
+            conn.send("printf '\\n[AITerminal] Git clone failed for ${project.name}. Check git/network/path on the server.\\n'\n")
         }
 
         conn.awaitTransportQuiescence()
