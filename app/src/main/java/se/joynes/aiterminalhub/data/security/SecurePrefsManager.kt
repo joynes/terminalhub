@@ -87,6 +87,11 @@ class SecurePrefsManager @Inject constructor(
         logger.log(LogLevel.DEBUG, TAG, "Private key deleted for server $serverId")
     }
 
+    fun clearAll() {
+        prefs.edit().clear().apply()
+        logger.log(LogLevel.INFO, TAG, "All stored SSH credentials cleared")
+    }
+
     fun savePassphrase(keyAlias: String, passphrase: String) {
         prefs.edit().putString("pp_$keyAlias", passphrase).apply()
     }

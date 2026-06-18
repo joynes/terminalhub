@@ -2,13 +2,20 @@ package se.joynes.aiterminalhub.data.export
 
 import android.content.Context
 import android.net.Uri
+import androidx.room.withTransaction
 import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.flow.first
+import dagger.hilt.android.qualifiers.ApplicationContext
+import se.joynes.aiterminalhub.data.db.AppDatabase
+import se.joynes.aiterminalhub.data.db.dao.TextInputHistoryDao
 import se.joynes.aiterminalhub.data.db.entity.ServerEntity
 import se.joynes.aiterminalhub.data.model.Project
 import se.joynes.aiterminalhub.data.model.Server
+import se.joynes.aiterminalhub.data.runtime.AppRuntimeRepository
+import se.joynes.aiterminalhub.data.security.SecurePrefsManager
 import se.joynes.aiterminalhub.data.repository.ProjectRepository
 import se.joynes.aiterminalhub.data.repository.ServerRepository
+import se.joynes.aiterminalhub.domain.TerminalSessionManager
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,8 +23,14 @@ data class ImportResult(val servers: Int, val projects: Int)
 
 @Singleton
 class ExportImportManager @Inject constructor(
+    @ApplicationContext private val appContext: Context,
+    private val db: AppDatabase,
     private val serverRepo: ServerRepository,
-    private val projectRepo: ProjectRepository
+    private val projectRepo: ProjectRepository,
+    private val textInputHistoryDao: TextInputHistoryDao,
+    private val securePrefsManager: SecurePrefsManager,
+    private val runtimeRepository: AppRuntimeRepository,
+    private val sessionManager: TerminalSessionManager
 ) {
     // ── Serialization ───────────────────────────────────────────────────────
 
@@ -88,36 +101,47 @@ class ExportImportManager @Inject constructor(
         var serversImported = 0
         var projectsImported = 0
 
-        for (serverMap in servers) {
-            val server = Server(
-                id = 0,
-                name = serverMap["name"] ?: "",
-                host = serverMap["host"] ?: "",
-                port = serverMap["port"]?.toIntOrNull() ?: 22,
-                username = serverMap["username"] ?: "",
-                authType = serverMap["authType"] ?: "password",
-                keyAlias = serverMap["keyAlias"]?.ifBlank { null },
-                projectsFolder = serverMap["projectsFolder"] ?: "~/aiterminalhub",
-                setupScript = serverMap["setupScript"] ?: ServerEntity.DEFAULT_SETUP_SCRIPT
-            )
-            val serverId = serverRepo.save(server)
-            serversImported++
+        sessionManager.clearForConfigImport()
+        runtimeRepository.clearSessionState()
+        securePrefsManager.clearAll()
+        appContext.getSharedPreferences("session_host", Context.MODE_PRIVATE).edit().clear().apply()
 
-            val projectsRaw = serverMap["__projects__"] ?: ""
-            val projectMaps = parseProjectsBlock(projectsRaw)
-            for (projectMap in projectMaps) {
-                val project = Project(
+        db.withTransaction {
+            textInputHistoryDao.clearAll()
+            projectRepo.clearAll()
+            serverRepo.clearAll()
+
+            for (serverMap in servers) {
+                val server = Server(
                     id = 0,
-                    serverId = serverId,
-                    name = projectMap["name"] ?: "",
-                    useTmux = projectMap["useTmux"] != "false",
-                    customScript = projectMap["customScript"] ?: "cd {{PROJECT_PATH}}",
-                    aiCommand = projectMap["aiCommand"] ?: "",
-                    colorSeed = projectMap["colorSeed"]?.toIntOrNull() ?: 0,
-                    gitUrl = projectMap["gitUrl"] ?: ""
+                    name = serverMap["name"] ?: "",
+                    host = serverMap["host"] ?: "",
+                    port = serverMap["port"]?.toIntOrNull() ?: 22,
+                    username = serverMap["username"] ?: "",
+                    authType = serverMap["authType"] ?: "password",
+                    keyAlias = serverMap["keyAlias"]?.ifBlank { null },
+                    projectsFolder = serverMap["projectsFolder"] ?: "~/aiterminalhub",
+                    setupScript = serverMap["setupScript"] ?: ServerEntity.DEFAULT_SETUP_SCRIPT
                 )
-                projectRepo.save(project)
-                projectsImported++
+                val serverId = serverRepo.save(server)
+                serversImported++
+
+                val projectsRaw = serverMap["__projects__"] ?: ""
+                val projectMaps = parseProjectsBlock(projectsRaw)
+                for (projectMap in projectMaps) {
+                    val project = Project(
+                        id = 0,
+                        serverId = serverId,
+                        name = projectMap["name"] ?: "",
+                        useTmux = projectMap["useTmux"] != "false",
+                        customScript = projectMap["customScript"] ?: "cd {{PROJECT_PATH}}",
+                        aiCommand = projectMap["aiCommand"] ?: "",
+                        colorSeed = projectMap["colorSeed"]?.toIntOrNull() ?: 0,
+                        gitUrl = projectMap["gitUrl"] ?: ""
+                    )
+                    projectRepo.save(project)
+                    projectsImported++
+                }
             }
         }
         return ImportResult(serversImported, projectsImported)

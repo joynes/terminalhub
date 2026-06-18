@@ -26,6 +26,8 @@ class ProjectRepository @Inject constructor(
 
     suspend fun delete(project: Project) = dao.delete(project.toEntity())
 
+    suspend fun clearAll() = dao.clearAll()
+
     suspend fun updateLastOpenedAt(projectId: Long, timestamp: Long) =
         dao.updateLastOpenedAt(projectId, timestamp)
 

@@ -20,4 +20,7 @@ interface TextInputHistoryDao {
         )
     """)
     suspend fun pruneOldest(projectId: Long)
+
+    @Query("DELETE FROM text_input_history")
+    suspend fun clearAll()
 }

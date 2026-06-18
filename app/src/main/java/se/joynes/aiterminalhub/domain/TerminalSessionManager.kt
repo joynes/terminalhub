@@ -97,6 +97,14 @@ class TerminalSessionManager @Inject constructor(
     fun markProjectOpen(projectId: Long)   { closedProjectIds.remove(projectId); persistClosed() }
     fun isProjectClosed(projectId: Long)   = projectId in closedProjectIds
 
+    fun clearForConfigImport() {
+        entries.keys.map(::TerminalSessionId).forEach { close(it, killTmuxSession = false) }
+        _closedSessions.value = emptyList()
+        closedProjectIds.clear()
+        persistClosed()
+        publishSessions()
+    }
+
     fun activeSession(): StateFlow<TerminalSession?> = _activeSession.asStateFlow()
 
     fun localProjectPath(projectName: String): String =

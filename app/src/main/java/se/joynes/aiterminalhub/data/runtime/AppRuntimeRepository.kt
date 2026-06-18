@@ -136,6 +136,24 @@ class AppRuntimeRepository @Inject constructor(
         )
     }
 
+    fun clearSessionState() {
+        update(
+            _state.value.copy(
+                remoteProjectIds = emptySet(),
+                localProjectIds = emptySet(),
+                activeProjectId = null,
+                foregroundServiceRunning = false,
+                recoveryPending = false,
+                recoveryRemoteProjectIds = emptySet(),
+                recoveryLocalProjectIds = emptySet(),
+                recoveryActiveProjectId = null,
+                lastSshDisconnectProjectId = null,
+                lastSshDisconnectSummary = null,
+                lastSshDisconnectAt = null
+            )
+        )
+    }
+
     private fun update(next: AppRuntimeState) {
         persist(next)
     }
