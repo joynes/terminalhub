@@ -34,10 +34,11 @@ class ExportImportManager @Inject constructor(
 ) {
     // ── Serialization ───────────────────────────────────────────────────────
 
-    suspend fun exportYaml(context: Context, uri: Uri) {
+    suspend fun exportYaml(context: Context, uri: Uri, activeProjectIds: Set<Long>? = null) {
         val servers = serverRepo.getAll().first()
         val yaml = buildYaml(servers) { server ->
-            projectRepo.getByServer(server.id).first()
+            val projects = projectRepo.getByServer(server.id).first()
+            activeProjectIds?.let { ids -> projects.filter { it.id in ids } } ?: projects
         }
         val output = context.contentResolver.openOutputStream(uri, "wt")
             ?: error("Cannot open export destination")

@@ -109,7 +109,15 @@ fun SessionHostScreen(
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")
-    ) { uri -> uri?.let { exportImportViewModel.export(context, it) } }
+    ) { uri ->
+        uri?.let {
+            exportImportViewModel.export(
+                context,
+                it,
+                activeProjectIds = projectTabs.map { tab -> tab.projectId }.toSet()
+            )
+        }
+    }
 
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()

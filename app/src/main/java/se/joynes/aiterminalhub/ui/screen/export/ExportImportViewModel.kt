@@ -28,11 +28,11 @@ class ExportImportViewModel @Inject constructor(
     private val _state = MutableStateFlow<ExportImportState>(ExportImportState.Idle)
     val state: StateFlow<ExportImportState> = _state.asStateFlow()
 
-    fun export(context: Context, uri: Uri) {
+    fun export(context: Context, uri: Uri, activeProjectIds: Set<Long>? = null) {
         _state.value = ExportImportState.Working
         viewModelScope.launch {
             try {
-                manager.exportYaml(context, uri)
+                manager.exportYaml(context, uri, activeProjectIds)
                 _state.value = ExportImportState.ExportDone
             } catch (e: Exception) {
                 _state.value = ExportImportState.Error(e.message ?: "Export failed")
