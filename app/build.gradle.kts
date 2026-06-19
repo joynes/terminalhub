@@ -11,21 +11,21 @@ fun gitCommitCount(): Int = try {
         .inputStream.bufferedReader().readLine().trim().toInt()
 } catch (_: Exception) { 1 }
 
-fun legacyExportFixVersionCode(): Int = maxOf(gitCommitCount(), 203)
+fun legacyExportFixVersionCode(): Int = maxOf(gitCommitCount(), 204)
 
 android {
-    namespace = "se.joynes.aiterminalhub"
+    namespace = "se.joynes.aiterminal"
     compileSdk = 36
     flavorDimensions += "mode"
 
     defaultConfig {
-        applicationId = "se.joynes.aiterminalhub"
+        applicationId = "se.joynes.aiterminal"
         minSdk = 24
         targetSdk = 36
         versionCode = legacyExportFixVersionCode()
         versionName = "1.${legacyExportFixVersionCode()}"
 
-        testInstrumentationRunner = "se.joynes.aiterminalhub.HiltTestRunner"
+        testInstrumentationRunner = "se.joynes.aiterminal.HiltTestRunner"
     }
     productFlavors {
         create("production") {

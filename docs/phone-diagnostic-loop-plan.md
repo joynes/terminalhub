@@ -43,8 +43,8 @@ Recommended setup:
 
 Target outcome:
 
-- Release app stays installed as `se.joynes.aiterminalhub`
-- Diagnostic app installs separately as `se.joynes.aiterminalhub.diag`
+- Release app stays installed as `se.joynes.aiterminal`
+- Diagnostic app installs separately as `se.joynes.aiterminal.diag`
 
 ## What The Diagnostic App Should Contain
 
@@ -211,7 +211,7 @@ Stop the loop once one of these is true:
 
 Implement the first safe milestone:
 
-- create the side-by-side diagnostic package `se.joynes.aiterminalhub.diag`
+- create the side-by-side diagnostic package `se.joynes.aiterminal.diag`
 - keep the current release package untouched
 - move the current terminal diagnostics into that diagnostic package
 - use that package for all further phone loops

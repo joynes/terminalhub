@@ -1,0 +1,10 @@
+package se.joynes.aiterminal.domain.usecase
+
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import se.joynes.aiterminal.data.model.ServerStatus
+import javax.inject.Inject
+
+class GetServerStatus @Inject constructor() {
+    operator fun invoke(serverId: Long): Flow<ServerStatus> = emptyFlow()
+}

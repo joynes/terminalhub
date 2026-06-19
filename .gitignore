@@ -25,3 +25,4 @@ local.properties
 /Screenshot_*.jpg
 /app-icon-cut.png
 /file_*.png
+/aiterminal_backup.yaml.txt

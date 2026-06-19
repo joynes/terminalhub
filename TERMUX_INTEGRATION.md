@@ -22,7 +22,7 @@ It does not include Termux's `TermuxActivity`, `TermuxService`, `termux-shared`,
 
 ## Session Model
 
-The core integration lives in `app/src/main/java/se/joynes/aiterminalhub/domain/TerminalSessionManager.kt`.
+The core integration lives in `app/src/main/java/se/joynes/aiterminal/domain/TerminalSessionManager.kt`.
 
 What it does:
 
@@ -37,8 +37,8 @@ This is the key design choice: Termux's terminal engine is being used as a rende
 
 The actual widget embedding is in:
 
-- `app/src/main/java/se/joynes/aiterminalhub/ui/screen/terminal/TerminalScreen.kt`
-- `app/src/main/java/se/joynes/aiterminalhub/ui/screen/sessions/SessionHostScreen.kt`
+- `app/src/main/java/se/joynes/aiterminal/ui/screen/terminal/TerminalScreen.kt`
+- `app/src/main/java/se/joynes/aiterminal/ui/screen/sessions/SessionHostScreen.kt`
 
 The flow is:
 
@@ -51,7 +51,7 @@ So the Termux widget is embedded as a normal Android view inside Compose, with C
 
 ## Input Handling
 
-The custom input bridge is in `app/src/main/java/se/joynes/aiterminalhub/ui/screen/terminal/TerminalViewClientImpl.kt`.
+The custom input bridge is in `app/src/main/java/se/joynes/aiterminal/ui/screen/terminal/TerminalViewClientImpl.kt`.
 
 What it does:
 
@@ -61,11 +61,11 @@ What it does:
 - Intercepts special keys in `onKeyDown(...)` and translates them to ANSI escape sequences.
 - Uses tap events only to trigger keyboard showing.
 
-The extra keys UI is not Termux's stock extra-keys view. AITerminal has its own Compose bar in `app/src/main/java/se/joynes/aiterminalhub/ui/screen/terminal/SpecialKeyBar.kt`, which emits escape sequences and modifier state into that same bridge.
+The extra keys UI is not Termux's stock extra-keys view. AITerminal has its own Compose bar in `app/src/main/java/se/joynes/aiterminal/ui/screen/terminal/SpecialKeyBar.kt`, which emits escape sequences and modifier state into that same bridge.
 
 ## Session Client Hooks
 
-`TerminalSessionClientImpl` is a minimal adapter in `app/src/main/java/se/joynes/aiterminalhub/data/ssh/TerminalSessionClientImpl.kt`.
+`TerminalSessionClientImpl` is a minimal adapter in `app/src/main/java/se/joynes/aiterminal/data/ssh/TerminalSessionClientImpl.kt`.
 
 It mostly no-ops the Termux callbacks, except:
 

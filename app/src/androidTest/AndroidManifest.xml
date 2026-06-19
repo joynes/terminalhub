@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity
-            android:name="se.joynes.aiterminalhub.HiltTestActivity"
+            android:name="se.joynes.aiterminal.HiltTestActivity"
             android:exported="true" />
     </application>
 </manifest>

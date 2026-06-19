@@ -39,8 +39,8 @@ The fix was not one single line. It was a combination of host-view and renderer 
 
 ## Files Involved
 
-- `app/src/main/java/se/joynes/aiterminalhub/ui/screen/sessions/SessionHostScreen.kt`
-- `app/src/main/java/se/joynes/aiterminalhub/ui/screen/terminal/TerminalScreen.kt`
+- `app/src/main/java/se/joynes/aiterminal/ui/screen/sessions/SessionHostScreen.kt`
+- `app/src/main/java/se/joynes/aiterminal/ui/screen/terminal/TerminalScreen.kt`
 - `terminal-view/src/main/java/com/termux/view/TerminalView.java`
 - `terminal-view/src/main/java/com/termux/view/TerminalRenderer.java`
 
