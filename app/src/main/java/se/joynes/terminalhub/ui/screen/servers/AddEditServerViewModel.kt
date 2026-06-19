@@ -13,12 +13,21 @@ import se.joynes.terminalhub.data.db.entity.ServerEntity
 import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.security.SecurePrefsManager
+import se.joynes.terminalhub.data.security.SshKeyGenerator
 import se.joynes.terminalhub.data.ssh.SshManager
+import se.joynes.terminalhub.data.ssh.SshPublicKeyInstaller
 import javax.inject.Inject
 
 enum class SshTestStatus {
     Idle,
     Testing,
+    Success,
+    Failure
+}
+
+enum class KeyInstallStatus {
+    Idle,
+    Installing,
     Success,
     Failure
 }
@@ -30,11 +39,14 @@ data class AddEditServerState(
     val username: String = "",
     val password: String = "",
     val privateKey: String = "",
+    val publicKey: String = "",
     val hasSavedPrivateKey: Boolean = false,
     val projectsFolder: String = "~/terminalhub",
     val setupScript: String = ServerEntity.DEFAULT_SETUP_SCRIPT,
     val sshTestStatus: SshTestStatus = SshTestStatus.Idle,
     val sshTestMessage: String = "",
+    val keyInstallStatus: KeyInstallStatus = KeyInstallStatus.Idle,
+    val keyInstallMessage: String = "",
     val saved: Boolean = false
 )
 
@@ -42,7 +54,9 @@ data class AddEditServerState(
 class AddEditServerViewModel @Inject constructor(
     private val repo: ServerRepository,
     private val securePrefs: SecurePrefsManager,
-    private val sshManager: SshManager
+    private val sshManager: SshManager,
+    private val keyGenerator: SshKeyGenerator,
+    private val publicKeyInstaller: SshPublicKeyInstaller
 ) : ViewModel() {
     private val _state = MutableStateFlow(AddEditServerState())
     val state: StateFlow<AddEditServerState> = _state.asStateFlow()
@@ -70,7 +84,64 @@ class AddEditServerViewModel @Inject constructor(
     fun update(block: AddEditServerState.() -> AddEditServerState) {
         _state.value = _state.value
             .block()
-            .copy(sshTestStatus = SshTestStatus.Idle, sshTestMessage = "")
+            .copy(
+                sshTestStatus = SshTestStatus.Idle,
+                sshTestMessage = "",
+                keyInstallStatus = KeyInstallStatus.Idle,
+                keyInstallMessage = ""
+            )
+    }
+
+    fun generateKey() {
+        val s = _state.value
+        val commentHost = s.host.ifBlank { "server" }.trim()
+        val commentUser = s.username.ifBlank { "terminalhub" }.trim()
+        val generated = keyGenerator.generate("$commentUser@$commentHost-terminalhub")
+        _state.value = s.copy(
+            privateKey = generated.privateKeyPem,
+            publicKey = generated.publicKeyOpenSsh,
+            hasSavedPrivateKey = false,
+            keyInstallStatus = KeyInstallStatus.Idle,
+            keyInstallMessage = "Generated a new SSH key. Install it on the server, then save."
+        )
+    }
+
+    fun installGeneratedKey() {
+        val s = _state.value
+        if (s.host.isBlank() || s.username.isBlank()) return
+        if (s.publicKey.isBlank()) {
+            _state.value = s.copy(
+                keyInstallStatus = KeyInstallStatus.Failure,
+                keyInstallMessage = "Generate a key first."
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            _state.value = _state.value.copy(
+                keyInstallStatus = KeyInstallStatus.Installing,
+                keyInstallMessage = "Installing public key..."
+            )
+            val current = _state.value
+            val password = current.password.ifBlank {
+                editingId?.let { securePrefs.getPassword(it) }.orEmpty()
+            }
+            val server = Server(
+                id = editingId ?: 0L,
+                name = current.name.ifBlank { current.host },
+                host = current.host.trim(),
+                port = current.port.toIntOrNull() ?: 22,
+                username = current.username.trim(),
+                projectsFolder = current.projectsFolder,
+                setupScript = current.setupScript
+            )
+            val result = publicKeyInstaller.install(server, password, current.publicKey)
+            _state.value = _state.value.copy(
+                keyInstallStatus = if (result.isSuccess) KeyInstallStatus.Success else KeyInstallStatus.Failure,
+                keyInstallMessage = result.exceptionOrNull()?.message
+                    ?: "Public key installed. Save the server; the password was only needed once."
+            )
+        }
     }
 
     fun save() {
@@ -86,21 +157,24 @@ class AddEditServerViewModel @Inject constructor(
                 projectsFolder = s.projectsFolder,
                 setupScript = s.setupScript
             )
+            val usesPrivateKey = s.privateKey.isNotBlank() || s.hasSavedPrivateKey
             // For edits: save credentials before DB update so the Room flow never
             // sees the server without credentials already in place.
-            if (editingId != null && s.password.isNotBlank()) {
-                securePrefs.savePassword(editingId!!, s.password)
-            }
-            if (editingId != null && s.privateKey.isNotBlank()) {
-                securePrefs.savePrivateKey(editingId!!, s.privateKey.trim())
+            if (editingId != null) {
+                if (s.privateKey.isNotBlank()) securePrefs.savePrivateKey(editingId!!, s.privateKey.trim())
+                if (usesPrivateKey) {
+                    securePrefs.deletePassword(editingId!!)
+                } else if (s.password.isNotBlank()) {
+                    securePrefs.savePassword(editingId!!, s.password)
+                }
             }
             val savedId = if (editingId != null) {
                 repo.update(server); editingId!!
             } else {
                 // New server: DB generates the ID, save credentials immediately after.
                 val id = repo.save(server)
-                if (s.password.isNotBlank()) securePrefs.savePassword(id, s.password)
                 if (s.privateKey.isNotBlank()) securePrefs.savePrivateKey(id, s.privateKey.trim())
+                if (!usesPrivateKey && s.password.isNotBlank()) securePrefs.savePassword(id, s.password)
                 id
             }
             _state.value = _state.value.copy(saved = true)

@@ -81,6 +81,66 @@ fun AddEditServerScreen(
                     color = MegaDriveGreen
                 )
             }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                RetroButton(
+                    text = "[ GENERATE KEY ]",
+                    onClick = { viewModel.generateKey() },
+                    modifier = Modifier.weight(1f)
+                )
+                RetroButton(
+                    text = if (state.keyInstallStatus == KeyInstallStatus.Installing) "[ INSTALLING ]" else "[ INSTALL ON SERVER ]",
+                    onClick = { viewModel.installGeneratedKey() },
+                    modifier = Modifier.weight(1f),
+                    enabled = state.host.isNotBlank() &&
+                        state.username.isNotBlank() &&
+                        state.password.isNotBlank() &&
+                        state.publicKey.isNotBlank() &&
+                        state.keyInstallStatus != KeyInstallStatus.Installing
+                )
+            }
+            Text(
+                "Key install uses the password once to write ~/.ssh/authorized_keys; saved servers use the private key.",
+                color = MegaDriveDim,
+                fontSize = 10.sp,
+                fontFamily = MonoFontFamily
+            )
+            if (state.publicKey.isNotBlank()) {
+                Text("PUBLIC KEY", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+                OutlinedTextField(
+                    value = state.publicKey,
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier.fillMaxWidth().height(92.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontFamily = MonoFontFamily,
+                        fontSize = 10.sp,
+                        color = MegaDriveOnSurface
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MegaDrivePrimary,
+                        unfocusedBorderColor = MegaDriveDim,
+                        focusedTextColor = MegaDriveOnSurface,
+                        unfocusedTextColor = MegaDriveOnSurface,
+                        cursorColor = MegaDrivePrimary
+                    )
+                )
+            }
+            if (state.keyInstallMessage.isNotBlank()) {
+                Text(
+                    state.keyInstallMessage,
+                    color = when (state.keyInstallStatus) {
+                        KeyInstallStatus.Success -> MegaDriveGreen
+                        KeyInstallStatus.Failure -> MegaDriveError
+                        KeyInstallStatus.Installing -> MegaDriveWarning
+                        KeyInstallStatus.Idle -> MegaDriveDim
+                    },
+                    fontSize = 10.sp,
+                    fontFamily = MonoFontFamily
+                )
+            }
             RetroTextField(state.projectsFolder, { viewModel.update { copy(projectsFolder = it) } }, "Projects Folder", Modifier.fillMaxWidth())
 
             Row(
