@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.AITerminal" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.TerminalHub" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/mega_drive_bg</item>
         <item name="android:forceDarkAllowed">false</item>
     </style>

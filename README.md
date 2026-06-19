@@ -1,6 +1,6 @@
-# AITerminal
+# TerminalHub
 
-AITerminal is an Android SSH terminal for people who run real work somewhere
+TerminalHub is an Android SSH terminal for people who run real work somewhere
 else and use the phone as the slightly-too-small cockpit. It is built around
 SSH, tmux, project tabs, file transfer, and AI terminal tools such as Claude
 Code, Codex, Gemini, and Openclaw.
@@ -65,8 +65,8 @@ For the remote machine you connect to:
 Clone the repository:
 
 ```sh
-git clone https://github.com/joynes/AITerminal.git
-cd AITerminal
+git clone https://github.com/joynes/terminalhub.git
+cd terminalhub
 ```
 
 Check that the Gradle wrapper is present:
@@ -161,7 +161,7 @@ $HOME/Library/Android/sdk/platform-tools/adb devices
 
 ## License
 
-AITerminal is released under the GNU General Public License v3.0 only. See
+TerminalHub is released under the GNU General Public License v3.0 only. See
 [LICENSE](LICENSE).
 
 The app includes or adapts terminal components from the Termux project. See

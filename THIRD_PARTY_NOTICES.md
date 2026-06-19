@@ -1,18 +1,18 @@
 # Third-Party Notices
 
 This project includes or adapts code, assets, and libraries from the following
-projects. Unless otherwise noted, AITerminal's own source code is distributed
+projects. Unless otherwise noted, TerminalHub's own source code is distributed
 under GPLv3 only as described in `LICENSE`.
 
 ## Termux
 
-AITerminal includes Termux terminal integration code and terminal rendering/input components adapted from the Termux project:
+TerminalHub includes Termux terminal integration code and terminal rendering/input components adapted from the Termux project:
 
 - https://github.com/termux/termux-app
 
 The Termux app repository is released under GPLv3 only. Its upstream license notes state exceptions for Terminal Emulator for Android code in the `terminal-view` and `terminal-emulator` libraries under Apache License 2.0.
 
-AITerminal is distributed under GPLv3 only to satisfy redistribution requirements for GPL-covered Termux-derived code.
+TerminalHub is distributed under GPLv3 only to satisfy redistribution requirements for GPL-covered Termux-derived code.
 
 ## Terminal Emulator for Android
 
@@ -73,5 +73,5 @@ The test-only dependencies include:
 
 ## Source Availability
 
-AITerminal's corresponding source is the contents of this repository. Build
+TerminalHub's corresponding source is the contents of this repository. Build
 instructions are in `README.md`.

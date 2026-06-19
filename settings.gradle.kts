@@ -20,7 +20,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "AITerminal"
+rootProject.name = "TerminalHub"
 include(":app")
 include(":terminal-emulator")
 include(":terminal-view")

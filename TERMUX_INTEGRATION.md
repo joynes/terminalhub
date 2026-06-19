@@ -1,8 +1,8 @@
-# Termux Terminal Integration In AITerminal
+# Termux Terminal Integration In TerminalHub
 
 Timestamp: 2026-03-23 19:32:19 CET
 
-AITerminal integrates the Termux terminal library as an embedded terminal widget layer, not as the full Termux app/runtime.
+TerminalHub integrates the Termux terminal library as an embedded terminal widget layer, not as the full Termux app/runtime.
 
 ## Dependency Layer
 
@@ -11,7 +11,7 @@ The app pulls in the two published Termux modules from JitPack in `gradle/libs.v
 - `terminal-emulator`
 - `terminal-view`
 
-That means AITerminal reuses:
+That means TerminalHub reuses:
 
 - `com.termux.terminal.TerminalSession`
 - `com.termux.view.TerminalView`
@@ -22,7 +22,7 @@ It does not include Termux's `TermuxActivity`, `TermuxService`, `termux-shared`,
 
 ## Session Model
 
-The core integration lives in `app/src/main/java/se/joynes/aiterminal/domain/TerminalSessionManager.kt`.
+The core integration lives in `app/src/main/java/se/joynes/terminalhub/domain/TerminalSessionManager.kt`.
 
 What it does:
 
@@ -37,8 +37,8 @@ This is the key design choice: Termux's terminal engine is being used as a rende
 
 The actual widget embedding is in:
 
-- `app/src/main/java/se/joynes/aiterminal/ui/screen/terminal/TerminalScreen.kt`
-- `app/src/main/java/se/joynes/aiterminal/ui/screen/sessions/SessionHostScreen.kt`
+- `app/src/main/java/se/joynes/terminalhub/ui/screen/terminal/TerminalScreen.kt`
+- `app/src/main/java/se/joynes/terminalhub/ui/screen/sessions/SessionHostScreen.kt`
 
 The flow is:
 
@@ -51,7 +51,7 @@ So the Termux widget is embedded as a normal Android view inside Compose, with C
 
 ## Input Handling
 
-The custom input bridge is in `app/src/main/java/se/joynes/aiterminal/ui/screen/terminal/TerminalViewClientImpl.kt`.
+The custom input bridge is in `app/src/main/java/se/joynes/terminalhub/ui/screen/terminal/TerminalViewClientImpl.kt`.
 
 What it does:
 
@@ -61,17 +61,17 @@ What it does:
 - Intercepts special keys in `onKeyDown(...)` and translates them to ANSI escape sequences.
 - Uses tap events only to trigger keyboard showing.
 
-The extra keys UI is not Termux's stock extra-keys view. AITerminal has its own Compose bar in `app/src/main/java/se/joynes/aiterminal/ui/screen/terminal/SpecialKeyBar.kt`, which emits escape sequences and modifier state into that same bridge.
+The extra keys UI is not Termux's stock extra-keys view. TerminalHub has its own Compose bar in `app/src/main/java/se/joynes/terminalhub/ui/screen/terminal/SpecialKeyBar.kt`, which emits escape sequences and modifier state into that same bridge.
 
 ## Session Client Hooks
 
-`TerminalSessionClientImpl` is a minimal adapter in `app/src/main/java/se/joynes/aiterminal/data/ssh/TerminalSessionClientImpl.kt`.
+`TerminalSessionClientImpl` is a minimal adapter in `app/src/main/java/se/joynes/terminalhub/data/ssh/TerminalSessionClientImpl.kt`.
 
 It mostly no-ops the Termux callbacks, except:
 
 - copy-to-clipboard support
 
-So AITerminal uses only the callback surface it needs.
+So TerminalHub uses only the callback surface it needs.
 
 ## Compared With Real Termux
 
@@ -94,4 +94,4 @@ Different from Termux:
 
 ## Summary
 
-AITerminal integrated Termux correctly as a terminal widget/emulator library, then wrapped it with its own SSH transport, Compose UI, tabs, and special-key UX. It is not a fork of the Termux app; it is a custom SSH app using Termux's terminal engine as the rendering/input core.
+TerminalHub integrated Termux correctly as a terminal widget/emulator library, then wrapped it with its own SSH transport, Compose UI, tabs, and special-key UX. It is not a fork of the Termux app; it is a custom SSH app using Termux's terminal engine as the rendering/input core.

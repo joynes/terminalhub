@@ -14,18 +14,18 @@ fun gitCommitCount(): Int = try {
 fun legacyExportFixVersionCode(): Int = maxOf(gitCommitCount(), 204)
 
 android {
-    namespace = "se.joynes.aiterminal"
+    namespace = "se.joynes.terminalhub"
     compileSdk = 36
     flavorDimensions += "mode"
 
     defaultConfig {
-        applicationId = "se.joynes.aiterminal"
+        applicationId = "se.joynes.terminalhub"
         minSdk = 24
         targetSdk = 36
         versionCode = legacyExportFixVersionCode()
         versionName = "1.${legacyExportFixVersionCode()}"
 
-        testInstrumentationRunner = "se.joynes.aiterminal.HiltTestRunner"
+        testInstrumentationRunner = "se.joynes.terminalhub.HiltTestRunner"
     }
     productFlavors {
         create("production") {
