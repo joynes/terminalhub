@@ -1,31 +1,23 @@
 # TerminalHub
 
-TerminalHub is an Android SSH terminal for people who run real work somewhere
-else and use the phone as the slightly-too-small cockpit. It is built around
-SSH, tmux, project tabs, file transfer, and AI terminal tools such as Claude
-Code, Codex, Gemini, and Openclaw.
+## Built For AI Terminal Sessions
 
-It uses Jetpack Compose for the Android UI and Termux terminal components for
-terminal rendering and input behavior.
+TerminalHub is made for people who use a phone to control a real computer over
+SSH. The typical setup is a home server, workstation, or local machine on a
+private network, preferably through Tailscale or another VPN.
 
-## Built For AI Terminal Work
+The main idea is fast switching between terminal tabs. Each tab can run its own
+AI terminal client or shell session in the same project: one tab for Claude
+Code, one for Codex, one for Gemini, one for a local AI model, and one plain
+terminal for commands like `git`, `sudo`, logs, installs, and fixes.
 
-TerminalHub is especially shaped for advanced AI-terminal use: you have a home
-machine, lab box, workstation, or other local server with an SSH user, and you
-want your phone to become the control surface for that machine.
+This is useful when one AI is busy, stuck, out of tokens, or simply the wrong
+tool for the next step. Instead of stopping your workflow, you switch tab and
+continue with another AI or a normal shell in the same remote environment.
 
-The point is not to hide the terminal. The point is to keep the terminal, with
-all the power and mild sharp edges that implies, while making it practical on a
-phone. You can keep one tab running Gemini, another running a local AI model,
-another running Claude Code or Codex, and another plain shell for the ancient
-rituals: `git`, `sudo`, logs, package installs, broken PATH archaeology, and
-whatever command needs to happen right now.
-
-Because these are real terminal sessions, AI clients keep their normal features:
-slash commands, shell escapes, project context, long-running jobs, tmux state,
-and the full mess of useful things a web chat usually sands off. TerminalHub is
-for people who want the AI tool and the Unix toolbelt in the same pocket-sized
-rectangle.
+Because the AI clients run in real terminals, you keep their advanced features:
+slash commands, project-aware commands, interactive prompts, long-running tasks,
+and tmux-backed sessions that can survive reconnects.
 
 ## Why This Exists
 
