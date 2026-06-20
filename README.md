@@ -2,22 +2,16 @@
 
 ## Built For AI Terminal Sessions
 
-TerminalHub is made for people who use a phone to control a real computer over
-SSH. The typical setup is a home server, workstation, or local machine on a
-private network, preferably through Tailscale or another VPN.
+TerminalHub lets your phone control a real computer over SSH, usually a home
+server or workstation on Tailscale/VPN. It is built around fast tab switching:
+Claude Code in one tab, Codex in another, Gemini or local AI in another, plus a
+normal shell for `git`, `sudo`, logs, installs, and fixes.
 
-The main idea is fast switching between terminal tabs. Each tab can run its own
-AI terminal client or shell session in the same project: one tab for Claude
-Code, one for Codex, one for Gemini, one for a local AI model, and one plain
-terminal for commands like `git`, `sudo`, logs, installs, and fixes.
-
-This is useful when one AI is busy, stuck, out of tokens, or simply the wrong
-tool for the next step. Instead of stopping your workflow, you switch tab and
-continue with another AI or a normal shell in the same remote environment.
-
-Because the AI clients run in real terminals, you keep their advanced features:
-slash commands, project-aware commands, interactive prompts, long-running tasks,
-and tmux-backed sessions that can survive reconnects.
+When one AI is busy, stuck, or out of tokens, switch tabs and keep working in
+the same remote project. Because the clients run in real terminals, you keep
+slash commands, project-aware prompts, long-running tasks, and tmux-backed
+reconnects. The keybar is tuned for quick AI-terminal interaction, with common
+terminal keys and upload/download actions close at hand.
 
 ## Why This Exists
 
