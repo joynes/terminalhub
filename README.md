@@ -12,10 +12,10 @@ normal shell for `git`, `sudo`, logs, installs, and fixes.
 
 TerminalHub is AI agnostic: when one client runs out of tokens, continue with
 another AI client in the same project. Because the clients run in real
-terminals, you keep slash commands, project-aware prompts, long-running tasks,
-and tmux-backed reconnects. The keybar is tuned for quick AI-terminal
-interaction, with common terminal keys and upload/download actions close at
-hand.
+terminals, you keep advanced AI-client-specific slash commands, project-aware
+prompts, long-running tasks, and tmux-backed reconnects. The keybar is tuned
+for quick AI-terminal interaction, with common terminal keys and
+upload/download actions close at hand.
 
 ![TerminalHub demo](docs/assets/terminalhub-demo.gif)
 
