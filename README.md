@@ -7,11 +7,12 @@ server or workstation on Tailscale/VPN. It is built around fast tab switching:
 Claude Code in one tab, Codex in another, Gemini or local AI in another, plus a
 normal shell for `git`, `sudo`, logs, installs, and fixes.
 
-When one AI is busy, stuck, or out of tokens, switch tabs and keep working in
-the same remote project. Because the clients run in real terminals, you keep
-slash commands, project-aware prompts, long-running tasks, and tmux-backed
-reconnects. The keybar is tuned for quick AI-terminal interaction, with common
-terminal keys and upload/download actions close at hand.
+TerminalHub is AI agnostic: when one client runs out of tokens, continue with
+another AI client in the same project. Because the clients run in real
+terminals, you keep slash commands, project-aware prompts, long-running tasks,
+and tmux-backed reconnects. The keybar is tuned for quick AI-terminal
+interaction, with common terminal keys and upload/download actions close at
+hand.
 
 ## Why This Exists
 
