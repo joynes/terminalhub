@@ -1,5 +1,8 @@
 # TerminalHub
 
+**Android only.** TerminalHub is an Android app; the machine you connect to can
+be Linux, macOS, a home server, workstation, or VPS as long as it runs SSH.
+
 ## Built For AI Terminal Sessions
 
 TerminalHub lets your phone control a real computer over SSH, usually a home
