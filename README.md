@@ -8,6 +8,25 @@ Code, Codex, Gemini, and Openclaw.
 It uses Jetpack Compose for the Android UI and Termux terminal components for
 terminal rendering and input behavior.
 
+## Built For AI Terminal Work
+
+TerminalHub is especially shaped for advanced AI-terminal use: you have a home
+machine, lab box, workstation, or other local server with an SSH user, and you
+want your phone to become the control surface for that machine.
+
+The point is not to hide the terminal. The point is to keep the terminal, with
+all the power and mild sharp edges that implies, while making it practical on a
+phone. You can keep one tab running Gemini, another running a local AI model,
+another running Claude Code or Codex, and another plain shell for the ancient
+rituals: `git`, `sudo`, logs, package installs, broken PATH archaeology, and
+whatever command needs to happen right now.
+
+Because these are real terminal sessions, AI clients keep their normal features:
+slash commands, shell escapes, project context, long-running jobs, tmux state,
+and the full mess of useful things a web chat usually sands off. TerminalHub is
+for people who want the AI tool and the Unix toolbelt in the same pocket-sized
+rectangle.
+
 ## Why This Exists
 
 - **Tabs are the main event.** Tap the top bar and jump between live sessions.
@@ -54,11 +73,18 @@ For the Android build machine:
 
 For the remote machine you connect to:
 
+- A local server, home computer, workstation, VPS, or lab machine reachable over
+  the network.
 - SSH server.
 - A user account you can log into.
 - `tmux` installed if you want session restore, which you probably do.
 - Optional: AI terminal tools such as `claude`, `codex`, `gemini`, or
   `openclaw` installed on that remote machine.
+
+For safety and convenience, using a private VPN mesh such as Tailscale is
+recommended. It keeps SSH off the public internet, makes phones and home
+machines easier to reach, and generally removes several boring network problems
+before they can become a personality.
 
 ## Fresh Setup
 
@@ -151,12 +177,16 @@ $HOME/Library/Android/sdk/platform-tools/adb devices
 
 ## First Run
 
-1. Add an SSH server with host, port, username, and password or private key.
-2. Add a project pointing at that server and the remote project directory.
-3. Make sure `tmux` is installed on the remote machine.
-4. Open the project. A tab/session should appear.
-5. Use the keybar for common terminal keys, upload, and download.
-6. Use the larger text input when talking to AI tools like a person instead of
+1. Prepare a machine you can SSH into. A home computer or local server over
+   Tailscale is the intended boring-good setup.
+2. Install `tmux` and any AI terminal clients you want on that machine.
+3. Add an SSH server with host, port, username, and password or private key.
+4. Add a project pointing at that server and the remote project directory.
+5. Open the project. A tab/session should appear.
+6. Start separate tabs for Gemini, a local AI model, Claude Code, Codex, or a
+   plain shell for direct terminal work.
+7. Use the keybar for common terminal keys, upload, and download.
+8. Use the larger text input when talking to AI tools like a person instead of
    feeding the shell one nervous line at a time.
 
 ## License
