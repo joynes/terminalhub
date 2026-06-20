@@ -14,6 +14,8 @@ and tmux-backed reconnects. The keybar is tuned for quick AI-terminal
 interaction, with common terminal keys and upload/download actions close at
 hand.
 
+![TerminalHub demo](docs/assets/terminalhub-demo.gif)
+
 ## Why This Exists
 
 - **Tabs are the main event.** Tap the top bar and jump between live sessions.

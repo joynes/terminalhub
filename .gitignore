@@ -23,6 +23,8 @@ local.properties
 
 # Local generated images/screenshots
 /Screenshot_*.jpg
+/Screen_Recording_*.mp4
 /app-icon-cut.png
 /file_*.png
-/aiterminal_backup.yaml.txt
+/*terminal*_backup*.yaml*
+/*terminal*_backup*.txt
