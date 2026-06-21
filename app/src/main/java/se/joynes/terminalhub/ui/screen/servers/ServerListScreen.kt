@@ -21,9 +21,6 @@ import se.joynes.terminalhub.ui.theme.*
 fun ServerListScreen(
     onAddServer: () -> Unit,
     onEditServer: (Long) -> Unit,
-    onOpenTerminal: (Long) -> Unit,
-    onOpenStatus: (Long) -> Unit,
-    onOpenUpload: (Long) -> Unit,
     onOpenLog: () -> Unit,
     onOpenSessionLog: () -> Unit,
     viewModel: ServerListViewModel = hiltViewModel()
@@ -68,10 +65,7 @@ fun ServerListScreen(
                     items(servers) { server ->
                         ServerCard(
                             server = server,
-                            onEdit = { onEditServer(server.id) },
-                            onOpenTerminal = { onOpenTerminal(server.id) },
-                            onOpenStatus = { onOpenStatus(server.id) },
-                            onOpenUpload = { onOpenUpload(server.id) }
+                            onEdit = { onEditServer(server.id) }
                         )
                     }
                 }
@@ -83,10 +77,7 @@ fun ServerListScreen(
 @Composable
 private fun ServerCard(
     server: Server,
-    onEdit: () -> Unit,
-    onOpenTerminal: () -> Unit,
-    onOpenStatus: () -> Unit,
-    onOpenUpload: () -> Unit
+    onEdit: () -> Unit
 ) {
     RetroCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -97,15 +88,7 @@ private fun ServerCard(
             Spacer(Modifier.height(4.dp))
             Text("${server.username}@${server.host}:${server.port}", color = MegaDriveOnSurface, fontSize = 12.sp, fontFamily = MonoFontFamily)
             Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RetroButton("TERMINAL", onOpenTerminal, Modifier.weight(1f))
-                RetroButton("EDIT", onEdit, Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(4.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RetroButton("STATUS", onOpenStatus, Modifier.weight(1f))
-                RetroButton("UPLOAD", onOpenUpload, Modifier.weight(1f))
-            }
+            RetroButton("EDIT", onEdit, Modifier.fillMaxWidth())
         }
     }
 }

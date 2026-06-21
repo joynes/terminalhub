@@ -50,6 +50,8 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenSessions: () -> Unit,
+    onOpenServers: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -144,6 +146,25 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                item {
+                    SettingsCard(
+                        title = "NAVIGATION",
+                        description = "Jump between active terminal sessions and server configuration from here."
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            RetroButton(
+                                text = "SESSIONS",
+                                onClick = onOpenSessions,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            RetroButton(
+                                text = "SERVERS",
+                                onClick = onOpenServers,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
                 item {
                     SettingsCard(
                         title = "BACKGROUND STATUS",

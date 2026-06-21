@@ -46,13 +46,6 @@ fun AppNavGraph(
             ServerListScreen(
                 onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
                 onEditServer = { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) },
-                onOpenTerminal = { id ->
-                    navController.navigate(Screen.SessionHost.createRoute(id)) {
-                        launchSingleTop = true
-                    }
-                },
-                onOpenStatus = { id -> navController.navigate(Screen.ServerStatus.createRoute(id)) },
-                onOpenUpload = { id -> navController.navigate(Screen.FileUpload.createRoute(id)) },
                 onOpenLog = { navController.navigate(Screen.AppLog.route) },
                 onOpenSessionLog = { navController.navigate(Screen.SessionLog.route) }
             )
@@ -94,7 +87,15 @@ fun AppNavGraph(
             )
         }
         composable(Screen.Settings.route) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenSessions = {
+                    navController.navigate(Screen.SessionHost.createRoute()) {
+                        launchSingleTop = true
+                    }
+                },
+                onOpenServers = { navController.navigate(Screen.ServerList.route) }
+            )
         }
         composable(
             Screen.ServerStatus.route,
