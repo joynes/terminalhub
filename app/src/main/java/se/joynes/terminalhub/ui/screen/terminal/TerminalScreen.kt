@@ -10,10 +10,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.termux.view.TerminalView
+import kotlinx.coroutines.delay
 import se.joynes.terminalhub.ui.theme.MegaDriveBg
 import se.joynes.terminalhub.ui.theme.MegaDrivePrimary
 import se.joynes.terminalhub.ui.theme.MonoFontFamily
@@ -24,6 +26,8 @@ fun TerminalScreen(
 ) {
     val session by viewModel.activeSession.collectAsState()
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
     val modifierManager = remember { MutableModifierManager() }
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
     var lastSyncedCols by remember { mutableIntStateOf(-1) }
@@ -59,6 +63,27 @@ fun TerminalScreen(
             lastSyncedRows = emulator.mRows
             viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
         }
+    }
+
+    fun requestTerminalResize(tv: TerminalView) {
+        tv.requestLayout()
+        tv.invalidate()
+        tv.post {
+            syncRemotePty(tv)
+            tv.onScreenUpdated(true)
+        }
+    }
+
+    LaunchedEffect(session, imeBottomPx) {
+        keyboardVisible = imeBottomPx > 0
+        val tv = terminalViewRef.value ?: return@LaunchedEffect
+        requestTerminalResize(tv)
+        withFrameNanos { }
+        terminalViewRef.value?.let(::requestTerminalResize)
+        delay(120)
+        terminalViewRef.value?.let(::requestTerminalResize)
+        delay(220)
+        terminalViewRef.value?.let(::requestTerminalResize)
     }
 
     LaunchedEffect(viewModel) {

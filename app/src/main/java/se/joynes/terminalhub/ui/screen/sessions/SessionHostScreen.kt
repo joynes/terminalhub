@@ -22,12 +22,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.Image
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
@@ -85,7 +87,9 @@ fun SessionHostScreen(
     val preferFastResume by viewModel.preferFastResume.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val density = LocalDensity.current
     val bottomBarReservedHeight = KeyBarReservedHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
 
     var keyboardVisible by remember { mutableStateOf(false) }
     var showSessionHistory by remember { mutableStateOf(false) }
@@ -236,6 +240,27 @@ fun SessionHostScreen(
         if (viewChanged || ptyChanged) {
             tv.onScreenUpdated(true)
         }
+    }
+
+    fun requestTerminalResize(tv: TerminalView) {
+        tv.requestLayout()
+        tv.invalidate()
+        tv.post {
+            syncRemotePty(tv)
+            tv.onScreenUpdated(true)
+        }
+    }
+
+    LaunchedEffect(activeId, session, imeBottomPx) {
+        keyboardVisible = imeBottomPx > 0
+        val tv = terminalViewRef.value ?: return@LaunchedEffect
+        requestTerminalResize(tv)
+        withFrameNanos { }
+        terminalViewRef.value?.let(::requestTerminalResize)
+        delay(120)
+        terminalViewRef.value?.let(::requestTerminalResize)
+        delay(220)
+        terminalViewRef.value?.let(::requestTerminalResize)
     }
 
     LaunchedEffect(sharedUri) {
