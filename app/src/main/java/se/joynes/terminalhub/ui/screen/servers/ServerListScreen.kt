@@ -26,6 +26,42 @@ fun ServerListScreen(
     viewModel: ServerListViewModel = hiltViewModel()
 ) {
     val servers by viewModel.servers.collectAsState()
+    var pendingDelete by remember { mutableStateOf<Server?>(null) }
+
+    pendingDelete?.let { server ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            containerColor = MegaDriveSurface,
+            title = {
+                Text(
+                    "DELETE SERVER?",
+                    color = MegaDrivePrimary,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 14.sp
+                )
+            },
+            text = {
+                Text(
+                    "Delete ${server.name}? Stored credentials and projects for this server will also be removed.",
+                    color = MegaDriveOnSurface,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 12.sp
+                )
+            },
+            dismissButton = {
+                RetroButton("CANCEL", onClick = { pendingDelete = null })
+            },
+            confirmButton = {
+                RetroButton(
+                    "DELETE",
+                    onClick = {
+                        viewModel.deleteServer(server)
+                        pendingDelete = null
+                    }
+                )
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -65,7 +101,8 @@ fun ServerListScreen(
                     items(servers) { server ->
                         ServerCard(
                             server = server,
-                            onEdit = { onEditServer(server.id) }
+                            onEdit = { onEditServer(server.id) },
+                            onDelete = { pendingDelete = server }
                         )
                     }
                 }
@@ -77,7 +114,8 @@ fun ServerListScreen(
 @Composable
 private fun ServerCard(
     server: Server,
-    onEdit: () -> Unit
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
     RetroCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
@@ -88,7 +126,10 @@ private fun ServerCard(
             Spacer(Modifier.height(4.dp))
             Text("${server.username}@${server.host}:${server.port}", color = MegaDriveOnSurface, fontSize = 12.sp, fontFamily = MonoFontFamily)
             Spacer(Modifier.height(8.dp))
-            RetroButton("EDIT", onEdit, Modifier.fillMaxWidth())
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RetroButton("EDIT", onEdit, Modifier.weight(1f))
+                RetroButton("DELETE", onDelete, Modifier.weight(1f))
+            }
         }
     }
 }

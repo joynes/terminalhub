@@ -24,6 +24,9 @@ interface ProjectDao {
     @Delete
     suspend fun delete(entity: ProjectEntity)
 
+    @Query("DELETE FROM projects WHERE serverId = :serverId")
+    suspend fun deleteByServer(serverId: Long)
+
     @Query("DELETE FROM projects")
     suspend fun clearAll()
 

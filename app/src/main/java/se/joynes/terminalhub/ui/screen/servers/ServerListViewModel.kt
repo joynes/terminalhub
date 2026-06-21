@@ -9,6 +9,7 @@ import se.joynes.terminalhub.data.repository.ServerRepository
 import javax.inject.Inject
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class ServerListViewModel @Inject constructor(
@@ -16,4 +17,10 @@ class ServerListViewModel @Inject constructor(
 ) : ViewModel() {
     val servers: StateFlow<List<Server>> = repo.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun deleteServer(server: Server) {
+        viewModelScope.launch {
+            repo.delete(server)
+        }
+    }
 }
