@@ -7,6 +7,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -21,6 +23,7 @@ fun AddEditServerScreen(
     viewModel: AddEditServerViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val clipboardManager = LocalClipboardManager.current
 
     LaunchedEffect(serverId) { viewModel.loadServer(serverId) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
@@ -44,18 +47,30 @@ fun AddEditServerScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            RetroTextField(state.name, { viewModel.update { copy(name = it) } }, "Name *", Modifier.fillMaxWidth())
-            RetroTextField(state.host, { viewModel.update { copy(host = it) } }, "Hostname / IP *", Modifier.fillMaxWidth())
-            RetroTextField(state.port, { viewModel.update { copy(port = it) } }, "Port (default 22)", Modifier.fillMaxWidth())
-            RetroTextField(state.username, { viewModel.update { copy(username = it) } }, "Username *", Modifier.fillMaxWidth())
-            RetroTextField(state.password, { viewModel.update { copy(password = it) } }, "Password", Modifier.fillMaxWidth(), isPassword = true)
-            Text("PRIVATE KEY", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+            SecurityNote(
+                title = "RECOMMENDED SETUP",
+                body = "Use SSH keys. TerminalHub keeps the private key on this Android device. The server only needs the public key. Password login is optional and best used once to install the public key."
+            )
+            SectionTitle("1. SERVER")
+            RetroTextField(state.name, { viewModel.update { copy(name = it) } }, "Display name *", Modifier.fillMaxWidth())
+            HelpText("Any name you recognize, for example Home PC, Mac mini, or VPS.")
+            RetroTextField(state.host, { viewModel.update { copy(host = it) } }, "Host or IP address *", Modifier.fillMaxWidth())
+            HelpText("The SSH address. With Tailscale this is usually the device name or Tailscale IP.")
+            RetroTextField(state.port, { viewModel.update { copy(port = it) } }, "SSH port", Modifier.fillMaxWidth())
+            HelpText("Usually 22. Change only if your SSH server uses another port.")
+            RetroTextField(state.username, { viewModel.update { copy(username = it) } }, "SSH username *", Modifier.fillMaxWidth())
+            HelpText("The user on the remote computer, not your Android user.")
+
+            SectionTitle("2. AUTHENTICATION")
+            RetroTextField(state.password, { viewModel.update { copy(password = it) } }, "One-time password (optional)", Modifier.fillMaxWidth(), isPassword = true)
+            HelpText("Not recommended for normal use. Add it only if you want TerminalHub to install the public key for you once.")
+            Text("PRIVATE KEY - LOCAL ONLY", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
             OutlinedTextField(
                 value = state.privateKey,
                 onValueChange = { viewModel.update { copy(privateKey = it) } },
                 placeholder = {
                     Text(
-                        if (state.hasSavedPrivateKey) "Private key saved. Paste a new PEM key to replace it." else "Paste PEM private key (optional)",
+                        if (state.hasSavedPrivateKey) "Private key saved locally. Paste a new PEM key only to replace it." else "Optional: paste an existing private key into the app. Do not copy this to the server.",
                         color = MegaDriveDim,
                         fontSize = 11.sp,
                         fontFamily = MonoFontFamily
@@ -81,6 +96,7 @@ fun AddEditServerScreen(
                     color = MegaDriveGreen
                 )
             }
+            HelpText("Generate a new key here unless you already know which private key you want to use.")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -91,7 +107,7 @@ fun AddEditServerScreen(
                     modifier = Modifier.weight(1f)
                 )
                 RetroButton(
-                    text = if (state.keyInstallStatus == KeyInstallStatus.Installing) "[ INSTALLING ]" else "[ INSTALL ON SERVER ]",
+                    text = if (state.keyInstallStatus == KeyInstallStatus.Installing) "[ INSTALLING ]" else "[ INSTALL PUBLIC KEY ]",
                     onClick = { viewModel.installGeneratedKey() },
                     modifier = Modifier.weight(1f),
                     enabled = state.host.isNotBlank() &&
@@ -102,13 +118,23 @@ fun AddEditServerScreen(
                 )
             }
             Text(
-                "Key install uses the password once to write ~/.ssh/authorized_keys; saved servers use the private key.",
+                "Automatic install needs host, username, one-time password, and a generated public key.",
                 color = MegaDriveDim,
                 fontSize = 10.sp,
                 fontFamily = MonoFontFamily
             )
             if (state.publicKey.isNotBlank()) {
-                Text("PUBLIC KEY", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Text("PUBLIC KEY - COPY THIS TO SERVER", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+                    RetroButton(
+                        text = "[ COPY ]",
+                        onClick = { clipboardManager.setText(AnnotatedString(state.publicKey)) }
+                    )
+                }
                 OutlinedTextField(
                     value = state.publicKey,
                     onValueChange = {},
@@ -127,6 +153,12 @@ fun AddEditServerScreen(
                         cursorColor = MegaDrivePrimary
                     )
                 )
+                Text(
+                    "Manual setup: copy only this public key to the remote user's ~/.ssh/authorized_keys. Never copy the private key to the server.",
+                    color = MegaDriveDim,
+                    fontSize = 10.sp,
+                    fontFamily = MonoFontFamily
+                )
             }
             if (state.keyInstallMessage.isNotBlank()) {
                 Text(
@@ -141,7 +173,10 @@ fun AddEditServerScreen(
                     fontFamily = MonoFontFamily
                 )
             }
-            RetroTextField(state.projectsFolder, { viewModel.update { copy(projectsFolder = it) } }, "Projects Folder", Modifier.fillMaxWidth())
+
+            SectionTitle("3. PROJECTS")
+            RetroTextField(state.projectsFolder, { viewModel.update { copy(projectsFolder = it) } }, "Remote projects folder", Modifier.fillMaxWidth())
+            HelpText("TerminalHub opens project tabs inside this folder on the remote computer.")
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -177,6 +212,7 @@ fun AddEditServerScreen(
                 )
             }
 
+            SectionTitle("ADVANCED")
             Spacer(Modifier.height(4.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -210,6 +246,45 @@ fun AddEditServerScreen(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.host.isNotBlank() && state.username.isNotBlank()
             )
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        color = MegaDrivePrimary,
+        fontSize = 12.sp,
+        fontFamily = MonoFontFamily
+    )
+}
+
+@Composable
+private fun HelpText(text: String) {
+    Text(
+        text,
+        color = MegaDriveDim,
+        fontSize = 10.sp,
+        fontFamily = MonoFontFamily
+    )
+}
+
+@Composable
+private fun SecurityNote(
+    title: String,
+    body: String
+) {
+    RetroCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MegaDriveSurface)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(title, color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+            Text(body, color = MegaDriveOnSurface, fontSize = 11.sp, fontFamily = MonoFontFamily)
         }
     }
 }

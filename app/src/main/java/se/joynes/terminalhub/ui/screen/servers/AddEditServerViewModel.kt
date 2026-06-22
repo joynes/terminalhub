@@ -102,7 +102,7 @@ class AddEditServerViewModel @Inject constructor(
             publicKey = generated.publicKeyOpenSsh,
             hasSavedPrivateKey = false,
             keyInstallStatus = KeyInstallStatus.Idle,
-            keyInstallMessage = "Generated a new SSH key. Install it on the server, then save."
+            keyInstallMessage = "Generated a new SSH key. Keep the private key in TerminalHub. Copy or install only the public key on the server."
         )
     }
 
@@ -120,7 +120,7 @@ class AddEditServerViewModel @Inject constructor(
         viewModelScope.launch {
             _state.value = _state.value.copy(
                 keyInstallStatus = KeyInstallStatus.Installing,
-                keyInstallMessage = "Installing public key..."
+                keyInstallMessage = "Installing public key with the one-time password..."
             )
             val current = _state.value
             val password = current.password.ifBlank {
@@ -139,7 +139,7 @@ class AddEditServerViewModel @Inject constructor(
             _state.value = _state.value.copy(
                 keyInstallStatus = if (result.isSuccess) KeyInstallStatus.Success else KeyInstallStatus.Failure,
                 keyInstallMessage = result.exceptionOrNull()?.message
-                    ?: "Public key installed. Save the server; the password was only needed once."
+                    ?: "Public key installed. Save the server and use key login; the password was only needed once."
             )
         }
     }
