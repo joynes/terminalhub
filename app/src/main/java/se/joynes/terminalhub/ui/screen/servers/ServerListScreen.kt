@@ -19,6 +19,8 @@ import se.joynes.terminalhub.ui.theme.*
 
 @Composable
 fun ServerListScreen(
+    onBack: () -> Unit,
+    onOpenSessions: () -> Unit,
     onAddServer: () -> Unit,
     onEditServer: (Long) -> Unit,
     onOpenLog: () -> Unit,
@@ -67,7 +69,11 @@ fun ServerListScreen(
         topBar = {
             RetroTopBar(
                 title = "SERVERS",
+                onBack = onBack,
                 actions = {
+                    IconButton(onClick = onOpenSessions) {
+                        Text("SESS", color = MegaDrivePrimary, fontSize = 10.sp, fontFamily = MonoFontFamily)
+                    }
                     IconButton(onClick = onOpenSessionLog) {
                         Text("SLOG", color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily)
                     }
@@ -91,6 +97,8 @@ fun ServerListScreen(
                     Text("NO SERVERS CONFIGURED", color = MegaDriveDim, fontSize = 12.sp, fontFamily = MonoFontFamily)
                     Spacer(Modifier.height(16.dp))
                     RetroButton("[ ADD SERVER ]", onAddServer)
+                    Spacer(Modifier.height(8.dp))
+                    RetroButton("[ SESSIONS ]", onOpenSessions)
                 }
             } else {
                 LazyColumn(

@@ -43,7 +43,17 @@ fun AppNavGraph(
             AddEditServerScreen(serverId = serverId, onBack = { navController.popBackStack() })
         }
         composable(Screen.ServerList.route) {
+            fun openSessions() {
+                navController.navigate(Screen.SessionHost.createRoute()) {
+                    launchSingleTop = true
+                    popUpTo(Screen.SessionHost.route) { inclusive = false }
+                }
+            }
             ServerListScreen(
+                onBack = {
+                    if (!navController.popBackStack()) openSessions()
+                },
+                onOpenSessions = { openSessions() },
                 onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
                 onEditServer = { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) },
                 onOpenLog = { navController.navigate(Screen.AppLog.route) },
