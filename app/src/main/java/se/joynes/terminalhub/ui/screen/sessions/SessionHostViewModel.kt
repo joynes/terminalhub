@@ -414,6 +414,30 @@ class SessionHostViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Opens a specific project by id (e.g. from the project list), switching to it if it is
+     * already running or activating a fresh session otherwise. Waits for the project database to
+     * load so it works even when called immediately after the screen is created.
+     */
+    fun openProject(projectId: Long) {
+        viewModelScope.launch {
+            val project = _allDbProjects
+                .first { projects -> projects.any { it.id == projectId } }
+                .first { it.id == projectId }
+            sessionManager.markProjectOpen(projectId)
+            val existing = sessionManager.sessions.value.firstOrNull { it.projectId == projectId }
+            if (existing != null) {
+                switchToSession(existing.id)
+                return@launch
+            }
+            if (_dbProjects.value.none { it.id == projectId }) {
+                _dbProjects.value = _dbProjects.value + project
+            }
+            projectRepo.updateLastOpenedAt(projectId, System.currentTimeMillis())
+            activateProject(project, autoSwitch = true)
+        }
+    }
+
     fun reopenSession(projectId: Long) {
         sessionManager.markProjectOpen(projectId)
         val project = _allDbProjects.value.find { it.id == projectId } ?: return

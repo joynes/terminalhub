@@ -21,6 +21,7 @@ import se.joynes.terminalhub.ui.theme.*
 fun ServerListScreen(
     onBack: () -> Unit,
     onOpenSessions: () -> Unit,
+    onOpenProjects: (Long) -> Unit,
     onAddServer: () -> Unit,
     onEditServer: (Long) -> Unit,
     onOpenLog: () -> Unit,
@@ -109,6 +110,7 @@ fun ServerListScreen(
                     items(servers) { server ->
                         ServerCard(
                             server = server,
+                            onOpen = { onOpenProjects(server.id) },
                             onEdit = { onEditServer(server.id) },
                             onDelete = { pendingDelete = server }
                         )
@@ -122,6 +124,7 @@ fun ServerListScreen(
 @Composable
 private fun ServerCard(
     server: Server,
+    onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -133,6 +136,8 @@ private fun ServerCard(
             }
             Spacer(Modifier.height(4.dp))
             Text("${server.username}@${server.host}:${server.port}", color = MegaDriveOnSurface, fontSize = 12.sp, fontFamily = MonoFontFamily)
+            Spacer(Modifier.height(8.dp))
+            RetroButton("[ PROJECTS ]", onOpen, Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RetroButton("EDIT", onEdit, Modifier.weight(1f))

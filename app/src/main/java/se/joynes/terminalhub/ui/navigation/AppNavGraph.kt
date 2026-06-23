@@ -12,6 +12,7 @@ import androidx.navigation.navArgument
 import se.joynes.terminalhub.BuildConfig
 import se.joynes.terminalhub.ui.screen.applog.AppLogScreen
 import se.joynes.terminalhub.ui.screen.projects.AddEditProjectScreen
+import se.joynes.terminalhub.ui.screen.projects.ProjectListScreen
 import se.joynes.terminalhub.ui.screen.settings.SettingsScreen
 import se.joynes.terminalhub.ui.screen.servers.AddEditServerScreen
 import se.joynes.terminalhub.ui.screen.servers.ServerListScreen
@@ -54,10 +55,31 @@ fun AppNavGraph(
                     if (!navController.popBackStack()) openSessions()
                 },
                 onOpenSessions = { openSessions() },
+                onOpenProjects = { id -> navController.navigate(Screen.ProjectList.createRoute(id)) },
                 onAddServer = { navController.navigate(Screen.AddEditServer.createRoute()) },
                 onEditServer = { id -> navController.navigate(Screen.AddEditServer.createRoute(id)) },
                 onOpenLog = { navController.navigate(Screen.AppLog.route) },
                 onOpenSessionLog = { navController.navigate(Screen.SessionLog.route) }
+            )
+        }
+        composable(
+            Screen.ProjectList.route,
+            arguments = listOf(navArgument("serverId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val serverId = backStackEntry.arguments?.getLong("serverId") ?: return@composable
+            ProjectListScreen(
+                serverId = serverId,
+                onAddProject = { navController.navigate(Screen.AddEditProject.createRoute(serverId)) },
+                onEditProject = { projectId ->
+                    navController.navigate(Screen.AddEditProject.createRoute(serverId, projectId))
+                },
+                onConnect = { projectId ->
+                    navController.navigate(Screen.SessionHost.createRoute(serverId, projectId)) {
+                        launchSingleTop = true
+                        popUpTo(Screen.SessionHost.route) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
         composable(
@@ -73,13 +95,18 @@ fun AppNavGraph(
         }
         composable(
             Screen.SessionHost.route,
-            arguments = listOf(navArgument("serverId") { type = NavType.LongType; defaultValue = -1L })
+            arguments = listOf(
+                navArgument("serverId") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("projectId") { type = NavType.LongType; defaultValue = -1L }
+            )
         ) { backStackEntry ->
             val requestedServerId = backStackEntry.arguments?.getLong("serverId")?.takeIf { it >= 0 }
+            val requestedProjectId = backStackEntry.arguments?.getLong("projectId")?.takeIf { it >= 0 }
             val viewModel = androidx.hilt.navigation.compose.hiltViewModel<se.joynes.terminalhub.ui.screen.sessions.SessionHostViewModel>()
             val serverId by viewModel.serverId.collectAsState()
             SessionHostScreen(
                 requestedServerId = requestedServerId,
+                requestedProjectId = requestedProjectId,
                 viewModel = viewModel,
                 sharedUri = sharedUri,
                 onConsumeSharedUri = onConsumeSharedUri,

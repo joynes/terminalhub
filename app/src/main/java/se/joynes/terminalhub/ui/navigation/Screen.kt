@@ -13,8 +13,9 @@ sealed class Screen(val route: String) {
         fun createRoute(serverId: Long? = null, projectId: Long? = null) =
             "add_edit_project?projectId=${projectId ?: -1}&serverId=${serverId ?: -1}"
     }
-    object SessionHost : Screen("session_host?serverId={serverId}") {
-        fun createRoute(serverId: Long? = null) = "session_host?serverId=${serverId ?: -1}"
+    object SessionHost : Screen("session_host?serverId={serverId}&projectId={projectId}") {
+        fun createRoute(serverId: Long? = null, projectId: Long? = null) =
+            "session_host?serverId=${serverId ?: -1}&projectId=${projectId ?: -1}"
     }
     object ServerStatus : Screen("server_status?serverId={serverId}") {
         fun createRoute(serverId: Long) = "server_status?serverId=$serverId"
