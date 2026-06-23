@@ -137,21 +137,16 @@ class SessionHostViewModel @Inject constructor(
                 val previousProjectIds = _allDbProjects.value.map { it.id }.toSet()
                 _allDbProjects.value = projects
                 syncProjectOrder(projects)
-                val runtimeState = runtimeRepository.state.value
-                val recoveryIds = if (runtimeState.recoveryPending) {
-                    runtimeState.recoveryRemoteProjectIds + runtimeState.recoveryLocalProjectIds
-                } else {
-                    emptySet()
-                }
-                val liveIds = sessionManager.sessions.value.map { it.projectId }.toSet()
                 val newlyAddedIds = if (previousProjectIds.isEmpty()) {
                     emptySet()
                 } else {
                     projects.map { it.id }.toSet() - previousProjectIds
                 }
-                val visibleIds = liveIds + connectingProjectIds.value + recoveryIds + newlyAddedIds
+                // Open-tab state must not depend on the short-lived in-memory session list.
+                // After a device restart that list is empty until recovery reconnects, but the
+                // persisted project tabs should remain visible immediately.
                 val visible = projects.filter {
-                    !sessionManager.isProjectClosed(it.id) && it.id in visibleIds
+                    !sessionManager.isProjectClosed(it.id)
                 }
                 val preferredActive = runtimeRepository.state.value.recoveryActiveProjectId
                 _dbProjects.value = visible
