@@ -15,13 +15,13 @@ fun legacyExportFixVersionCode(): Int = maxOf(gitCommitCount(), 204)
 
 android {
     namespace = "se.joynes.terminalhub"
-    compileSdk = 36
+    compileSdk = 35
     flavorDimensions += "mode"
 
     defaultConfig {
         applicationId = "se.joynes.terminalhub"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = legacyExportFixVersionCode()
         versionName = "1.${legacyExportFixVersionCode()}"
 
