@@ -221,32 +221,32 @@ fun SessionHostScreen(
         }
     }
 
-    fun syncRemotePty(tv: TerminalView) {
+    fun syncRemotePty(tv: TerminalView, force: Boolean = false) {
         tv.setBackgroundColor(0xFF0D0D1A.toInt())
         tv.setCanvasBackgroundColor(0xFF0D0D1A.toInt())
         val viewChanged = tv.width != lastViewWidth || tv.height != lastViewHeight
-        if (viewChanged) {
+        if (viewChanged || force) {
             lastViewWidth = tv.width
             lastViewHeight = tv.height
             tv.updateSize()
         }
         val emulator = tv.mEmulator ?: return
         val ptyChanged = emulator.mColumns != lastSyncedCols || emulator.mRows != lastSyncedRows
-        if (ptyChanged) {
+        if (ptyChanged || force) {
             lastSyncedCols = emulator.mColumns
             lastSyncedRows = emulator.mRows
             viewModel.resizeActivePty(emulator.mColumns, emulator.mRows)
         }
-        if (viewChanged || ptyChanged) {
+        if (viewChanged || ptyChanged || force) {
             tv.onScreenUpdated(true)
         }
     }
 
-    fun requestTerminalResize(tv: TerminalView) {
+    fun requestTerminalResize(tv: TerminalView, force: Boolean = false) {
         tv.requestLayout()
         tv.invalidate()
         tv.post {
-            syncRemotePty(tv)
+            syncRemotePty(tv, force = force)
             tv.onScreenUpdated(true)
         }
     }
@@ -254,13 +254,19 @@ fun SessionHostScreen(
     LaunchedEffect(activeId, session, imeBottomPx) {
         keyboardVisible = imeBottomPx > 0
         val tv = terminalViewRef.value ?: return@LaunchedEffect
-        requestTerminalResize(tv)
+        lastSyncedCols = -1
+        lastSyncedRows = -1
+        lastViewWidth = -1
+        lastViewHeight = -1
+        requestTerminalResize(tv, force = true)
         withFrameNanos { }
-        terminalViewRef.value?.let(::requestTerminalResize)
+        terminalViewRef.value?.let { requestTerminalResize(it, force = true) }
         delay(120)
-        terminalViewRef.value?.let(::requestTerminalResize)
+        terminalViewRef.value?.let { requestTerminalResize(it, force = true) }
         delay(220)
-        terminalViewRef.value?.let(::requestTerminalResize)
+        terminalViewRef.value?.let { requestTerminalResize(it, force = true) }
+        delay(500)
+        terminalViewRef.value?.let { requestTerminalResize(it, force = true) }
     }
 
     LaunchedEffect(sharedUri) {
