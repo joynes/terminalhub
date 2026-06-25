@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -12,6 +14,36 @@ fun gitCommitCount(): Int = try {
 } catch (_: Exception) { 1 }
 
 fun legacyExportFixVersionCode(): Int = maxOf(gitCommitCount(), 204)
+
+val releaseKeystoreProperties = Properties().apply {
+    val propertiesFile = rootProject.file("release-keystore.properties")
+    if (propertiesFile.isFile) {
+        propertiesFile.inputStream().use(::load)
+    }
+}
+
+fun releaseSigningProperty(name: String): String? =
+    releaseKeystoreProperties.getProperty(name)
+        ?: providers.gradleProperty(name).orNull
+        ?: System.getenv(name)
+
+val hasReleaseSigningConfig = listOf(
+    "RELEASE_STORE_FILE",
+    "RELEASE_STORE_PASSWORD",
+    "RELEASE_KEY_ALIAS",
+    "RELEASE_KEY_PASSWORD"
+).all { !releaseSigningProperty(it).isNullOrBlank() }
+
+gradle.taskGraph.whenReady {
+    val needsReleaseSigning = allTasks.any { it.name.contains("Release") }
+    if (needsReleaseSigning && !hasReleaseSigningConfig) {
+        throw GradleException(
+            "Release signing is not configured. Create release-keystore.properties " +
+                "or provide RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD, " +
+                "RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD."
+        )
+    }
+}
 
 android {
     namespace = "se.joynes.terminalhub"
@@ -42,10 +74,17 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+            if (hasReleaseSigningConfig) {
+                storeFile = file(releaseSigningProperty("RELEASE_STORE_FILE")!!)
+                storePassword = releaseSigningProperty("RELEASE_STORE_PASSWORD")
+                keyAlias = releaseSigningProperty("RELEASE_KEY_ALIAS")
+                keyPassword = releaseSigningProperty("RELEASE_KEY_PASSWORD")
+            } else {
+                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
     buildTypes {
