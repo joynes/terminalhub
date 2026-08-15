@@ -83,6 +83,7 @@ fun SessionHostScreen(
     val activeId by viewModel.activeId.collectAsState()
     val session by viewModel.activeSession.collectAsState()
     val serverId by viewModel.serverId.collectAsState()
+    val homeState by viewModel.homeState.collectAsState()
     val runtimeState by viewModel.runtimeState.collectAsState()
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
@@ -633,28 +634,91 @@ fun SessionHostScreen(
 
             if (projectTabs.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        if (serverId == null) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                    ) {
+                        when {
+                            BuildConfig.IS_DIAGNOSTIC -> {
+                                Text(
+                                    "NO LOCAL PROJECTS",
+                                    color = MegaDriveDim,
+                                    fontSize = 12.sp,
+                                    fontFamily = MonoFontFamily
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                RetroButton("[ + ADD PROJECT ]", onAddServer)
+                            }
+                            homeState.hasServers -> {
+                                Text(
+                                    "SERVER READY",
+                                    color = MegaDrivePrimary,
+                                    fontSize = 12.sp,
+                                    fontFamily = MonoFontFamily
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                homeState.selectedServer?.let { server ->
+                                    Text(
+                                        server.name,
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                        fontFamily = MonoFontFamily
+                                    )
+                                    Spacer(Modifier.height(4.dp))
+                                    Text(
+                                        "${server.username}@${server.host}:${server.port}",
+                                        color = MegaDriveOnSurface,
+                                        fontSize = 11.sp,
+                                        fontFamily = MonoFontFamily
+                                    )
+                                }
+                                Spacer(Modifier.height(14.dp))
+                                Text(
+                                    "Create a project to open your first terminal session.",
+                                    color = MegaDriveDim,
+                                    fontSize = 11.sp,
+                                    fontFamily = MonoFontFamily
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                RetroButton(
+                                    "[ + ADD PROJECT ]",
+                                    onAddProject,
+                                    Modifier.fillMaxWidth(),
+                                    enabled = serverId != null
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                RetroButton("[ MANAGE SERVERS ]", onOpenServers, Modifier.fillMaxWidth())
+                            }
+                            else -> {
+                                Text(
+                                    "NO SERVER",
+                                    color = MegaDriveDim,
+                                    fontSize = 12.sp,
+                                    fontFamily = MonoFontFamily
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    "Add a server first. Then create a project to start a terminal session.",
+                                    color = MegaDriveDim,
+                                    fontSize = 11.sp,
+                                    fontFamily = MonoFontFamily
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                RetroButton("[ + ADD SERVER ]", onAddServer, Modifier.fillMaxWidth())
+                                Spacer(Modifier.height(8.dp))
+                                RetroButton("[ SERVERS ]", onOpenServers, Modifier.fillMaxWidth())
+                            }
+                        }
+                        if (!BuildConfig.IS_DIAGNOSTIC && homeState.projectCount > 0) {
+                            Spacer(Modifier.height(8.dp))
                             Text(
-                                if (BuildConfig.IS_DIAGNOSTIC) "NO LOCAL PROJECTS" else "NO SERVER",
+                                "${homeState.projectCount} saved project(s). Open Servers > Projects to reconnect closed sessions.",
                                 color = MegaDriveDim,
-                                fontSize = 12.sp,
+                                fontSize = 10.sp,
                                 fontFamily = MonoFontFamily
                             )
-                            Spacer(Modifier.height(16.dp))
-                            RetroButton(
-                                if (BuildConfig.IS_DIAGNOSTIC) "[ + ADD PROJECT ]" else "[ + ADD SERVER ]",
-                                onAddServer
-                            )
-                        } else {
-                            Text(
-                                "NO PROJECTS",
-                                color = MegaDriveDim,
-                                fontSize = 12.sp,
-                                fontFamily = MonoFontFamily
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            RetroButton("[ + ADD PROJECT ]", onAddProject)
                         }
                     }
                 }

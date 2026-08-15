@@ -21,6 +21,7 @@ import se.joynes.terminalhub.data.logging.LogLevel
 import se.joynes.terminalhub.data.model.LOCAL_PROJECT_SERVER_ID
 import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.data.model.Project
+import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
@@ -47,6 +48,14 @@ data class ProjectTabState(
     val usesTmux: Boolean = false,
     val targetType: ProjectTargetType = ProjectTargetType.SSH
 )
+
+data class SessionHomeState(
+    val serverCount: Int = 0,
+    val projectCount: Int = 0,
+    val selectedServer: Server? = null
+) {
+    val hasServers: Boolean get() = serverCount > 0
+}
 
 @HiltViewModel
 class SessionHostViewModel @Inject constructor(
@@ -112,6 +121,19 @@ class SessionHostViewModel @Inject constructor(
     private val _serverId = MutableStateFlow<Long?>(null)
     val serverId: StateFlow<Long?> = _serverId.asStateFlow()
     private var selectedServerId: Long? = null
+
+    val homeState: StateFlow<SessionHomeState> = combine(
+        serverRepo.getAll(),
+        _allDbProjects,
+        _serverId
+    ) { servers, projects, currentServerId ->
+        val selected = servers.firstOrNull { it.id == currentServerId } ?: servers.firstOrNull()
+        SessionHomeState(
+            serverCount = servers.size,
+            projectCount = projects.size,
+            selectedServer = selected
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, SessionHomeState())
 
     private var initialized = false
 
@@ -191,14 +213,15 @@ class SessionHostViewModel @Inject constructor(
             }
         }
         viewModelScope.launch {
-            combine(activeId, sessionManager.sessions, _allDbProjects) { activeSessionId, sessions, projects ->
+            combine(activeId, sessionManager.sessions, _allDbProjects, serverRepo.getAll()) { activeSessionId, sessions, projects, servers ->
                 val activeProjectId = sessions.firstOrNull { it.id == activeSessionId }?.projectId
                 val activeServerId = projects.firstOrNull {
                     it.id == activeProjectId && it.targetType == ProjectTargetType.SSH
                 }?.serverId
-                activeSessionId to activeServerId
-            }.collect { (activeSessionId, activeServerId) ->
-                _serverId.value = if (activeSessionId == null) selectedServerId else activeServerId
+                val fallbackServerId = selectedServerId ?: servers.firstOrNull()?.id
+                Triple(activeSessionId, activeServerId, fallbackServerId)
+            }.collect { (activeSessionId, activeServerId, fallbackServerId) ->
+                _serverId.value = if (activeSessionId == null) fallbackServerId else activeServerId
             }
         }
     }
