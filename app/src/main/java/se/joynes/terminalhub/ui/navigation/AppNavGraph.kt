@@ -118,7 +118,9 @@ fun AppNavGraph(
                         navController.navigate(Screen.AddEditServer.createRoute())
                     }
                 },
-                onAddProject = { navController.navigate(Screen.AddEditProject.createRoute(serverId)) },
+                onAddProject = { selectedServerId ->
+                    navController.navigate(Screen.AddEditProject.createRoute(selectedServerId ?: serverId))
+                },
                 onOpenLogs = { navController.navigate(Screen.AppLog.route) },
                 onOpenSettings = { navController.navigate(Screen.Settings.route) }
             )

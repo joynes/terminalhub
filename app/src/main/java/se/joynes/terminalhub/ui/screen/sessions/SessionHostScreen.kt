@@ -71,7 +71,7 @@ fun SessionHostScreen(
     requestedProjectId: Long? = null,
     onOpenServers: () -> Unit,
     onAddServer: () -> Unit,
-    onAddProject: () -> Unit,
+    onAddProject: (Long?) -> Unit,
     onOpenLogs: () -> Unit,
     onOpenSettings: () -> Unit,
     sharedUri: Uri? = null,
@@ -481,7 +481,7 @@ fun SessionHostScreen(
                             }
                         },
                         onMove = { fromIndex, toIndex -> viewModel.moveSession(fromIndex, toIndex) },
-                        onAddProject = onAddProject,
+                        onAddProject = { onAddProject(serverId) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(end = 32.dp)
@@ -684,9 +684,9 @@ fun SessionHostScreen(
                                 Spacer(Modifier.height(16.dp))
                                 RetroButton(
                                     "[ + ADD PROJECT ]",
-                                    onAddProject,
+                                    { onAddProject(homeState.selectedServer?.id) },
                                     Modifier.fillMaxWidth(),
-                                    enabled = serverId != null
+                                    enabled = homeState.selectedServer != null
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 RetroButton("[ MANAGE SERVERS ]", onOpenServers, Modifier.fillMaxWidth())
