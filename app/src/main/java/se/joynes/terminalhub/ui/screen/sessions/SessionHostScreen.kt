@@ -467,7 +467,10 @@ fun SessionHostScreen(
                     SessionTabBar(
                         tabs = projectTabs,
                         activeId = activeId,
-                        onSelect = { viewModel.switchToSession(it); terminalViewRef.value?.requestFocus() },
+                        onSelect = {
+                            viewModel.openProject(it)
+                            terminalViewRef.value?.requestFocus()
+                        },
                         onClose = { projectId, sessionId ->
                             val tab = projectTabs.firstOrNull { it.projectId == projectId }
                             if (tab?.usesTmux == true && sessionId != null) {

@@ -3,6 +3,7 @@ package se.joynes.terminalhub
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,5 +60,31 @@ class SessionTabSwipeTest {
             }
         }
         composeRule.onNodeWithText("+").assertIsDisplayed()
+    }
+
+    @Test
+    fun disconnectedTabCanBeOpened() {
+        var selectedProjectId: Long? = null
+        val tab = ProjectTabState(
+            projectId = 42L,
+            projectName = "disconnected",
+            sessionId = null,
+            isConnected = false
+        )
+        composeRule.setContent {
+            TerminalHubTheme {
+                SessionTabBar(
+                    tabs = listOf(tab),
+                    activeId = null,
+                    onSelect = { selectedProjectId = it },
+                    onClose = { _, _ -> },
+                    onMove = { _, _ -> },
+                    onAddProject = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("DISCONNECTED").performClick()
+        composeRule.runOnIdle { assertEquals(42L, selectedProjectId) }
     }
 }

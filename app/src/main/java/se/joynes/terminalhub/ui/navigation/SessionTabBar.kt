@@ -37,7 +37,7 @@ private fun tabColor(seed: Int, active: Boolean): Color {
 fun SessionTabBar(
     tabs: List<ProjectTabState>,
     activeId: TerminalSessionId?,
-    onSelect: (TerminalSessionId) -> Unit,
+    onSelect: (Long) -> Unit,
     onClose: (Long, TerminalSessionId?) -> Unit,
     onMove: (Int, Int) -> Unit,
     onAddProject: () -> Unit,
@@ -68,7 +68,7 @@ fun SessionTabBar(
                         .height(28.dp)
                         .background(bg)
                         .combinedClickable(
-                            onClick = { tab.sessionId?.let { onSelect(it) } },
+                            onClick = { onSelect(tab.projectId) },
                             onLongClick = { menuTabIndex = index }
                         )
                         .padding(start = 7.dp, end = 7.dp),
