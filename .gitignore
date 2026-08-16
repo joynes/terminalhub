@@ -10,6 +10,7 @@
 .DS_Store
 /build
 /captures
+/marketing-output
 .externalNativeBuild
 .cxx
 local.properties

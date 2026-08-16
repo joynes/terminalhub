@@ -1,11 +1,23 @@
 # TerminalHub
 
-**Android only.** TerminalHub is an Android app; the machine you connect to can
-be Linux, macOS, a home server, workstation, or VPS as long as it runs SSH.
+**Manage several terminal AI sessions directly from your Android phone.**
 
-## Built For AI Terminal Sessions
+TerminalHub turns the phone into a control surface for Codex, Claude Code,
+Gemini, local agents and ordinary shell sessions running on infrastructure you
+control. Once the sessions are running, you can switch projects, send the next
+prompt, inspect progress and resume tmux-backed work without sitting at or
+interacting with the computer's desktop.
 
-TerminalHub lets your phone control a real computer over SSH, usually a home
+[Get TerminalHub on Google Play](https://play.google.com/store/apps/details?id=se.joynes.terminalhub)
+· [View the open-source code](https://github.com/joynes/terminalhub)
+
+TerminalHub is GPL-3.0 open source and AI-provider agnostic. It does not provide
+an AI model: the tools continue to run in real terminals on your Linux or macOS
+workstation, home server or VPS over SSH.
+
+## Built For Multiple AI Terminal Sessions
+
+TerminalHub connects your phone to a real machine over SSH, usually a home
 server or workstation on Tailscale/VPN. It is built around fast tab switching:
 Claude Code in one tab, Codex in another, Gemini or local AI in another, plus a
 normal shell for `git`, `sudo`, logs, installs, and fixes.
@@ -47,7 +59,7 @@ Other useful parts:
 
 - Saved SSH servers and project profiles.
 - Password and private-key SSH authentication.
-- Remote file download from the SSH login directory.
+- Remote file download from the active project's remote directory.
 - Terminal search, app logs, session logs, and SSH status/error diagnostics.
 - Optional biometric gate on startup.
 - Diagnostic build flavor for local testing.
@@ -60,7 +72,7 @@ For the Android build machine:
 - Git.
 - Android Studio, or the Android SDK command-line tools.
 - JDK 17 or newer. Android Studio's bundled JDK works.
-- Android SDK Platform 36.
+- Android SDK Platform 35.
 - Android SDK Build Tools installed by Android Studio/SDK Manager.
 
 For the remote machine you connect to:
@@ -97,7 +109,7 @@ If you use Android Studio:
 
 1. Open the repository folder.
 2. Let Gradle sync finish.
-3. Install Android SDK Platform 36 if Android Studio asks for it.
+3. Install Android SDK Platform 35 if Android Studio asks for it.
 4. Select the `app` run configuration.
 5. Run on an emulator or a connected Android device.
 
@@ -185,6 +197,10 @@ $HOME/Library/Android/sdk/platform-tools/adb devices
 
 TerminalHub is released under the GNU General Public License v3.0 only. See
 [LICENSE](LICENSE).
+
+Contributions, bug reports and independently built variants are welcome. The
+complete Android source is public so users can inspect how SSH sessions,
+credentials and terminal data are handled.
 
 The app includes or adapts terminal components from the Termux project. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and license
