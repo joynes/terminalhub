@@ -6,7 +6,9 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Canvas;
+import android.net.Uri;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Handler;
@@ -41,6 +43,7 @@ import androidx.annotation.RequiresApi;
 import com.termux.terminal.KeyHandler;
 import com.termux.terminal.TerminalEmulator;
 import com.termux.terminal.TerminalSession;
+import com.termux.terminal.TerminalUrlFinder;
 import com.termux.view.textselection.TextSelectionCursorController;
 
 /** View displaying and interacting with a {@link TerminalSession}. */
@@ -178,6 +181,7 @@ public final class TerminalView extends View {
                     stopTextSelectionMode();
                     return true;
                 }
+                if (!mEmulator.isMouseTrackingActive() && openUrlAt(event)) return true;
                 requestFocus();
                 mClient.onSingleTapUp(event);
                 return true;
@@ -627,6 +631,22 @@ public final class TerminalView extends View {
             row += mTopRow;
         }
         return new int[] { column, row };
+    }
+
+    private boolean openUrlAt(MotionEvent event) {
+        int[] position = getColumnAndRow(event, true);
+        String token = mEmulator.getScreen().getWrappedWordAtLocation(position[0], position[1]);
+        String url = TerminalUrlFinder.find(token);
+        if (url == null) return false;
+        if (url.regionMatches(true, 0, "www.", 0, 4)) url = "https://" + url;
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /** Send a single mouse event code to the terminal. */

@@ -144,6 +144,35 @@ public final class TerminalBuffer {
         return text.substring(x1 + 1, x2);
     }
 
+    /**
+     * Return the whitespace-delimited token at a terminal cell, joining only rows that were
+     * actually wrapped by the terminal. Unlike {@link #getWordAtLocation(int, int)}, a full row
+     * followed by a hard newline is not treated as a continuation.
+     */
+    public String getWrappedWordAtLocation(int x, int y) {
+        int minRow = -getActiveTranscriptRows();
+        int maxRow = mScreenRows - 1;
+        if (x < 0 || x >= mColumns || y < minRow || y > maxRow) return "";
+
+        int firstRow = y;
+        while (firstRow > minRow && getLineWrap(firstRow - 1)) firstRow--;
+        int lastRow = y;
+        while (lastRow < maxRow && getLineWrap(lastRow)) lastRow++;
+
+        String text = getSelectedText(0, firstRow, mColumns - 1, lastRow, true, false);
+        String selectedCell = getSelectedText(x, y, x, y, false, false);
+        if (selectedCell.isEmpty() || Character.isWhitespace(selectedCell.charAt(0))) return "";
+        String throughSelectedCell = getSelectedText(0, firstRow, x, y, true, false);
+        int offset = throughSelectedCell.length() - selectedCell.length();
+        if (offset >= text.length() || Character.isWhitespace(text.charAt(offset))) return "";
+
+        int start = offset;
+        while (start > 0 && !Character.isWhitespace(text.charAt(start - 1))) start--;
+        int end = offset + 1;
+        while (end < text.length() && !Character.isWhitespace(text.charAt(end))) end++;
+        return text.substring(start, end);
+    }
+
     public int getActiveTranscriptRows() {
         return mActiveTranscriptRows;
     }

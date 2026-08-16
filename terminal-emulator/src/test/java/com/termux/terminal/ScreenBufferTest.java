@@ -62,4 +62,27 @@ public class ScreenBufferTest extends TerminalTestCase {
 		assertEquals("", mTerminal.getScreen().getWordAtLocation(1, 2));
 		assertEquals("", mTerminal.getScreen().getWordAtLocation(2, 2));
 	}
+
+	public void testGetWrappedWordAtLocationAcrossRows() {
+		String url = "https://example.com/a/very/long/path?value=123";
+		withTerminalSized(12, 5).enterString("  " + url);
+
+		assertEquals(url, mTerminal.getScreen().getWrappedWordAtLocation(2, 0));
+		assertEquals(url, mTerminal.getScreen().getWrappedWordAtLocation(5, 1));
+		assertEquals(url, mTerminal.getScreen().getWrappedWordAtLocation(3, 3));
+	}
+
+	public void testGetWrappedWordDoesNotJoinHardNewline() {
+		withTerminalSized(12, 3).enterString("first\r\nsecond");
+
+		assertEquals("first", mTerminal.getScreen().getWrappedWordAtLocation(2, 0));
+		assertEquals("second", mTerminal.getScreen().getWrappedWordAtLocation(2, 1));
+	}
+
+	public void testFindTerminalUrl() {
+		assertEquals("https://example.com/path", TerminalUrlFinder.find("(https://example.com/path)."));
+		assertEquals("https://example.com/a_(b)", TerminalUrlFinder.find("https://example.com/a_(b)"));
+		assertEquals("www.example.com/long/path", TerminalUrlFinder.find("url=www.example.com/long/path,"));
+		assertNull(TerminalUrlFinder.find("not-a-link"));
+	}
 }
