@@ -22,7 +22,9 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -37,8 +39,8 @@ import kotlin.math.roundToInt
  */
 @Composable
 fun FloatingTextInputDialog(
-    text: String,
-    onTextChange: (String) -> Unit,
+    text: TextFieldValue,
+    onTextChange: (TextFieldValue) -> Unit,
     onSend: (String) -> Unit,
     onDismiss: () -> Unit,
     history: List<String> = emptyList(),
@@ -53,9 +55,9 @@ fun FloatingTextInputDialog(
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     fun send() {
-        if (text.isNotEmpty()) {
-            onSaveHistory(text)
-            onSend(text)
+        if (text.text.isNotEmpty()) {
+            onSaveHistory(text.text)
+            onSend(text.text)
             onDismiss()
         }
     }
@@ -174,7 +176,7 @@ fun FloatingTextInputDialog(
                                     )
                                 },
                                 onClick = {
-                                    onTextChange(entry)
+                                    onTextChange(TextFieldValue(entry, TextRange(entry.length)))
                                     showHistory = false
                                 },
                                 modifier = Modifier.background(MegaDriveSurface)
@@ -218,4 +220,26 @@ fun FloatingTextInputDialog(
             )
         }
     }
+}
+
+/** Compatibility overload for static previews that do not need cursor-aware insertion. */
+@Composable
+fun FloatingTextInputDialog(
+    text: String,
+    onTextChange: (String) -> Unit,
+    onSend: (String) -> Unit,
+    onDismiss: () -> Unit,
+    history: List<String> = emptyList(),
+    onSaveHistory: (String) -> Unit = {},
+    bottomAvoidanceDp: Dp = 0.dp
+) {
+    FloatingTextInputDialog(
+        text = TextFieldValue(text, TextRange(text.length)),
+        onTextChange = { onTextChange(it.text) },
+        onSend = onSend,
+        onDismiss = onDismiss,
+        history = history,
+        onSaveHistory = onSaveHistory,
+        bottomAvoidanceDp = bottomAvoidanceDp
+    )
 }

@@ -207,6 +207,29 @@ fun SettingsScreen(
                 }
                 item {
                     SettingsCard(
+                        title = "TEXT INPUT ENTER",
+                        description = "When enabled, Send/Enter in the large text input also sends Enter to the terminal, so the command runs immediately. Keep it disabled when composing multi-line text or when you want to review the command in the terminal first."
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (settings.executeTextInputOnSend) "Execute immediately" else "Send text only",
+                                color = MegaDriveOnSurface,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 12.sp
+                            )
+                            Switch(
+                                checked = settings.executeTextInputOnSend,
+                                onCheckedChange = viewModel::setExecuteTextInputOnSend
+                            )
+                        }
+                    }
+                }
+                item {
+                    SettingsCard(
                         title = "SSH KEEPALIVE",
                         description = "Sends SSH keepalive traffic to reduce silent disconnects. Foreground sends every 60 seconds. Background behavior below controls how aggressively the app keeps multiple sessions alive."
                     ) {

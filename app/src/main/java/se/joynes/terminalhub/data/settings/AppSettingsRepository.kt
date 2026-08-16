@@ -10,6 +10,7 @@ import javax.inject.Singleton
 
 data class AppSettings(
     val preferFastResume: Boolean = true,
+    val executeTextInputOnSend: Boolean = false,
     val sshKeepaliveEnabled: Boolean = true,
     val backgroundKeepaliveProfile: BackgroundKeepaliveProfile = BackgroundKeepaliveProfile.BALANCED,
     val backgroundKeepaliveScope: BackgroundKeepaliveScope = BackgroundKeepaliveScope.ACTIVE_TAB_ONLY
@@ -36,6 +37,7 @@ class AppSettingsRepository @Inject constructor(
     private val _settings = MutableStateFlow(
         AppSettings(
             preferFastResume = prefs.getBoolean(KEY_FAST_RESUME, true),
+            executeTextInputOnSend = prefs.getBoolean(KEY_EXECUTE_TEXT_INPUT_ON_SEND, false),
             sshKeepaliveEnabled = prefs.getBoolean(KEY_SSH_KEEPALIVE, true),
             backgroundKeepaliveProfile = prefs.getString(KEY_BACKGROUND_KEEPALIVE_PROFILE, BackgroundKeepaliveProfile.BALANCED.name)
                 ?.let { runCatching { BackgroundKeepaliveProfile.valueOf(it) }.getOrNull() }
@@ -49,6 +51,10 @@ class AppSettingsRepository @Inject constructor(
 
     fun setPreferFastResume(enabled: Boolean) {
         update(_settings.value.copy(preferFastResume = enabled))
+    }
+
+    fun setExecuteTextInputOnSend(enabled: Boolean) {
+        update(_settings.value.copy(executeTextInputOnSend = enabled))
     }
 
     fun setSshKeepaliveEnabled(enabled: Boolean) {
@@ -67,6 +73,7 @@ class AppSettingsRepository @Inject constructor(
         _settings.value = next
         prefs.edit()
             .putBoolean(KEY_FAST_RESUME, next.preferFastResume)
+            .putBoolean(KEY_EXECUTE_TEXT_INPUT_ON_SEND, next.executeTextInputOnSend)
             .putBoolean(KEY_SSH_KEEPALIVE, next.sshKeepaliveEnabled)
             .putString(KEY_BACKGROUND_KEEPALIVE_PROFILE, next.backgroundKeepaliveProfile.name)
             .putString(KEY_BACKGROUND_KEEPALIVE_SCOPE, next.backgroundKeepaliveScope.name)
@@ -75,6 +82,7 @@ class AppSettingsRepository @Inject constructor(
 
     companion object {
         private const val KEY_FAST_RESUME = "prefer_fast_resume"
+        private const val KEY_EXECUTE_TEXT_INPUT_ON_SEND = "execute_text_input_on_send"
         private const val KEY_SSH_KEEPALIVE = "ssh_keepalive_enabled"
         private const val KEY_BACKGROUND_KEEPALIVE_PROFILE = "background_keepalive_profile"
         private const val KEY_BACKGROUND_KEEPALIVE_SCOPE = "background_keepalive_scope"

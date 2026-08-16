@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.Image
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -27,7 +26,6 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
 import androidx.lifecycle.Lifecycle
@@ -37,6 +35,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.terminalhub.R
 import se.joynes.terminalhub.BuildConfig
@@ -50,6 +49,7 @@ import se.joynes.terminalhub.ui.screen.upload.FloatingFileUploadDialog
 import se.joynes.terminalhub.ui.screen.upload.UploadState
 import com.termux.view.TerminalView
 import se.joynes.terminalhub.ui.components.RetroButton
+import se.joynes.terminalhub.ui.components.TerminalHubAboutDialog
 import se.joynes.terminalhub.ui.navigation.SessionTabBar
 import se.joynes.terminalhub.ui.screen.terminal.MutableModifierManager
 import se.joynes.terminalhub.ui.screen.terminal.SpecialKeyBar
@@ -87,6 +87,7 @@ fun SessionHostScreen(
     val runtimeState by viewModel.runtimeState.collectAsState()
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
+    val executeTextInputOnSend by viewModel.executeTextInputOnSend.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -100,7 +101,7 @@ fun SessionHostScreen(
     var pendingTabClose by remember { mutableStateOf<PendingTabClose?>(null) }
     var deleteProjectOnClose by remember(pendingTabClose?.projectId) { mutableStateOf(false) }
     val textInputVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
-    val textInputDraftByProject = remember { mutableStateMapOf<Long, String>() }
+    val textInputDraftByProject = remember { mutableStateMapOf<Long, TextFieldValue>() }
     val fileUploadVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     val fileUploadSelectedUriByProject = remember { mutableStateMapOf<Long, Uri?>() }
     val fileUploadSelectedNameByProject = remember { mutableStateMapOf<Long, String>() }
@@ -165,7 +166,7 @@ fun SessionHostScreen(
     val canReconnectActiveTab = activeTab != null &&
         activeTab.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH
     val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
-    val activeTextInputDraft = activeProjectId?.let { textInputDraftByProject[it].orEmpty() }.orEmpty()
+    val activeTextInputDraft = activeProjectId?.let { textInputDraftByProject[it] } ?: TextFieldValue()
     val activeFileUploadVisible = activeProjectId?.let { fileUploadVisibleByProject[it] == true } ?: false
     val activeFileUploadSelectedUri = activeProjectId?.let { fileUploadSelectedUriByProject[it] }
     val activeFileUploadSelectedName = activeProjectId?.let { fileUploadSelectedNameByProject[it].orEmpty() }.orEmpty()
@@ -179,6 +180,19 @@ fun SessionHostScreen(
     val fileDownloadState by remember(activeProjectId) {
         activeProjectId?.let { fileDownloadViewModel.downloadState(it) } ?: kotlinx.coroutines.flow.flowOf(DownloadState.Idle)
     }.collectAsState(initial = DownloadState.Idle)
+
+    LaunchedEffect(activeProjectId, fileUploadState) {
+        val projectId = activeProjectId ?: return@LaunchedEffect
+        val completed = fileUploadState as? UploadState.Done ?: return@LaunchedEffect
+        val draft = textInputDraftByProject[projectId] ?: TextFieldValue()
+        textInputDraftByProject[projectId] = insertTextAtCursor(draft, completed.remotePath)
+        fileUploadVisibleByProject[projectId] = false
+        fileUploadSelectedUriByProject[projectId] = null
+        fileUploadSelectedNameByProject[projectId] = ""
+        fileUploadViewModel.reset(projectId)
+        textInputVisibleByProject[projectId] = true
+        Toast.makeText(context, "Uploaded path inserted in text input", Toast.LENGTH_SHORT).show()
+    }
 
     // Shared modifier manager: toggles in SpecialKeyBar are read by TerminalViewClientImpl
     val modifierManager = remember { MutableModifierManager() }
@@ -333,52 +347,7 @@ fun SessionHostScreen(
         )
     }
     if (showAboutDialog) {
-        AlertDialog(
-            onDismissRequest = { showAboutDialog = false },
-            containerColor = MegaDriveSurface,
-            title = {
-                Text(
-                    "ABOUT",
-                    color = MegaDrivePrimary,
-                    fontFamily = MonoFontFamily,
-                    fontSize = 14.sp
-                )
-            },
-            text = {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_launcher_foreground_image),
-                        contentDescription = "App icon",
-                        modifier = Modifier
-                            .size(72.dp)
-                            .background(MegaDriveBg)
-                            .padding(6.dp)
-                    )
-                    Text(
-                        "AI TERMINAL HUB",
-                        color = Color.White,
-                        fontFamily = MonoFontFamily,
-                        fontSize = 13.sp
-                    )
-                    Text(
-                        "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                        color = MegaDriveDim,
-                        fontFamily = MonoFontFamily,
-                        fontSize = 12.sp
-                    )
-                }
-            },
-            confirmButton = {
-                RetroButton(
-                    text = "CLOSE",
-                    onClick = { showAboutDialog = false }
-                )
-            }
-        )
+        TerminalHubAboutDialog(onDismiss = { showAboutDialog = false })
     }
     pendingTabClose?.let { pending ->
         AlertDialog(
@@ -885,9 +854,9 @@ fun SessionHostScreen(
                                 text = activeTextInputDraft,
                                 onTextChange = { textInputDraftByProject[activeProjectId] = it },
                                 onSend = { text ->
-                                    val payload = if (text.endsWith("\n") || text.endsWith("\r")) text else "$text\r"
+                                    val payload = terminalTextInputPayload(text, executeTextInputOnSend)
                                     viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
-                                    textInputDraftByProject[activeProjectId] = ""
+                                    textInputDraftByProject[activeProjectId] = TextFieldValue()
                                     textInputVisibleByProject[activeProjectId] = false
                                 },
                                 onDismiss = {
@@ -971,18 +940,18 @@ fun SessionHostScreen(
                                 if (activeTextInputVisible && activeProjectId != null) {
                                     when {
                                         keyStr == "\r" -> {
-                                            val draft = textInputDraftByProject[activeProjectId].orEmpty()
-                                            if (draft.isNotEmpty()) {
-                                                viewModel.saveTextInput(activeProjectId, draft)
-                                                val payload = if (draft.endsWith("\n") || draft.endsWith("\r")) draft else "$draft\r"
+                                            val draft = textInputDraftByProject[activeProjectId] ?: TextFieldValue()
+                                            if (draft.text.isNotEmpty()) {
+                                                viewModel.saveTextInput(activeProjectId, draft.text)
+                                                val payload = terminalTextInputPayload(draft.text, executeTextInputOnSend)
                                                 viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
-                                                textInputDraftByProject[activeProjectId] = ""
+                                                textInputDraftByProject[activeProjectId] = TextFieldValue()
                                                 textInputVisibleByProject[activeProjectId] = false
                                             }
                                         }
                                         (keyStr.length == 1 && keyStr[0] >= ' ' && keyStr[0] != '\u007F') || keyStr == "\t" -> {
-                                            textInputDraftByProject[activeProjectId] =
-                                                textInputDraftByProject[activeProjectId].orEmpty() + keyStr
+                                            val draft = textInputDraftByProject[activeProjectId] ?: TextFieldValue()
+                                            textInputDraftByProject[activeProjectId] = insertTextAtCursor(draft, keyStr)
                                         }
                                     }
                                 } else {

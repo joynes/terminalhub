@@ -20,6 +20,10 @@ class SettingsViewModel @Inject constructor(
         settingsRepository.setPreferFastResume(enabled)
     }
 
+    fun setExecuteTextInputOnSend(enabled: Boolean) {
+        settingsRepository.setExecuteTextInputOnSend(enabled)
+    }
+
     fun setSshKeepaliveEnabled(enabled: Boolean) {
         settingsRepository.setSshKeepaliveEnabled(enabled)
     }

@@ -114,6 +114,10 @@ class SessionHostViewModel @Inject constructor(
         settingsRepository.settings
             .map { it.preferFastResume }
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.preferFastResume)
+    val executeTextInputOnSend: StateFlow<Boolean> =
+        settingsRepository.settings
+            .map { it.executeTextInputOnSend }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.executeTextInputOnSend)
     val runtimeState = runtimeRepository.state
     private val connectingJobs = mutableMapOf<Long, Job>()
     private var deferredRecoveryScheduled = false
