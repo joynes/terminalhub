@@ -3,14 +3,20 @@ package se.joynes.terminalhub.ui.screen.terminal
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -139,18 +145,46 @@ private fun TermKey(
     fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.92f else 1f,
+        label = "key bar press scale"
+    )
+    val backgroundColor = when {
+        pressed -> MegaDriveOnSurface
+        active -> MegaDrivePrimary
+        else -> MegaDriveBg
+    }
+    val foregroundColor = if (pressed || active) MegaDriveBg else MegaDrivePrimary
+
     Box(
         modifier = Modifier
             .then(modifier)
             .height(KEY_H)
+            .graphicsLayer {
+                scaleX = pressScale
+                scaleY = pressScale
+            }
             .clip(RoundedCornerShape(4.dp))
-            .background(if (active) MegaDrivePrimary else MegaDriveBg)
-            .clickable(onClick = onClick),
+            .background(backgroundColor)
+            .semantics {
+                stateDescription = when {
+                    pressed -> "Pressed"
+                    active -> "Active"
+                    else -> "Ready"
+                }
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            ),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            color = if (active) MegaDriveBg else MegaDrivePrimary,
+            color = foregroundColor,
             fontSize = fontSize,
             fontFamily = MonoFontFamily,
             textAlign = TextAlign.Center
