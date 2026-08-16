@@ -38,29 +38,22 @@ fun SpecialKeyBar(
     val normalizedRows = remember(rows) { KeyBarLayoutConfig.normalize(rows) }
 
     fun modified(normal: String): String {
-        val shifted = if (shiftActive && normal.length == 1 && normal[0].isLetter()) {
-            normal.uppercase()
-        } else {
-            normal
-        }
-        val result = when {
-            ctrlActive -> {
-                val controlChar = normal.lowercase().singleOrNull()
-                if (controlChar != null && controlChar in 'a'..'z')
-                    (controlChar.code xor 0x40).toChar().toString()
-                else shifted
-            }
-            altActive -> "\u001B$shifted"
-            else -> shifted
-        }
+        // Read the manager directly. A second, very quick tap can arrive before Compose
+        // has recomposed the active-state colors and their captured snapshot values.
+        val result = applyKeyBarModifiers(
+            normal = normal,
+            ctrl = modifierManager.ctrl,
+            alt = modifierManager.alt,
+            shift = modifierManager.shift
+        )
         modifierManager.clearTransients()
         return result
     }
 
     fun arrowKey(letter: Char): String {
-        val modBits = (if (shiftActive) 1 else 0) or
-                      (if (altActive)   2 else 0) or
-                      (if (ctrlActive)  4 else 0)
+        val modBits = (if (modifierManager.shift) 1 else 0) or
+                      (if (modifierManager.alt)   2 else 0) or
+                      (if (modifierManager.ctrl)  4 else 0)
         modifierManager.clearTransients()
         return if (modBits == 0) "\u001B[$letter"
         else "\u001B[1;${modBits + 1}$letter"
@@ -166,6 +159,29 @@ private fun TermKey(
 }
 
 private val LARGE_GLYPH_KEYS = setOf("TAB", "ENTER", "SHIFT", "UP", "DOWN", "LEFT", "RIGHT", "KEYBOARD", "TEXT_INPUT", "UPLOAD", "DOWNLOAD")
+
+internal fun applyKeyBarModifiers(
+    normal: String,
+    ctrl: Boolean,
+    alt: Boolean,
+    shift: Boolean
+): String {
+    val shifted = if (shift && normal.length == 1 && normal[0].isLetter()) {
+        normal.uppercase()
+    } else {
+        normal
+    }
+    if (ctrl) {
+        val controlChar = normal.lowercase().singleOrNull()
+        if (controlChar != null && controlChar in 'a'..'z') {
+            // ASCII control characters are the letter code with the upper three bits
+            // cleared. In particular, lowercase c (0x63) must become ETX (0x03),
+            // not '#' (0x23), which XOR 0x40 would produce.
+            return (controlChar.code and 0x1F).toChar().toString()
+        }
+    }
+    return if (alt) "\u001B$shifted" else shifted
+}
 
 private fun compactLabel(keyId: String): String = when (keyId) {
     "TAB" -> "⇥"
