@@ -35,4 +35,8 @@ class SettingsViewModel @Inject constructor(
     fun setBackgroundKeepaliveScope(scope: BackgroundKeepaliveScope) {
         settingsRepository.setBackgroundKeepaliveScope(scope)
     }
+
+    fun setKeyBarRows(rows: List<List<String>>) {
+        settingsRepository.setKeyBarRows(rows)
+    }
 }

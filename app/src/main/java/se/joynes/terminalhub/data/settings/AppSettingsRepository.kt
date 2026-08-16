@@ -13,7 +13,8 @@ data class AppSettings(
     val executeTextInputOnSend: Boolean = false,
     val sshKeepaliveEnabled: Boolean = true,
     val backgroundKeepaliveProfile: BackgroundKeepaliveProfile = BackgroundKeepaliveProfile.BALANCED,
-    val backgroundKeepaliveScope: BackgroundKeepaliveScope = BackgroundKeepaliveScope.ACTIVE_TAB_ONLY
+    val backgroundKeepaliveScope: BackgroundKeepaliveScope = BackgroundKeepaliveScope.ACTIVE_TAB_ONLY,
+    val keyBarRows: List<List<String>> = KeyBarLayoutConfig.defaultRows
 )
 
 enum class BackgroundKeepaliveProfile {
@@ -44,7 +45,8 @@ class AppSettingsRepository @Inject constructor(
                 ?: BackgroundKeepaliveProfile.BALANCED,
             backgroundKeepaliveScope = prefs.getString(KEY_BACKGROUND_KEEPALIVE_SCOPE, BackgroundKeepaliveScope.ACTIVE_TAB_ONLY.name)
                 ?.let { runCatching { BackgroundKeepaliveScope.valueOf(it) }.getOrNull() }
-                ?: BackgroundKeepaliveScope.ACTIVE_TAB_ONLY
+                ?: BackgroundKeepaliveScope.ACTIVE_TAB_ONLY,
+            keyBarRows = KeyBarLayoutConfig.decode(prefs.getString(KEY_KEY_BAR_LAYOUT, null))
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -69,6 +71,10 @@ class AppSettingsRepository @Inject constructor(
         update(_settings.value.copy(backgroundKeepaliveScope = scope))
     }
 
+    fun setKeyBarRows(rows: List<List<String>>) {
+        update(_settings.value.copy(keyBarRows = KeyBarLayoutConfig.normalize(rows)))
+    }
+
     private fun update(next: AppSettings) {
         _settings.value = next
         prefs.edit()
@@ -77,6 +83,7 @@ class AppSettingsRepository @Inject constructor(
             .putBoolean(KEY_SSH_KEEPALIVE, next.sshKeepaliveEnabled)
             .putString(KEY_BACKGROUND_KEEPALIVE_PROFILE, next.backgroundKeepaliveProfile.name)
             .putString(KEY_BACKGROUND_KEEPALIVE_SCOPE, next.backgroundKeepaliveScope.name)
+            .putString(KEY_KEY_BAR_LAYOUT, KeyBarLayoutConfig.encode(next.keyBarRows))
             .apply()
     }
 
@@ -86,5 +93,6 @@ class AppSettingsRepository @Inject constructor(
         private const val KEY_SSH_KEEPALIVE = "ssh_keepalive_enabled"
         private const val KEY_BACKGROUND_KEEPALIVE_PROFILE = "background_keepalive_profile"
         private const val KEY_BACKGROUND_KEEPALIVE_SCOPE = "background_keepalive_scope"
+        private const val KEY_KEY_BAR_LAYOUT = "key_bar_layout"
     }
 }

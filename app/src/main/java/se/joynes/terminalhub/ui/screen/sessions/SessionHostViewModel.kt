@@ -118,6 +118,10 @@ class SessionHostViewModel @Inject constructor(
         settingsRepository.settings
             .map { it.executeTextInputOnSend }
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.executeTextInputOnSend)
+    val keyBarRows: StateFlow<List<List<String>>> =
+        settingsRepository.settings
+            .map { it.keyBarRows }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.keyBarRows)
     val runtimeState = runtimeRepository.state
     private val connectingJobs = mutableMapOf<Long, Job>()
     private var deferredRecoveryScheduled = false

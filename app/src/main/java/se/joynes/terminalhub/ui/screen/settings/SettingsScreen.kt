@@ -230,6 +230,17 @@ fun SettingsScreen(
                 }
                 item {
                     SettingsCard(
+                        title = "TERMINAL KEY BAR",
+                        description = "Tap a key to replace or remove it. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows. The layout is included in app export/import backups."
+                    ) {
+                        KeyBarSettingsEditor(
+                            rows = settings.keyBarRows,
+                            onRowsChange = viewModel::setKeyBarRows
+                        )
+                    }
+                }
+                item {
+                    SettingsCard(
                         title = "SSH KEEPALIVE",
                         description = "Sends SSH keepalive traffic to reduce silent disconnects. Foreground sends every 60 seconds. Background behavior below controls how aggressively the app keeps multiple sessions alive."
                     ) {

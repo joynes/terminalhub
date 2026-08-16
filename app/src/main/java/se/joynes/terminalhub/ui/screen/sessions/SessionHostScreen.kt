@@ -57,8 +57,6 @@ import se.joynes.terminalhub.ui.screen.terminal.TerminalSearchOverlay
 import se.joynes.terminalhub.ui.screen.terminal.TerminalViewClientImpl
 import se.joynes.terminalhub.ui.theme.*
 
-private val KeyBarReservedHeight = 70.dp
-
 private data class PendingTabClose(
     val projectId: Long,
     val projectName: String,
@@ -88,10 +86,12 @@ fun SessionHostScreen(
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
     val executeTextInputOnSend by viewModel.executeTextInputOnSend.collectAsState()
+    val keyBarRows by viewModel.keyBarRows.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val density = LocalDensity.current
-    val bottomBarReservedHeight = KeyBarReservedHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val keyBarReservedHeight = (keyBarRows.size * 36).dp
+    val bottomBarReservedHeight = keyBarReservedHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val imeBottomPx = WindowInsets.ime.getBottom(density)
 
     var keyboardVisible by remember { mutableStateOf(false) }
@@ -936,6 +936,7 @@ fun SessionHostScreen(
                     ) {
                         SpecialKeyBar(
                             modifierManager = modifierManager,
+                            rows = keyBarRows,
                             onKey = { keyStr ->
                                 if (activeTextInputVisible && activeProjectId != null) {
                                     when {

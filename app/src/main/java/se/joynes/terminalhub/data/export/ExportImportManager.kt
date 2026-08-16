@@ -15,6 +15,8 @@ import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.terminalhub.data.security.SecurePrefsManager
 import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
+import se.joynes.terminalhub.data.settings.AppSettingsRepository
+import se.joynes.terminalhub.data.settings.KeyBarLayoutConfig
 import se.joynes.terminalhub.domain.TerminalSessionManager
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,6 +31,7 @@ class ExportImportManager @Inject constructor(
     private val projectRepo: ProjectRepository,
     private val textInputHistoryDao: TextInputHistoryDao,
     private val securePrefsManager: SecurePrefsManager,
+    private val settingsRepository: AppSettingsRepository,
     private val runtimeRepository: AppRuntimeRepository,
     private val sessionManager: TerminalSessionManager
 ) {
@@ -50,7 +53,9 @@ class ExportImportManager @Inject constructor(
         projectsForServer: suspend (Server) -> List<Project>
     ): String {
         val sb = StringBuilder()
-        sb.appendLine("version: 1")
+        sb.appendLine("version: 2")
+        sb.appendLine("settings:")
+        sb.appendLine("  keyBarLayout: ${ys(KeyBarLayoutConfig.encode(settingsRepository.settings.value.keyBarRows))}")
         sb.appendLine("servers:")
         for (server in servers) {
             val projects = projectsForServer(server)
@@ -99,6 +104,9 @@ class ExportImportManager @Inject constructor(
             ?: error("Cannot read file")
 
         val servers = parseYaml(text)
+        // Backups created before version 2 have no settings section. Keep the user's
+        // current key bar in that case instead of silently resetting it.
+        val keyBarRows = extractKeyBarLayoutFromYaml(text) ?: settingsRepository.settings.value.keyBarRows
         var serversImported = 0
         var projectsImported = 0
 
@@ -145,6 +153,7 @@ class ExportImportManager @Inject constructor(
                 }
             }
         }
+        settingsRepository.setKeyBarRows(keyBarRows)
         return ImportResult(serversImported, projectsImported)
     }
 
@@ -229,13 +238,34 @@ class ExportImportManager @Inject constructor(
     }
 
     private fun unquote(s: String): String {
-        if (s.startsWith("\"") && s.endsWith("\"") && s.length >= 2) {
-            return s.substring(1, s.length - 1)
-                .replace("\\n", "\n")
-                .replace("\\t", "\t")
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\")
-        }
-        return s
+        return decodeYamlScalar(s)
     }
+}
+
+internal fun extractKeyBarLayoutFromYaml(text: String): List<List<String>>? {
+    var inSettings = false
+    for (rawLine in text.lines()) {
+        val indent = rawLine.length - rawLine.trimStart().length
+        val line = rawLine.trim()
+        if (indent == 0) {
+            inSettings = line == "settings:"
+            continue
+        }
+        if (inSettings && indent == 2 && line.startsWith("keyBarLayout:")) {
+            val rawValue = line.substringAfter(':').trim()
+            return KeyBarLayoutConfig.decode(decodeYamlScalar(rawValue))
+        }
+    }
+    return null
+}
+
+private fun decodeYamlScalar(value: String): String {
+    if (value.startsWith("\"") && value.endsWith("\"") && value.length >= 2) {
+        return value.substring(1, value.length - 1)
+            .replace("\\n", "\n")
+            .replace("\\t", "\t")
+            .replace("\\\"", "\"")
+            .replace("\\\\", "\\")
+    }
+    return value
 }
