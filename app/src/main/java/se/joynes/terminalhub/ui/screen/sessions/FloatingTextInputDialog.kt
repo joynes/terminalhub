@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
@@ -47,7 +46,6 @@ fun FloatingTextInputDialog(
     onSaveHistory: (String) -> Unit = {},
     bottomAvoidanceDp: Dp = 0.dp
 ) {
-    val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     var showHistory by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
@@ -68,21 +66,28 @@ fun FloatingTextInputDialog(
     BoxWithConstraints(
         modifier = Modifier.fillMaxSize()
     ) {
-        val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+        // maxHeight is the actual host area below the app's status/tab bars. Using the
+        // full device screen height here double-counted that top area and pushed the
+        // panel's last lines underneath the configurable key bar.
+        val containerHeightPx = with(density) { maxHeight.toPx() }
         val imeBottomPx = WindowInsets.ime.getBottom(density).toFloat()
         val bottomAvoidancePx = with(density) { bottomAvoidanceDp.toPx() }
         val availableWidthPx = with(density) { maxWidth.toPx() }
-        val availableHeightPx = with(density) {
-            (screenHeightPx - imeBottomPx - bottomAvoidancePx).coerceAtLeast(220.dp.toPx())
-        }
         val panelWidthDp = maxWidth * 0.92f
         val panelWidthPx = with(density) { panelWidthDp.toPx() }
         val panelHeightPx = with(density) { 184.dp.toPx() }
         val minPanelTopPx = with(density) { 12.dp.toPx() }
         val panelBottomGapPx = with(density) { 8.dp.toPx() }
-        val maxPanelTopPx = (availableHeightPx - panelHeightPx).coerceAtLeast(minPanelTopPx)
-        val anchoredPanelTopPx = (availableHeightPx - panelHeightPx - panelBottomGapPx)
-            .coerceIn(minPanelTopPx, maxPanelTopPx)
+        val verticalLayout = calculateFloatingPanelVerticalLayout(
+            containerHeightPx = containerHeightPx,
+            imeBottomPx = imeBottomPx,
+            bottomAvoidancePx = bottomAvoidancePx,
+            panelHeightPx = panelHeightPx,
+            minPanelTopPx = minPanelTopPx,
+            panelBottomGapPx = panelBottomGapPx
+        )
+        val maxPanelTopPx = verticalLayout.maxPanelTopPx
+        val anchoredPanelTopPx = verticalLayout.anchoredPanelTopPx
 
         var offsetX by remember(availableWidthPx, panelWidthPx) {
             mutableFloatStateOf(((availableWidthPx - panelWidthPx) / 2f).coerceAtLeast(0f))
@@ -220,6 +225,32 @@ fun FloatingTextInputDialog(
             )
         }
     }
+}
+
+internal data class FloatingPanelVerticalLayout(
+    val availableBottomPx: Float,
+    val maxPanelTopPx: Float,
+    val anchoredPanelTopPx: Float
+)
+
+internal fun calculateFloatingPanelVerticalLayout(
+    containerHeightPx: Float,
+    imeBottomPx: Float,
+    bottomAvoidancePx: Float,
+    panelHeightPx: Float,
+    minPanelTopPx: Float,
+    panelBottomGapPx: Float
+): FloatingPanelVerticalLayout {
+    val availableBottomPx = (containerHeightPx - imeBottomPx - bottomAvoidancePx)
+        .coerceAtLeast(minPanelTopPx + panelHeightPx)
+    val maxPanelTopPx = (availableBottomPx - panelHeightPx).coerceAtLeast(minPanelTopPx)
+    val anchoredPanelTopPx = (availableBottomPx - panelHeightPx - panelBottomGapPx)
+        .coerceIn(minPanelTopPx, maxPanelTopPx)
+    return FloatingPanelVerticalLayout(
+        availableBottomPx = availableBottomPx,
+        maxPanelTopPx = maxPanelTopPx,
+        anchoredPanelTopPx = anchoredPanelTopPx
+    )
 }
 
 /** Compatibility overload for static previews that do not need cursor-aware insertion. */

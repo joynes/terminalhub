@@ -106,7 +106,10 @@ class SshConnection @Inject constructor(
                 )
 
                 val conn = Connection(server.host, server.port)
-                conn.connect(permissiveHostKeyVerifier)
+                // Bound both the TCP connection and SSH key exchange. Without explicit
+                // limits the library may wait at OS socket timeout length when the phone
+                // has no route, leaving the UI in RESTORING/CONNECTING for minutes.
+                conn.connect(permissiveHostKeyVerifier, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS)
 
                 val authenticated = when {
                     !privateKeyPem.isNullOrBlank() -> {
@@ -500,6 +503,7 @@ class SshConnection @Inject constructor(
 
     companion object {
         private const val TAG = "SshConnection"
+        private const val CONNECT_TIMEOUT_MS = 15_000
         private const val FOREGROUND_KEEPALIVE_MS = 60_000L
     }
 }

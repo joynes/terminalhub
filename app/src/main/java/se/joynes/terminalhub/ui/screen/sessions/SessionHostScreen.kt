@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.terminalhub.R
@@ -162,6 +163,11 @@ fun SessionHostScreen(
         val recoveryId = runtimeState.recoveryActiveProjectId
         projectTabs.firstOrNull { it.projectId == recoveryId && it.isConnecting }
             ?: projectTabs.firstOrNull { it.isConnecting }
+    }
+    val failedConnectionTab = remember(projectTabs, runtimeState.recoveryActiveProjectId) {
+        val recoveryId = runtimeState.recoveryActiveProjectId
+        projectTabs.firstOrNull { it.projectId == recoveryId && it.connectionError != null }
+            ?: projectTabs.firstOrNull { it.connectionError != null }
     }
     val canReconnectActiveTab = activeTab != null &&
         activeTab.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH
@@ -791,6 +797,37 @@ fun SessionHostScreen(
                                     fontSize = 12.sp,
                                     fontFamily = MonoFontFamily
                                 )
+                            }
+                        } else if (failedConnectionTab != null) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MegaDriveBg)
+                                    .padding(horizontal = 28.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        "CONNECTION FAILED",
+                                        color = MegaDriveError,
+                                        fontSize = 14.sp,
+                                        fontFamily = MonoFontFamily
+                                    )
+                                    Text(
+                                        failedConnectionTab.connectionError.orEmpty(),
+                                        color = MegaDriveOnSurface,
+                                        fontSize = 11.sp,
+                                        fontFamily = MonoFontFamily,
+                                        textAlign = TextAlign.Center
+                                    )
+                                    RetroButton(
+                                        text = "RECONNECT",
+                                        onClick = { viewModel.reconnectProject(failedConnectionTab.projectId) }
+                                    )
+                                }
                             }
                         } else {
                             Box(

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.Flow
@@ -46,7 +47,29 @@ data class ProjectTabState(
     val isConnecting: Boolean = false,
     val colorSeed: Int = 0,
     val usesTmux: Boolean = false,
-    val targetType: ProjectTargetType = ProjectTargetType.SSH
+    val targetType: ProjectTargetType = ProjectTargetType.SSH,
+    val connectionError: String? = null
+)
+
+internal sealed interface SshConnectionAttemptResult {
+    data object Connected : SshConnectionAttemptResult
+    data class Failed(val message: String) : SshConnectionAttemptResult
+}
+
+internal suspend fun awaitSshConnectionAttempt(
+    connected: StateFlow<Boolean>,
+    lastErrorMessage: StateFlow<String?>,
+    timeoutMs: Long
+): SshConnectionAttemptResult = withTimeoutOrNull(timeoutMs) {
+    combine(connected, lastErrorMessage) { isConnected, error ->
+        when {
+            isConnected -> SshConnectionAttemptResult.Connected
+            !error.isNullOrBlank() -> SshConnectionAttemptResult.Failed(error)
+            else -> null
+        }
+    }.first { it != null }!!
+} ?: SshConnectionAttemptResult.Failed(
+    "Connection timed out. Check phone network, Tailscale, host, and SSH port, then try again."
 )
 
 data class SessionHomeState(
@@ -81,14 +104,16 @@ class SessionHostViewModel @Inject constructor(
     private val _allDbProjects = MutableStateFlow<List<Project>>(emptyList())
     private val _projectOrder = MutableStateFlow(loadProjectOrder())
     private val connectingProjectIds = MutableStateFlow<Set<Long>>(emptySet())
+    private val connectionErrors = MutableStateFlow<Map<Long, String>>(emptyMap())
 
     /** Combined tab list: open project tabs merged with live session state. */
     val projectTabs: StateFlow<List<ProjectTabState>> = combine(
         _dbProjects,
         sessionManager.sessions,
         _projectOrder,
-        connectingProjectIds
-    ) { projects, sessions, projectOrder, connectingIds ->
+        connectingProjectIds,
+        connectionErrors
+    ) { projects, sessions, projectOrder, connectingIds, errors ->
         val sessionByProjectId = sessions.associateBy { it.projectId }
         projects
             .sortedByProjectOrder(projectOrder)
@@ -102,7 +127,8 @@ class SessionHostViewModel @Inject constructor(
                 isConnecting = p.id in connectingIds,
                 colorSeed = p.colorSeed,
                 usesTmux = p.targetType == ProjectTargetType.SSH && p.useTmux,
-                targetType = p.targetType
+                targetType = p.targetType,
+                connectionError = errors[p.id]
             )
             }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
@@ -253,6 +279,7 @@ class SessionHostViewModel @Inject constructor(
         if (project.id in connectingProjectIds.value) return
         // Already registered as a session
         if (sessionManager.sessions.value.any { it.projectId == project.id }) return
+        connectionErrors.value = connectionErrors.value - project.id
         connectingProjectIds.value = connectingProjectIds.value + project.id
 
         connectingJobs[project.id] = viewModelScope.launch {
@@ -261,11 +288,27 @@ class SessionHostViewModel @Inject constructor(
                     ProjectTargetType.LOCAL -> activateLocalProject(project, autoSwitch)
                     ProjectTargetType.SSH -> activateSshProject(project, autoSwitch)
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                if (project.targetType == ProjectTargetType.SSH) {
+                    recordConnectionError(project, error.message ?: "SSH connection failed.")
+                }
+                logger.log(
+                    LogLevel.ERROR,
+                    "SessionRecovery",
+                    "Activation failed project=${project.name}: ${error.javaClass.simpleName}: ${error.message}"
+                )
             } finally {
                 connectingJobs.remove(project.id)
                 connectingProjectIds.value = connectingProjectIds.value - project.id
             }
         }
+    }
+
+    private fun recordConnectionError(project: Project, message: String) {
+        connectionErrors.value = connectionErrors.value + (project.id to message)
+        logger.log(LogLevel.WARN, "SessionRecovery", "Connection failed project=${project.name}: $message")
     }
 
     private suspend fun activateSshProject(project: Project, autoSwitch: Boolean) {
@@ -276,21 +319,26 @@ class SessionHostViewModel @Inject constructor(
             else -> "normal-activation"
         }
         logger.log(LogLevel.INFO, "SessionRecovery", "Activating SSH project=${project.name} reason=$reason")
-        val srv = serverRepo.getById(project.serverId) ?: return
+        val srv = serverRepo.getById(project.serverId)
+        if (srv == null) {
+            recordConnectionError(project, "Server configuration was not found.")
+            return
+        }
         val conn = connectToServer(srv)
         conn.bindProject(project.id, project.name)
         val setupCmd = engine.renderSetup(srv, project)
         val attachCmd = engine.renderAttach(srv, project)
         val customScript = engine.renderCustomScript(srv, project)
         val aiCmd = engine.renderAiCommand(project)
-        val connected = withTimeoutOrNull(SSH_CONNECT_TIMEOUT_MS) {
-            conn.connected.first { it }
-            true
-        } == true
-        if (!connected) {
-            logger.log(LogLevel.WARN, "SessionRecovery", "SSH activation timed out project=${project.name}")
-            sshManager.destroySession(conn.sessionId)
-            return
+        when (val attempt = awaitSshConnectionAttempt(conn.connected, conn.lastErrorMessage, SSH_CONNECT_TIMEOUT_MS)) {
+            SshConnectionAttemptResult.Connected -> {
+                connectionErrors.value = connectionErrors.value - project.id
+            }
+            is SshConnectionAttemptResult.Failed -> {
+                recordConnectionError(project, attempt.message)
+                sshManager.destroySession(conn.sessionId)
+                return
+            }
         }
         if (sessionManager.isProjectClosed(project.id)) {
             sshManager.destroySession(conn.sessionId)
@@ -378,6 +426,7 @@ class SessionHostViewModel @Inject constructor(
         connectingJobs.remove(projectId)?.cancel()
         _dbProjects.value = _dbProjects.value.filter { it.id != projectId }
         connectingProjectIds.value = connectingProjectIds.value - projectId
+        connectionErrors.value = connectionErrors.value - projectId
         sessionId?.let { sessionManager.close(it, killTmuxSession = killTmuxSession) }
     }
 
@@ -561,6 +610,6 @@ class SessionHostViewModel @Inject constructor(
     }
 
     private companion object {
-        const val SSH_CONNECT_TIMEOUT_MS = 30_000L
+        const val SSH_CONNECT_TIMEOUT_MS = 15_000L
     }
 }
