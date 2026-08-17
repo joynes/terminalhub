@@ -11,16 +11,21 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -44,10 +49,14 @@ fun FloatingTextInputDialog(
     onDismiss: () -> Unit,
     history: List<String> = emptyList(),
     onSaveHistory: (String) -> Unit = {},
-    bottomAvoidanceDp: Dp = 0.dp
+    bottomAvoidanceDp: Dp = 0.dp,
+    panelOpacity: Float? = null,
+    onPanelOpacityChange: ((Float) -> Unit)? = null
 ) {
     val density = LocalDensity.current
     var showHistory by remember { mutableStateOf(false) }
+    var localPanelOpacity by rememberSaveable { mutableStateOf(1f) }
+    val effectivePanelOpacity = normalizeTextInputPanelOpacity(panelOpacity ?: localPanelOpacity)
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
@@ -110,7 +119,7 @@ fun FloatingTextInputDialog(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .width(panelWidthDp)
-                .background(MegaDriveSurface, RoundedCornerShape(4.dp))
+                .background(MegaDriveSurface.copy(alpha = effectivePanelOpacity), RoundedCornerShape(4.dp))
                 // Consume all pointer events so they don't reach the dismiss handler above
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
@@ -127,18 +136,53 @@ fun FloatingTextInputDialog(
                     .fillMaxWidth()
                     .height(32.dp)
                     .background(MegaDrivePrimary, RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                    .pointerInput(Unit) {
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    "TEXT INPUT",
+                    color = MegaDriveBg,
+                    fontSize = 11.sp,
+                    fontFamily = MonoFontFamily,
+                    modifier = Modifier.pointerInput(Unit) {
                         detectDragGestures { change, drag ->
                             change.consume()
-                            offsetX = (offsetX + drag.x).coerceIn(0f, (availableWidthPx - panelWidthPx).coerceAtLeast(0f))
+                            offsetX = (offsetX + drag.x)
+                                .coerceIn(0f, (availableWidthPx - panelWidthPx).coerceAtLeast(0f))
                             offsetY = (offsetY + drag.y).coerceIn(minPanelTopPx, maxPanelTopPx)
                         }
                     }
-                    .padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("TEXT INPUT", color = MegaDriveBg, fontSize = 11.sp, fontFamily = MonoFontFamily)
+                )
+                Slider(
+                    value = effectivePanelOpacity,
+                    onValueChange = { value ->
+                        val normalized = normalizeTextInputPanelOpacity(value)
+                        if (onPanelOpacityChange != null) {
+                            onPanelOpacityChange(normalized)
+                        } else {
+                            localPanelOpacity = normalized
+                        }
+                    },
+                    valueRange = MIN_TEXT_INPUT_PANEL_OPACITY..MAX_TEXT_INPUT_PANEL_OPACITY,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MegaDriveBg,
+                        activeTrackColor = MegaDriveBg,
+                        inactiveTrackColor = MegaDriveBg.copy(alpha = 0.3f)
+                    ),
+                    modifier = Modifier
+                        .width(72.dp)
+                        .height(30.dp)
+                        .semantics { contentDescription = "Text input opacity" }
+                )
+                Text(
+                    "${(effectivePanelOpacity * 100).roundToInt()}%",
+                    color = MegaDriveBg,
+                    fontSize = 9.sp,
+                    fontFamily = MonoFontFamily,
+                    modifier = Modifier.width(30.dp)
+                )
+                Spacer(Modifier.weight(1f))
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -203,9 +247,9 @@ fun FloatingTextInputDialog(
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { send() }),
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor    = MegaDriveBg,
-                    unfocusedContainerColor  = MegaDriveBg,
-                    disabledContainerColor   = MegaDriveBg,
+                    focusedContainerColor    = MegaDriveBg.copy(alpha = effectivePanelOpacity),
+                    unfocusedContainerColor  = MegaDriveBg.copy(alpha = effectivePanelOpacity),
+                    disabledContainerColor   = MegaDriveBg.copy(alpha = effectivePanelOpacity),
                     focusedTextColor         = MegaDrivePrimary,
                     unfocusedTextColor       = MegaDrivePrimary,
                     disabledTextColor        = MegaDriveDim,
@@ -226,6 +270,12 @@ fun FloatingTextInputDialog(
         }
     }
 }
+
+internal const val MIN_TEXT_INPUT_PANEL_OPACITY = 0.15f
+internal const val MAX_TEXT_INPUT_PANEL_OPACITY = 1f
+
+internal fun normalizeTextInputPanelOpacity(value: Float): Float =
+    value.coerceIn(MIN_TEXT_INPUT_PANEL_OPACITY, MAX_TEXT_INPUT_PANEL_OPACITY)
 
 internal data class FloatingPanelVerticalLayout(
     val availableBottomPx: Float,
@@ -262,7 +312,9 @@ fun FloatingTextInputDialog(
     onDismiss: () -> Unit,
     history: List<String> = emptyList(),
     onSaveHistory: (String) -> Unit = {},
-    bottomAvoidanceDp: Dp = 0.dp
+    bottomAvoidanceDp: Dp = 0.dp,
+    panelOpacity: Float? = null,
+    onPanelOpacityChange: ((Float) -> Unit)? = null
 ) {
     FloatingTextInputDialog(
         text = TextFieldValue(text, TextRange(text.length)),
@@ -271,6 +323,8 @@ fun FloatingTextInputDialog(
         onDismiss = onDismiss,
         history = history,
         onSaveHistory = onSaveHistory,
-        bottomAvoidanceDp = bottomAvoidanceDp
+        bottomAvoidanceDp = bottomAvoidanceDp,
+        panelOpacity = panelOpacity,
+        onPanelOpacityChange = onPanelOpacityChange
     )
 }

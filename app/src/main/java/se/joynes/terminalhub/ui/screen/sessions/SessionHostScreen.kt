@@ -16,6 +16,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -110,6 +111,7 @@ fun SessionHostScreen(
     var searchVisible by remember { mutableStateOf(false) }
     var searchInitialQuery by remember { mutableStateOf("") }
     var isTerminalAtBottom by remember { mutableStateOf(true) }
+    var textInputPanelOpacity by rememberSaveable { mutableStateOf(1f) }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
@@ -905,7 +907,9 @@ fun SessionHostScreen(
                                 onSaveHistory = { text ->
                                     activeProjectId?.let { viewModel.saveTextInput(it, text) }
                                 },
-                                bottomAvoidanceDp = bottomBarReservedHeight
+                                bottomAvoidanceDp = bottomBarReservedHeight,
+                                panelOpacity = textInputPanelOpacity,
+                                onPanelOpacityChange = { textInputPanelOpacity = it }
                             )
                         }
 
