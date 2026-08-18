@@ -28,6 +28,7 @@ fun AddEditProjectScreen(
     LaunchedEffect(projectId) { viewModel.loadProject(serverId, projectId) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
     var serverMenuExpanded by remember { mutableStateOf(false) }
+    var advancedExpanded by remember { mutableStateOf(false) }
     val normalizedGitUrl = remember(state.gitUrl, state.targetType) {
         AddEditProjectViewModel.normalizeGitUrl(state.gitUrl, state.targetType)
     }
@@ -54,6 +55,7 @@ fun AddEditProjectScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // -- TARGET ----------------------------------------------------
             Text("TARGET", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
             ExposedDropdownMenuBox(
                 expanded = serverMenuExpanded,
@@ -69,9 +71,7 @@ fun AddEditProjectScreen(
                     textStyle = androidx.compose.ui.text.TextStyle(
                         fontFamily = MonoFontFamily, fontSize = 12.sp, color = MegaDriveOnSurface
                     ),
-                    label = {
-                        Text("Server", fontFamily = MonoFontFamily)
-                    },
+                    label = { Text("Server", fontFamily = MonoFontFamily) },
                     trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = serverMenuExpanded) },
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MegaDrivePrimary,
@@ -88,41 +88,20 @@ fun AddEditProjectScreen(
                     state.serverOptions.forEach { server ->
                         DropdownMenuItem(
                             text = {
-                                Text(
-                                    server.name,
-                                    color = MegaDriveOnSurface,
-                                    fontFamily = MonoFontFamily,
-                                    fontSize = 12.sp
-                                )
+                                Text(server.name, color = MegaDriveOnSurface, fontFamily = MonoFontFamily, fontSize = 12.sp)
                             },
                             onClick = {
-                                viewModel.update {
-                                    copy(
-                                        targetType = ProjectTargetType.SSH,
-                                        selectedServerId = server.id
-                                    )
-                                }
+                                viewModel.update { copy(targetType = ProjectTargetType.SSH, selectedServerId = server.id) }
                                 serverMenuExpanded = false
                             }
                         )
                     }
                     DropdownMenuItem(
                         text = {
-                            Text(
-                                "Local device",
-                                color = MegaDriveOnSurface,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 12.sp
-                            )
+                            Text("Local device", color = MegaDriveOnSurface, fontFamily = MonoFontFamily, fontSize = 12.sp)
                         },
                         onClick = {
-                            viewModel.update {
-                                copy(
-                                    targetType = ProjectTargetType.LOCAL,
-                                    selectedServerId = null,
-                                    useTmux = false
-                                )
-                            }
+                            viewModel.update { copy(targetType = ProjectTargetType.LOCAL, selectedServerId = null, useTmux = false) }
                             serverMenuExpanded = false
                         }
                     )
@@ -133,7 +112,7 @@ fun AddEditProjectScreen(
                 color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
             )
 
-            // ── Project name ──────────────────────────────────────────────
+            // -- Project name ----------------------------------------------
             RetroTextField(
                 state.name,
                 { viewModel.update { copy(name = it.replace(" ", "-")) } },
@@ -145,90 +124,125 @@ fun AddEditProjectScreen(
                 color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
             )
 
-            // ── GIT REPO URL ──────────────────────────────────────────────
-            RetroTextField(
-                state.gitUrl,
-                { viewModel.update { copy(gitUrl = it) } },
-                "Git Repo URL (optional)",
-                Modifier.fillMaxWidth()
-            )
-            Text(
-                when {
-                    state.targetType == ProjectTargetType.LOCAL ->
-                        "Local projects do not clone via server SSH. This URL is only used for SSH targets."
-                    normalizedGitUrl != state.gitUrl.trim() ->
-                        "GitHub HTTPS URLs are converted to SSH on save for server-side clone: $normalizedGitUrl"
-                    else ->
-                        "If set, the repo will be cloned into the project folder on first connect. For GitHub on servers, prefer SSH form like git@github.com:owner/repo.git"
-                },
-                color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
+            // -- ADVANCED (collapsible) ------------------------------------
+            Spacer(Modifier.height(4.dp))
+            RetroButton(
+                text = if (advancedExpanded) "[ v ADVANCED ]" else "[ > ADVANCED ]",
+                onClick = { advancedExpanded = !advancedExpanded },
+                modifier = Modifier.fillMaxWidth()
             )
 
-            // ── USE TMUX ──────────────────────────────────────────────────
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("USE TMUX", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
-                Checkbox(
-                    checked = state.useTmux && state.targetType == ProjectTargetType.SSH,
-                    onCheckedChange = { viewModel.update { copy(useTmux = it) } },
-                    enabled = state.targetType == ProjectTargetType.SSH,
-                    colors = CheckboxDefaults.colors(
-                        checkedColor = MegaDrivePrimary,
-                        uncheckedColor = MegaDriveDim,
-                        checkmarkColor = MegaDriveBg
+            if (advancedExpanded) {
+
+                // -- GIT REPO URL ------------------------------------------
+                RetroTextField(
+                    state.gitUrl,
+                    { viewModel.update { copy(gitUrl = it) } },
+                    "Git Repo URL (optional)",
+                    Modifier.fillMaxWidth()
+                )
+                Text(
+                    when {
+                        state.targetType == ProjectTargetType.LOCAL ->
+                            "Local projects do not clone via server SSH. This URL is only used for SSH targets."
+                        normalizedGitUrl != state.gitUrl.trim() ->
+                            "GitHub HTTPS URLs are converted to SSH on save: $normalizedGitUrl"
+                        else ->
+                            "If set, the repo will be cloned into the project folder on first connect. Prefer SSH form: git@github.com:owner/repo.git"
+                    },
+                    color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
+                )
+
+                // -- USE TMUX ---------------------------------------------
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("USE TMUX", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+                    Checkbox(
+                        checked = state.useTmux && state.targetType == ProjectTargetType.SSH,
+                        onCheckedChange = { viewModel.update { copy(useTmux = it) } },
+                        enabled = state.targetType == ProjectTargetType.SSH,
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = MegaDrivePrimary,
+                            uncheckedColor = MegaDriveDim,
+                            checkmarkColor = MegaDriveBg
+                        )
+                    )
+                }
+                Text(
+                    when {
+                        state.targetType == ProjectTargetType.LOCAL -> "Local mode currently uses a plain device shell without tmux."
+                        state.useTmux -> "Creates a tmux session named after the project, or attaches if it already exists."
+                        else -> "Connects to a plain shell without tmux."
+                    },
+                    color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
+                )
+
+                // -- CUSTOM SCRIPT -----------------------------------------
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("CUSTOM SCRIPT", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+                    RetroButton(
+                        text = "[ RESET ]",
+                        onClick = { viewModel.update { copy(customScript = "cd {{PROJECT_PATH}}") } }
+                    )
+                }
+                Text(
+                    "Runs inside the session after connect. Placeholders: {{PROJECT_PATH}}, {{SESSION_NAME}}",
+                    color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
+                )
+                OutlinedTextField(
+                    value = state.customScript,
+                    onValueChange = { viewModel.update { copy(customScript = it) } },
+                    modifier = Modifier.fillMaxWidth().height(100.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontFamily = MonoFontFamily, fontSize = 12.sp, color = MegaDriveOnSurface
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MegaDrivePrimary,
+                        unfocusedBorderColor = MegaDriveDim,
+                        focusedTextColor = MegaDriveOnSurface,
+                        unfocusedTextColor = MegaDriveOnSurface,
+                        cursorColor = MegaDrivePrimary
                     )
                 )
-            }
-            Text(
-                if (state.targetType == ProjectTargetType.LOCAL)
-                    "Local mode currently uses a plain device shell without tmux."
-                else if (state.useTmux)
-                    "Creates a tmux session named after the project, or attaches if it already exists."
-                else
-                    "Connects to a plain shell without tmux.",
-                color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
-            )
 
-            // ── CUSTOM SCRIPT ─────────────────────────────────────────────
-            Spacer(Modifier.height(4.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("CUSTOM SCRIPT", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
-                RetroButton(
-                    text = "[ RESET ]",
-                    onClick = { viewModel.update { copy(customScript = "cd {{PROJECT_PATH}}") } }
+                // -- CUSTOM COMMAND ----------------------------------------
+                Spacer(Modifier.height(4.dp))
+                Text("CUSTOM COMMAND", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+                Text(
+                    "Command to run last in the session (e.g. an AI tool or startup script).",
+                    color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
+                )
+                OutlinedTextField(
+                    value = state.aiCommand,
+                    onValueChange = { viewModel.update { copy(aiCommand = it) } },
+                    placeholder = {
+                        Text("e.g. claude --dangerously-skip-permissions", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontFamily = MonoFontFamily, fontSize = 12.sp, color = MegaDriveOnSurface
+                    ),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MegaDrivePrimary,
+                        unfocusedBorderColor = MegaDriveDim,
+                        focusedTextColor = MegaDriveOnSurface,
+                        unfocusedTextColor = MegaDriveOnSurface,
+                        cursorColor = MegaDrivePrimary
+                    ),
+                    singleLine = true
                 )
             }
-            Text(
-                "Runs inside the session after connect. Placeholders: {{PROJECT_PATH}}, {{SESSION_NAME}}",
-                color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
-            )
-            OutlinedTextField(
-                value = state.customScript,
-                onValueChange = { viewModel.update { copy(customScript = it) } },
-                modifier = Modifier.fillMaxWidth().height(100.dp),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = MonoFontFamily, fontSize = 12.sp, color = MegaDriveOnSurface
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MegaDrivePrimary,
-                    unfocusedBorderColor = MegaDriveDim,
-                    focusedTextColor = MegaDriveOnSurface,
-                    unfocusedTextColor = MegaDriveOnSurface,
-                    cursorColor = MegaDrivePrimary
-                )
-            )
 
-
-            // ── SAVE ──────────────────────────────────────────────────────
-
+            // -- SAVE ------------------------------------------------------
             Spacer(Modifier.height(8.dp))
             RetroButton(
                 text = "[ SAVE ]",
