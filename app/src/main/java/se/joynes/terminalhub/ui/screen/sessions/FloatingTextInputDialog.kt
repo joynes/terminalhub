@@ -55,7 +55,7 @@ fun FloatingTextInputDialog(
 ) {
     val density = LocalDensity.current
     var showHistory by remember { mutableStateOf(false) }
-    var localPanelOpacity by rememberSaveable { mutableStateOf(1f) }
+    var localPanelOpacity by rememberSaveable { mutableStateOf(0.50f) }
     val effectivePanelOpacity = normalizeTextInputPanelOpacity(panelOpacity ?: localPanelOpacity)
     val focusRequester = remember { FocusRequester() }
 
@@ -135,7 +135,7 @@ fun FloatingTextInputDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(32.dp)
-                    .background(MegaDrivePrimary, RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                    .background(MegaDrivePrimary.copy(alpha = effectivePanelOpacity), RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
                     .padding(horizontal = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
