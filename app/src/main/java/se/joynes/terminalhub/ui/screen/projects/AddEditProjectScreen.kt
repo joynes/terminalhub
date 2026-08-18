@@ -15,12 +15,6 @@ import se.joynes.terminalhub.ui.components.*
 import se.joynes.terminalhub.ui.theme.*
 import se.joynes.terminalhub.data.model.ProjectTargetType
 
-private val AI_TOOLS = listOf(
-    "None"         to "",
-    "Claude Code"  to "claude",
-    "Gemini CLI"   to "gemini",
-    "Openclaw"     to "openclaw tui"
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -232,45 +226,9 @@ fun AddEditProjectScreen(
                 )
             )
 
-            // ── AI TOOL ───────────────────────────────────────────────────
-            Spacer(Modifier.height(4.dp))
-            Text("AI TOOL", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                AI_TOOLS.forEach { (label, cmd) ->
-                    val selected = state.aiCommand == cmd
-                    RetroButton(
-                        text = if (selected) "[$label]" else label,
-                        onClick = { viewModel.update { copy(aiCommand = cmd) } },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-            Text(
-                "Command to run last in the session:",
-                color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
-            )
-            OutlinedTextField(
-                value = state.aiCommand,
-                onValueChange = { viewModel.update { copy(aiCommand = it) } },
-                placeholder = { Text("e.g. claude --dangerously-skip-permissions", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily) },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = MonoFontFamily, fontSize = 12.sp, color = MegaDriveOnSurface
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MegaDrivePrimary,
-                    unfocusedBorderColor = MegaDriveDim,
-                    focusedTextColor = MegaDriveOnSurface,
-                    unfocusedTextColor = MegaDriveOnSurface,
-                    cursorColor = MegaDrivePrimary
-                ),
-                singleLine = true
-            )
 
             // ── SAVE ──────────────────────────────────────────────────────
+
             Spacer(Modifier.height(8.dp))
             RetroButton(
                 text = "[ SAVE ]",
