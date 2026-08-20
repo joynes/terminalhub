@@ -889,23 +889,35 @@ fun SessionHostScreen(
                         }
 
                         if (activeTextInputVisible && activeProjectId != null) {
+                            val textInputProjectId = activeProjectId
                             FloatingTextInputDialog(
                                 text = activeTextInputDraft,
-                                onTextChange = { textInputDraftByProject[activeProjectId] = it },
+                                onTextChange = { updatedDraft ->
+                                    val currentDraft = textInputDraftByProject[textInputProjectId]
+                                        ?: TextFieldValue()
+                                    textInputDraftByProject[textInputProjectId] = textInputDraftAfterChange(
+                                        isInputVisible = textInputVisibleByProject[textInputProjectId] == true,
+                                        currentDraft = currentDraft,
+                                        updatedDraft = updatedDraft
+                                    )
+                                },
                                 onSend = { text ->
                                     val payload = terminalTextInputPayload(text, executeTextInputOnSend)
+                                    // Clear and close before handing the bytes to the terminal. Some IMEs emit
+                                    // a final stale onValueChange after their Send action; the visibility guard
+                                    // above prevents that callback from restoring the submitted command.
+                                    textInputDraftByProject[textInputProjectId] = TextFieldValue()
+                                    textInputVisibleByProject[textInputProjectId] = false
                                     viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
-                                    textInputDraftByProject[activeProjectId] = TextFieldValue()
-                                    textInputVisibleByProject[activeProjectId] = false
                                 },
                                 onDismiss = {
-                                    textInputVisibleByProject[activeProjectId] = false
+                                    textInputVisibleByProject[textInputProjectId] = false
                                     keyboardVisible = true
                                     showKeyboard()
                                 },
                                 history = textInputHistory,
                                 onSaveHistory = { text ->
-                                    activeProjectId?.let { viewModel.saveTextInput(it, text) }
+                                    viewModel.saveTextInput(textInputProjectId, text)
                                 },
                                 bottomAvoidanceDp = bottomBarReservedHeight,
                                 panelOpacity = textInputPanelOpacity,
@@ -986,9 +998,9 @@ fun SessionHostScreen(
                                             if (draft.text.isNotEmpty()) {
                                                 viewModel.saveTextInput(activeProjectId, draft.text)
                                                 val payload = terminalTextInputPayload(draft.text, executeTextInputOnSend)
-                                                viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
                                                 textInputDraftByProject[activeProjectId] = TextFieldValue()
                                                 textInputVisibleByProject[activeProjectId] = false
+                                                viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
                                             }
                                         }
                                         (keyStr.length == 1 && keyStr[0] >= ' ' && keyStr[0] != '\u007F') || keyStr == "\t" -> {
@@ -1059,6 +1071,12 @@ fun SessionHostScreen(
             }
     }
 }
+
+internal fun textInputDraftAfterChange(
+    isInputVisible: Boolean,
+    currentDraft: TextFieldValue,
+    updatedDraft: TextFieldValue
+): TextFieldValue = if (isInputVisible) updatedDraft else currentDraft
 
 @Composable
 private fun ScrollToBottomButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
