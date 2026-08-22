@@ -88,7 +88,7 @@ capture() {
 capture 01 sessions persistent-project-tabs
 capture 02 resume tmux-resume
 capture 03 prompt multiline-project-input
-capture 04 files project-file-transfer
+capture 04 files file-upload
 capture 05 opensource open-source-about
 
 echo "Captured Play screenshots in $OUTPUT_DIR"

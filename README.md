@@ -42,8 +42,8 @@ least one machine that the phone can reach over SSH.
   restarts, SSH interruptions, or a change between Wi-Fi and mobile data.
 - **Start new work from the phone.** Create a remote project folder or clone a Git
   repository without first opening a laptop.
-- **Move files in context.** Upload Android files into the active remote project
-  and download project output back to the phone.
+- **Upload files in context.** Send Android files directly into the active remote
+  project.
 - **A terminal designed for touch.** Use a configurable keybar for Ctrl, Alt,
   Esc, arrows, and common actions, plus a larger multiline input with per-project
   history.
@@ -189,8 +189,8 @@ $HOME/Library/Android/sdk/platform-tools/adb devices
 3. Add a project, choose the server, and optionally enter a Git URL.
 4. Open the project to create or clone it and place it in the tab bar.
 5. Add projects on any other configured servers.
-6. Switch tabs to work across projects, and use upload/download or multiline
-   input when needed.
+6. Switch tabs to work across projects, and use file upload or multiline input
+   when needed.
 7. Restart the app or reconnect later to verify that tabs and tmux sessions return.
 
 ## License

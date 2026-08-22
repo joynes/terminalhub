@@ -1,5 +1,6 @@
 package se.joynes.terminalhub.marketing
 
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import androidx.activity.ComponentActivity
@@ -28,21 +29,20 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import se.joynes.terminalhub.BuildConfig
 import se.joynes.terminalhub.data.model.ProjectTargetType
-import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 import se.joynes.terminalhub.domain.TerminalSessionId
 import se.joynes.terminalhub.ui.components.NeonStatusBadge
 import se.joynes.terminalhub.ui.components.RetroCard
 import se.joynes.terminalhub.ui.components.RetroTopBar
 import se.joynes.terminalhub.ui.components.TerminalHubAboutDialog
 import se.joynes.terminalhub.ui.navigation.SessionTabBar
-import se.joynes.terminalhub.ui.screen.download.DownloadState
-import se.joynes.terminalhub.ui.screen.download.FileDownloadViewModel
-import se.joynes.terminalhub.ui.screen.download.FloatingFileDownloadDialog
 import se.joynes.terminalhub.ui.screen.sessions.FloatingTextInputDialog
 import se.joynes.terminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.terminalhub.ui.screen.terminal.MutableModifierManager
 import se.joynes.terminalhub.ui.screen.terminal.SpecialKeyBar
 import se.joynes.terminalhub.ui.screen.terminal.TerminalViewClientImpl
+import se.joynes.terminalhub.ui.screen.upload.FileUploadViewModel
+import se.joynes.terminalhub.ui.screen.upload.FloatingFileUploadDialog
+import se.joynes.terminalhub.ui.screen.upload.UploadState
 import se.joynes.terminalhub.ui.theme.MegaDriveAccent
 import se.joynes.terminalhub.ui.theme.MegaDriveBg
 import se.joynes.terminalhub.ui.theme.MegaDriveDim
@@ -132,7 +132,7 @@ private fun DemoTerminalWorkspace(scene: String) {
             $ git status --short
              M src/screens/settings.kt
 
-            Upload requirements.md or download build output
+            Upload requirements.md from Android
             without leaving this project tab.
 
             $
@@ -225,18 +225,16 @@ private fun DemoTerminalWorkspace(scene: String) {
         }
 
         if (scene == "files") {
-            val viewModel: FileDownloadViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-            FloatingFileDownloadDialog(
+            val viewModel: FileUploadViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+            FloatingFileUploadDialog(
                 viewModel = viewModel,
                 projectId = 1,
                 serverId = 1,
-                downloadState = DownloadState.Listed(
-                    listOf(
-                        RemoteFileEntry("build-report.md", 18_432),
-                        RemoteFileEntry("test-results.zip", 284_672),
-                        RemoteFileEntry("release-notes.txt", 3_148)
-                    )
-                ),
+                uploadState = UploadState.Uploading("requirements.md", 0.72f),
+                selectedUri = Uri.parse("content://terminalhub.demo/requirements.md"),
+                selectedName = "requirements.md",
+                onSelectedUriChange = {},
+                onSelectedNameChange = {},
                 onDismiss = {}
             )
         }
