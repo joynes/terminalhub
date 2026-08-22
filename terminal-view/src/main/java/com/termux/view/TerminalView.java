@@ -162,7 +162,14 @@ public final class TerminalView extends View {
             @Override
             public boolean onUp(MotionEvent event) {
                 mScrollRemainder = 0.0f;
-                if (mEmulator != null && mEmulator.isMouseTrackingActive() && !event.isFromSource(InputDevice.SOURCE_MOUSE) && !isSelectingText() && !scrolledWithFinger) {
+                boolean urlAtTap = mEmulator != null && findUrlAt(event) != null;
+                if (shouldSendTrackedMouseTap(
+                    mEmulator != null && mEmulator.isMouseTrackingActive(),
+                    event.isFromSource(InputDevice.SOURCE_MOUSE),
+                    isSelectingText(),
+                    scrolledWithFinger,
+                    urlAtTap
+                )) {
                     // Quick event processing when mouse tracking is active - do not wait for check of double tapping
                     // for zooming.
                     sendMouseEventCode(event, TerminalEmulator.MOUSE_LEFT_BUTTON, true);
@@ -181,7 +188,7 @@ public final class TerminalView extends View {
                     stopTextSelectionMode();
                     return true;
                 }
-                if (!mEmulator.isMouseTrackingActive() && openUrlAt(event)) return true;
+                if (openUrlAt(event)) return true;
                 requestFocus();
                 mClient.onSingleTapUp(event);
                 return true;
@@ -633,12 +640,18 @@ public final class TerminalView extends View {
         return new int[] { column, row };
     }
 
-    private boolean openUrlAt(MotionEvent event) {
+    private String findUrlAt(MotionEvent event) {
         int[] position = getColumnAndRow(event, true);
-        String token = mEmulator.getScreen().getWrappedWordAtLocation(position[0], position[1]);
+        String token = mEmulator.getScreen().getUrlCandidateAtLocation(position[0], position[1]);
         String url = TerminalUrlFinder.find(token);
-        if (url == null) return false;
+        if (url == null) return null;
         if (url.regionMatches(true, 0, "www.", 0, 4)) url = "https://" + url;
+        return url;
+    }
+
+    private boolean openUrlAt(MotionEvent event) {
+        String url = findUrlAt(event);
+        if (url == null) return false;
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -647,6 +660,12 @@ public final class TerminalView extends View {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    static boolean shouldSendTrackedMouseTap(boolean mouseTracking, boolean fromMouse,
+                                             boolean selectingText, boolean scrolledWithFinger,
+                                             boolean urlAtTap) {
+        return mouseTracking && !fromMouse && !selectingText && !scrolledWithFinger && !urlAtTap;
     }
 
     /** Send a single mouse event code to the terminal. */

@@ -173,6 +173,101 @@ public final class TerminalBuffer {
         return text.substring(start, end);
     }
 
+    /**
+     * Return a URL candidate at a terminal cell. In addition to native terminal soft wrapping,
+     * this joins indented continuation rows produced by rich CLI renderers. Those renderers often
+     * insert a real newline before a long URL has finished, so the terminal's line-wrap flag alone
+     * is not enough to reconstruct what the user sees as one link.
+     */
+    public String getUrlCandidateAtLocation(int x, int y) {
+        String candidate = getWrappedWordAtLocation(x, y);
+        if (candidate.isEmpty()) return candidate;
+
+        int minRow = -getActiveTranscriptRows();
+        int maxRow = mScreenRows - 1;
+        int firstRow = y;
+        while (firstRow > minRow && getLineWrap(firstRow - 1)) firstRow--;
+        int lastRow = y;
+        while (lastRow < maxRow && getLineWrap(lastRow)) lastRow++;
+
+        // If the tap was on a continuation row, walk backwards until the URL scheme is found.
+        int joinedRows = 0;
+        while (TerminalUrlFinder.find(candidate) == null && firstRow > minRow && joinedRows < 8) {
+            int previousRow = firstRow - 1;
+            String previousToken = lastToken(rowText(previousRow));
+            if (previousToken.isEmpty() || !looksLikeHardWrappedBoundary(previousRow, previousToken)) break;
+            candidate = previousToken + candidate;
+            firstRow = previousRow;
+            while (firstRow > minRow && getLineWrap(firstRow - 1)) firstRow--;
+            joinedRows++;
+        }
+
+        // Continue forward while the preceding row ends where a renderer would wrap a long URL.
+        while (TerminalUrlFinder.find(candidate) != null && lastRow < maxRow && joinedRows < 8) {
+            int nextRow = lastRow + 1;
+            String nextToken = firstToken(rowText(nextRow));
+            if (nextToken.isEmpty() || !isUrlContinuation(nextToken) ||
+                !looksLikeHardWrappedBoundary(lastRow, candidate)) {
+                break;
+            }
+            candidate += nextToken;
+            lastRow = nextRow;
+            while (lastRow < maxRow && getLineWrap(lastRow)) lastRow++;
+            joinedRows++;
+        }
+
+        return candidate;
+    }
+
+    private boolean looksLikeHardWrappedBoundary(int previousRow, String textBeforeBoundary) {
+        int lastColumn = lastNonWhitespaceColumn(previousRow);
+        boolean nearRightEdge = lastColumn >= mColumns - 6;
+        boolean explicitContinuation = textBeforeBoundary.endsWith(".") ||
+            textBeforeBoundary.endsWith("/") || textBeforeBoundary.endsWith("-") ||
+            textBeforeBoundary.endsWith("?") || textBeforeBoundary.endsWith("&") ||
+            textBeforeBoundary.endsWith("=");
+        return nearRightEdge || explicitContinuation;
+    }
+
+    private int lastNonWhitespaceColumn(int row) {
+        for (int column = mColumns - 1; column >= 0; column--) {
+            String cell = getSelectedText(column, row, column, row, false, false);
+            if (!cell.isEmpty() && !Character.isWhitespace(cell.charAt(0))) return column;
+        }
+        return -1;
+    }
+
+    private String rowText(int row) {
+        return getSelectedText(0, row, mColumns - 1, row, false, false);
+    }
+
+    private static String firstToken(String text) {
+        int start = 0;
+        while (start < text.length() && Character.isWhitespace(text.charAt(start))) start++;
+        int end = start;
+        while (end < text.length() && !Character.isWhitespace(text.charAt(end))) end++;
+        return text.substring(start, end);
+    }
+
+    private static String lastToken(String text) {
+        int end = text.length();
+        while (end > 0 && Character.isWhitespace(text.charAt(end - 1))) end--;
+        int start = end;
+        while (start > 0 && !Character.isWhitespace(text.charAt(start - 1))) start--;
+        return text.substring(start, end);
+    }
+
+    private static boolean isUrlContinuation(String text) {
+        if (text.isEmpty()) return false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            boolean allowed = Character.isLetterOrDigit(c) ||
+                ".-_~:/?#[]@!$&()*+,;=%".indexOf(c) >= 0;
+            if (!allowed) return false;
+        }
+        return true;
+    }
+
     public int getActiveTranscriptRows() {
         return mActiveTranscriptRows;
     }

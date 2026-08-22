@@ -85,4 +85,24 @@ public class ScreenBufferTest extends TerminalTestCase {
 		assertEquals("www.example.com/long/path", TerminalUrlFinder.find("url=www.example.com/long/path,"));
 		assertNull(TerminalUrlFinder.find("not-a-link"));
 	}
+
+	public void testGetUrlCandidateAcrossIndentedHardWrap() {
+		withTerminalSized(18, 5).enterString(
+			" https://read-and-\r\n  resolve.vercel.\r\n  app/?game=quiz"
+		);
+
+		String expected = "https://read-and-resolve.vercel.app/?game=quiz";
+		assertEquals(expected, mTerminal.getScreen().getUrlCandidateAtLocation(2, 0));
+		assertEquals(expected, mTerminal.getScreen().getUrlCandidateAtLocation(4, 1));
+		assertEquals(expected, mTerminal.getScreen().getUrlCandidateAtLocation(5, 2));
+	}
+
+	public void testGetUrlCandidateDoesNotJoinUnrelatedNextLine() {
+		withTerminalSized(30, 3).enterString("https://example.com\r\nnext-command");
+
+		assertEquals(
+			"https://example.com",
+			mTerminal.getScreen().getUrlCandidateAtLocation(4, 0)
+		);
+	}
 }
