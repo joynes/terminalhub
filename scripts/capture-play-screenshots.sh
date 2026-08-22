@@ -6,6 +6,7 @@ ADB="${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}"
 EMULATOR="${EMULATOR:-$HOME/Library/Android/sdk/emulator/emulator}"
 AVD_NAME="${AVD_NAME:-Medium_Phone_API_36.1}"
 OUTPUT_DIR="${1:-$REPO_ROOT/marketing-output/play/phone}"
+FFMPEG="${FFMPEG:-$(command -v ffmpeg || true)}"
 PACKAGE="se.joynes.terminalhub.diag"
 ACTIVITY="$PACKAGE/se.joynes.terminalhub.marketing.MarketingPreviewActivity"
 
@@ -15,6 +16,11 @@ fi
 export PATH="${JAVA_HOME:+$JAVA_HOME/bin:}$PATH"
 
 mkdir -p "$OUTPUT_DIR"
+
+if [[ -z "$FFMPEG" ]]; then
+  echo "ffmpeg is required to create Google Play-compatible RGB PNG files." >&2
+  exit 1
+fi
 
 SERIAL="${ADB_SERIAL:-$("$ADB" devices | awk '$1 ~ /^emulator-/ { print $1; exit }')}"
 
@@ -72,7 +78,11 @@ capture() {
     adb_cmd shell input keyevent 4
     sleep 1
   fi
-  adb_cmd exec-out screencap -p > "$OUTPUT_DIR/$index-$filename.png"
+  local raw_capture="$OUTPUT_DIR/.$index-$filename-rgba.png"
+  adb_cmd exec-out screencap -p > "$raw_capture"
+  "$FFMPEG" -loglevel error -y -i "$raw_capture" -vf format=rgb24 \
+    "$OUTPUT_DIR/$index-$filename.png"
+  rm "$raw_capture"
 }
 
 capture 01 sessions persistent-project-tabs
