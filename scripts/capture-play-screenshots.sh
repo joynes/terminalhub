@@ -75,9 +75,9 @@ capture() {
   adb_cmd exec-out screencap -p > "$OUTPUT_DIR/$index-$filename.png"
 }
 
-capture 01 sessions multiple-ai-sessions
+capture 01 sessions persistent-project-tabs
 capture 02 resume tmux-resume
-capture 03 prompt long-prompt-input
+capture 03 prompt multiline-project-input
 capture 04 files project-file-transfer
 capture 05 opensource open-source-about
 

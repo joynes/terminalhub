@@ -2,8 +2,8 @@
 
 Last updated: June 26, 2026
 
-TerminalHub is an Android SSH terminal app for connecting to servers and
-workstations that you choose.
+TerminalHub is an Android SSH project workspace for starting, organizing, and
+resuming terminal projects on servers and workstations that you choose.
 
 ## Information handled by the app
 

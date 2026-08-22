@@ -1,70 +1,88 @@
 # TerminalHub
 
-**Manage several terminal AI sessions directly from your Android phone.**
+**Start projects on your servers from Android. Keep each one in a persistent tab.**
 
-TerminalHub turns the phone into a control surface for Codex, Claude Code,
-Gemini, local agents and ordinary shell sessions running on infrastructure you
-control. Once the sessions are running, you can switch projects, send the next
-prompt, inspect progress and resume tmux-backed work without sitting at or
-interacting with the computer's desktop.
+TerminalHub is an open-source Android workspace for people who work in several
+terminal projects at once. Add one or more SSH servers, create or clone projects
+from the phone, and open each project in its own tab. TerminalHub remembers the
+tabs and their order, while tmux keeps remote work available after disconnects,
+app restarts, and network changes.
 
 [Get TerminalHub on Google Play](https://play.google.com/store/apps/details?id=se.joynes.terminalhub)
 · [View the open-source code](https://github.com/joynes/terminalhub)
 
-TerminalHub is GPL-3.0 open source and AI-provider agnostic. It does not provide
-an AI model: the tools continue to run in real terminals on your Linux or macOS
-workstation, home server or VPS over SSH.
+The phone is where you configure, start, and switch projects. The shell,
+repository, and long-running processes live on a Linux or macOS workstation,
+home server, or VPS that you control. The main workflow therefore requires at
+least one machine that the phone can reach over SSH.
 
-## Built For Multiple AI Terminal Sessions
+## The Core Workflow
 
-TerminalHub connects your phone to a real machine over SSH, usually a home
-server or workstation on Tailscale/VPN. It is built around fast tab switching:
-Claude Code in one tab, Codex in another, Gemini or local AI in another, plus a
-normal shell for `git`, `sudo`, logs, installs, and fixes.
-
-TerminalHub is AI agnostic: when one client runs out of tokens, continue with
-another AI client in the same project. Because the clients run in real
-terminals, you keep advanced AI-client-specific slash commands, project-aware
-prompts, long-running tasks, and tmux-backed reconnects. The keybar is tuned
-for quick AI-terminal interaction, with common terminal keys and
-upload/download actions close at hand.
+1. Add an SSH server with a hostname, port, username, and password or private key.
+2. Add a project and choose which server should run it.
+3. Optionally provide a Git URL, setup script, and command to start with the project.
+4. Open the project. TerminalHub creates its remote folder or clones the repository,
+   starts or attaches to its tmux session, and adds it to the tab bar.
+5. Add more projects on the same server or other servers and switch between them
+   without leaving the terminal workspace.
+6. Reopen the app later. Saved tabs, tab order, project profiles, and tmux-backed
+   sessions are restored.
 
 ![TerminalHub demo](docs/assets/terminalhub-demo.gif)
 
-## Why This Exists
+## Why TerminalHub
 
-- **Tabs are the main event.** Tap the top bar and jump between live sessions.
-  Let one AI agent compile excuses while another pretends to refactor.
-- **Several sessions can work at once.** Each tab keeps its own project,
-  terminal, tmux target, and prompt history.
-- **Upload files straight into the current remote project.** Send one file or
-  several from Android into the active directory when an AI tool needs logs,
-  docs, screenshots, or any other context that was inconveniently born on the
-  phone.
-- **Write prompts like a human, not like a trapped shell builtin.** A larger
-  text input helps with natural-language AI prompts, and input history is saved
-  per tab if sending fails or the app gets closed.
-- **tmux is the seatbelt.** Sessions are created/attached through tmux by
-  default, so work can survive disconnects, app restarts, closed tabs, and other
-  traditional ceremonies of mobile networking.
-- **Workspace state is portable.** Active tabs, servers, and projects can be
-  restored after app updates, and exported/imported when moving to another
-  device.
-- **The keybar has the keys phones forgot.** Common terminal/modifier keys and
-  upload/download actions are reachable without doing finger origami.
-- **AI tools get shortcuts.** Launch helpers exist for Claude, Codex, Gemini,
-  and Openclaw, because typing the same command forever is not a personality.
+- **Projects are first-class.** A project combines a server, remote directory,
+  optional Git repository, tmux session, startup script, and terminal tab.
+- **Several servers, one tab bar.** Keep an API on a VPS, a mobile build on a
+  workstation, and homelab operations open side by side.
+- **Tabs persist.** TerminalHub stores which project tabs are open and their
+  order. Closing and reopening the app does not mean rebuilding the workspace.
+- **tmux keeps work alive.** Reattach to the remote session after Android process
+  restarts, SSH interruptions, or a change between Wi-Fi and mobile data.
+- **Start new work from the phone.** Create a remote project folder or clone a Git
+  repository without first opening a laptop.
+- **Move files in context.** Upload Android files into the active remote project
+  and download project output back to the phone.
+- **A terminal designed for touch.** Use a configurable keybar for Ctrl, Alt,
+  Esc, arrows, and common actions, plus a larger multiline input with per-project
+  history.
+- **Bring any terminal workflow.** Run development servers, builds, logs, editors,
+  administration tools, or custom startup commands.
+- **AI is one useful workflow, not the product boundary.** Codex, Claude Code,
+  Gemini, and other terminal agents can each run in separate project tabs, making
+  it easier to follow several AI sessions from one phone.
 
-Other useful parts:
+Other useful parts include terminal search, app and session logs, SSH
+diagnostics, password and private-key authentication, export/import of workspace
+configuration, and an optional biometric gate on startup.
 
-- Saved SSH servers and project profiles.
-- Password and private-key SSH authentication.
-- Remote file download from the active project's remote directory.
-- Terminal search, app logs, session logs, and SSH status/error diagnostics.
-- Optional biometric gate on startup.
-- Diagnostic build flavor for local testing.
+## Relationship To Termux
+
+TerminalHub uses adapted terminal rendering and input components from the
+open-source Termux project. That gives its embedded terminal a proven Android
+foundation, while TerminalHub adds its own SSH server, project, persistent-tab,
+tmux recovery, and file-transfer workflows.
+
+TerminalHub is an independent project and is not affiliated with or endorsed by
+Termux. It is not a full Termux environment: the primary TerminalHub workflow
+runs projects on machines reached over SSH. See
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and licenses.
 
 ## Requirements
+
+For normal remote-project use:
+
+- An Android phone or tablet.
+- At least one Linux or macOS workstation, home server, VPS, or lab machine.
+- An SSH server and a user account you can log into.
+- `tmux` on the remote machine for persistent sessions.
+- Network reachability from Android to the server. A private VPN such as
+  Tailscale is recommended instead of exposing SSH directly to the internet.
+- Optional: Git and any project-specific tools you want to run remotely.
+
+AI terminal clients such as `codex`, `claude`, or `gemini` are entirely optional
+and, when used, are installed on your server rather than supplied by TerminalHub.
 
 For the Android build machine:
 
@@ -74,21 +92,6 @@ For the Android build machine:
 - JDK 17 or newer. Android Studio's bundled JDK works.
 - Android SDK Platform 35.
 - Android SDK Build Tools installed by Android Studio/SDK Manager.
-
-For the remote machine you connect to:
-
-- A local server, home computer, workstation, VPS, or lab machine reachable over
-  the network.
-- SSH server.
-- A user account you can log into.
-- `tmux` installed if you want session restore, which you probably do.
-- Optional: AI terminal tools such as `claude`, `codex`, `gemini`, or
-  `openclaw` installed on that remote machine.
-
-For safety and convenience, using a private VPN mesh such as Tailscale is
-recommended. It keeps SSH off the public internet, makes phones and home
-machines easier to reach, and generally removes several boring network problems
-before they can become a personality.
 
 ## Fresh Setup
 
@@ -145,8 +148,8 @@ The release APK is written to:
 app/build/outputs/apk/production/release/app-production-release.apk
 ```
 
-There is also a diagnostic flavor, useful when you want a separate install for
-testing without trampling the normal app:
+There is also a diagnostic flavor for repeatable local testing without
+overwriting the installed production app:
 
 ```sh
 ./gradlew assembleDiagnosticDebug
@@ -166,7 +169,7 @@ Run a clean build plus unit tests plus release packaging:
 ./gradlew clean app:testProductionDebugUnitTest assembleProductionRelease
 ```
 
-Install the release APK on a connected emulator/device:
+Install the release APK on a connected emulator or device:
 
 ```sh
 adb devices
@@ -181,27 +184,24 @@ $HOME/Library/Android/sdk/platform-tools/adb devices
 
 ## First Run
 
-1. Prepare a machine you can SSH into. A home computer or local server over
-   Tailscale is the intended boring-good setup.
-2. Install `tmux` and any AI terminal clients you want on that machine.
-3. Add an SSH server with host, port, username, and password or private key.
-4. Add a project pointing at that server and the remote project directory.
-5. Open the project. A tab/session should appear.
-6. Start separate tabs for Gemini, a local AI model, Claude Code, Codex, or a
-   plain shell for direct terminal work.
-7. Use the keybar for common terminal keys, upload, and download.
-8. Use the larger text input when talking to AI tools like a person instead of
-   feeding the shell one nervous line at a time.
+1. Prepare a reachable SSH server and install `tmux` on it.
+2. Add the server in TerminalHub.
+3. Add a project, choose the server, and optionally enter a Git URL.
+4. Open the project to create or clone it and place it in the tab bar.
+5. Add projects on any other configured servers.
+6. Switch tabs to work across projects, and use upload/download or multiline
+   input when needed.
+7. Restart the app or reconnect later to verify that tabs and tmux sessions return.
 
 ## License
 
 TerminalHub is released under the GNU General Public License v3.0 only. See
 [LICENSE](LICENSE).
 
-Contributions, bug reports and independently built variants are welcome. The
+Contributions, bug reports, and independently built variants are welcome. The
 complete Android source is public so users can inspect how SSH sessions,
-credentials and terminal data are handled.
+credentials, terminal data, and persisted project state are handled.
 
-The app includes or adapts terminal components from the Termux project. See
+TerminalHub includes or adapts terminal components from the Termux project. See
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution and license
 notes.

@@ -218,14 +218,14 @@ fun AddEditProjectScreen(
                 Spacer(Modifier.height(4.dp))
                 Text("CUSTOM COMMAND", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
                 Text(
-                    "Command to run last in the session (e.g. an AI tool or startup script).",
+                    "Command to run last in the session (for example a dev server, monitor, or AI tool).",
                     color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
                 )
                 OutlinedTextField(
                     value = state.aiCommand,
                     onValueChange = { viewModel.update { copy(aiCommand = it) } },
                     placeholder = {
-                        Text("e.g. claude --dangerously-skip-permissions", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
+                        Text("e.g. npm run dev, htop, or codex", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
                     },
                     modifier = Modifier.fillMaxWidth(),
                     textStyle = androidx.compose.ui.text.TextStyle(

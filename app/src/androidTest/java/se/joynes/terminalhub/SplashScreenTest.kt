@@ -20,7 +20,7 @@ class SplashScreenTest {
         composeRule.setContent {
             TerminalHubTheme { SplashScreen(onAuthSuccess = {}) }
         }
-        composeRule.onNodeWithText("AI TERMINAL HUB").assertIsDisplayed()
+        composeRule.onNodeWithText("PROJECT TERMINAL HUB").assertIsDisplayed()
     }
 
     @Test

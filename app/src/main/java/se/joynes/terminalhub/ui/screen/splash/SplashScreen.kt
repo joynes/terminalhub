@@ -45,14 +45,14 @@ fun SplashScreen(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "AI TERMINAL HUB",
+                text = "PROJECT TERMINAL HUB",
                 color = MegaDrivePrimary,
                 fontSize = 20.sp,
                 fontFamily = MonoFontFamily
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "SSH PROJECT MANAGER v1.0",
+                text = "PERSISTENT SSH WORKSPACE",
                 color = MegaDriveAccent,
                 fontSize = 12.sp,
                 fontFamily = MonoFontFamily

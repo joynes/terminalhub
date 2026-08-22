@@ -79,10 +79,10 @@ class MarketingPreviewActivity : ComponentActivity() {
 }
 
 private val demoTabs = listOf(
-    ProjectTabState(1, "CODEX", TerminalSessionId("codex"), true, colorSeed = 110, usesTmux = true),
-    ProjectTabState(2, "CLAUDE", TerminalSessionId("claude"), true, colorSeed = 220, usesTmux = true),
-    ProjectTabState(3, "GEMINI", TerminalSessionId("gemini"), true, colorSeed = 330, usesTmux = true),
-    ProjectTabState(4, "SHELL", TerminalSessionId("shell"), true, colorSeed = 45, usesTmux = true),
+    ProjectTabState(1, "MOBILE", TerminalSessionId("mobile"), true, colorSeed = 110, usesTmux = true),
+    ProjectTabState(2, "API", TerminalSessionId("api"), true, colorSeed = 220, usesTmux = true),
+    ProjectTabState(3, "DOCS", TerminalSessionId("docs"), true, colorSeed = 330, usesTmux = true),
+    ProjectTabState(4, "OPS", TerminalSessionId("ops"), true, colorSeed = 45, usesTmux = true),
     ProjectTabState(
         5,
         "LOCAL",
@@ -111,46 +111,44 @@ private fun MarketingScene(scene: String) {
 
 @Composable
 private fun DemoTerminalWorkspace(scene: String) {
-    val activeId = if (scene == "resume") TerminalSessionId("claude") else TerminalSessionId("codex")
+    val activeId = if (scene == "resume") TerminalSessionId("api") else TerminalSessionId("mobile")
     val esc = "\u001B"
     val output = when (scene) {
         "resume" -> """
-            ${esc}[36mTerminalHub reconnecting...${esc}[0m
-            SSH transport restored
-            tmux session attached: claude/mobile-release
+            ${esc}[36mRestoring saved project tab: API${esc}[0m
+            SSH transport restored: ops@vps.example
+            tmux session attached: api
 
-            ${esc}[32mclaude${esc}[0m  Finished reviewing the release workflow.
-            ✓ Android tests passed
-            ✓ Play bundle assembled
-            ✓ Session survived the network change
+            ✓ Working directory restored: /srv/api
+            ✓ Development server still running
+            ✓ Tab order preserved after app restart
 
             $
         """.trimIndent()
         "files" -> """
             $ pwd
-            /workspace/terminalhub
+            /srv/mobile-app
 
             $ git status --short
-             M README.md
-             M app/src/main/AndroidManifest.xml
+             M src/screens/settings.kt
 
-            Upload phone-context.md or download build output
-            without leaving the active project.
+            Upload requirements.md or download build output
+            without leaving this project tab.
 
             $
         """.trimIndent()
         else -> """
-            ${esc}[36mTerminalHub / mobile-control${esc}[0m
+            ${esc}[36mTerminalHub / project-tabs${esc}[0m
 
-            Four tmux-backed sessions are running on your workstation.
+            Four projects are open across three servers.
 
-            ${esc}[32mCODEX${esc}[0m   implementing Android UI changes
-            ${esc}[35mCLAUDE${esc}[0m  reviewing the release checklist
-            ${esc}[33mGEMINI${esc}[0m  researching test coverage
-            ${esc}[34mSHELL${esc}[0m   watching the Gradle build
+            ${esc}[32mMOBILE${esc}[0m  workstation ~/projects/mobile
+            ${esc}[35mAPI${esc}[0m     vps /srv/api
+            ${esc}[33mDOCS${esc}[0m    home-lab ~/docs
+            ${esc}[34mOPS${esc}[0m     vps /srv/operations
 
-            Switch tabs to guide each session from your phone.
-            No need to sit at your computer.
+            Switch tabs; every project keeps its own SSH/tmux session.
+            Create, clone, and run projects from your phone.
 
             $
         """.trimIndent()
@@ -160,8 +158,9 @@ private fun DemoTerminalWorkspace(scene: String) {
     var prompt by remember {
         mutableStateOf(
             TextFieldValue(
-                "Review the failing Android test, fix the root cause, run the relevant suite, " +
-                    "and summarize exactly what changed."
+                "git switch -c feature/mobile-auth\n" +
+                    "./gradlew test\n" +
+                    "git status --short"
             )
         )
     }
@@ -190,7 +189,7 @@ private fun DemoTerminalWorkspace(scene: String) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (scene == "resume") "AI WORKSTATION / CLAUDE" else "AI WORKSTATION / CODEX",
+                    if (scene == "resume") "VPS / API" else "WORKSTATION / MOBILE",
                     color = MegaDriveOnSurface,
                     fontFamily = MonoFontFamily,
                     fontSize = 10.sp
@@ -218,8 +217,8 @@ private fun DemoTerminalWorkspace(scene: String) {
                 onSend = {},
                 onDismiss = {},
                 history = listOf(
-                    "Run the tests and explain any failures.",
-                    "Check the current diff for security issues."
+                    "git pull --ff-only && ./gradlew test",
+                    "docker compose logs --tail=100 api"
                 ),
                 bottomAvoidanceDp = 72.dp
             )
@@ -295,13 +294,13 @@ private fun DemoServers() {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                "Your AI sessions keep running on the machines you already control.",
+                "Start and organize projects on every server you control.",
                 color = MegaDriveOnSurface,
                 fontFamily = MonoFontFamily,
                 fontSize = 13.sp,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
-            DemoServerCard("AI WORKSTATION", "developer@workstation.example", "4 PROJECTS", MegaDrivePrimary)
+            DemoServerCard("WORKSTATION", "developer@workstation.example", "4 PROJECTS", MegaDrivePrimary)
             DemoServerCard("HOME LAB", "admin@homelab.example", "3 PROJECTS", MegaDriveAccent)
             DemoServerCard("VPS", "ops@vps.example", "2 PROJECTS", Color(0xFF8BD5CA))
             Spacer(Modifier.height(4.dp))
@@ -309,7 +308,7 @@ private fun DemoServers() {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("OPEN SOURCE", color = MegaDrivePrimary, fontFamily = MonoFontFamily, fontSize = 14.sp)
                     Text(
-                        "TerminalHub is GPL-3.0 licensed. Inspect the code, build it yourself, and contribute on GitHub.",
+                        "GPL-3.0 licensed, with terminal components adapted from the open-source Termux project.",
                         color = MegaDriveOnSurface,
                         fontFamily = MonoFontFamily,
                         fontSize = 12.sp

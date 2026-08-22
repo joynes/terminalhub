@@ -80,6 +80,12 @@ fun TerminalHubAboutDialog(
                     fontSize = 12.sp
                 )
                 Text(
+                    "TERMINAL COMPONENTS FROM TERMUX",
+                    color = MegaDriveDim,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 10.sp
+                )
+                Text(
                     "github.com/joynes/terminalhub",
                     color = MegaDrivePrimary,
                     fontFamily = MonoFontFamily,
