@@ -46,25 +46,20 @@ class ScpDownloader @Inject constructor(private val logger: AppLogger) {
         try {
             val sess = conn.openSession()
             try {
-                val dir = shellDoubleQuote(expandHome(remoteDir))
-                sess.execCommand(
-                    "for f in $dir/* $dir/.[!.]* $dir/..?*; do " +
-                        "[ -f \"\$f\" ] || continue; " +
-                        "size=\$(wc -c < \"\$f\" | tr -d \" \"); " +
-                        "name=\${f##*/}; " +
-                        "printf \"%s\\t%s\\n\" \"\$name\" \"\$size\"; " +
-                        "done"
-                )
+                sess.execCommand(remoteFileListCommand(remoteDir))
                 val stderr = sess.stderr.reader().readText().trim()
                 val rows = sess.stdout.reader().readLines()
+                if (stderr.contains(REMOTE_DIR_MISSING_MARKER)) {
+                    throw IOException("Remote project folder not found: $remoteDir")
+                }
                 val files = rows.mapNotNull { row ->
                     val parts = row.split('\t')
                     val name = parts.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                     val size = parts.getOrNull(1)?.toLongOrNull() ?: 0L
                     RemoteFileEntry(name, size)
                 }.sortedBy { it.name.lowercase() }
-                if (files.isEmpty() && stderr.isNotBlank()) {
-                    logger.log(LogLevel.DEBUG, TAG, "Remote list stderr: $stderr")
+                if (stderr.isNotBlank()) {
+                    logger.log(LogLevel.WARN, TAG, "Remote list stderr: $stderr")
                 }
                 files
             } finally {
@@ -89,8 +84,8 @@ class ScpDownloader @Inject constructor(private val logger: AppLogger) {
             try {
                 val sess = conn.openSession()
                 try {
-                    val remotePath = "${expandHome(remoteDir).trimEnd('/')}/$fileName"
-                    sess.execCommand("scp -f ${shellDoubleQuote(remotePath)}")
+                    val remotePath = "${remoteDir.trimEnd('/')}/$fileName"
+                    sess.execCommand("scp -f ${shellRemotePath(remotePath)}")
 
                     val fromRemote = sess.stdout
                     val toRemote = sess.stdin
@@ -156,15 +151,6 @@ class ScpDownloader @Inject constructor(private val logger: AppLogger) {
         return conn
     }
 
-    private fun expandHome(path: String): String =
-        if (path.startsWith("~/")) "\$HOME${path.substring(1)}" else path
-
-    private fun shellDoubleQuote(value: String): String =
-        "\"" + value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("`", "\\`") + "\""
-
     private fun readToken(input: java.io.InputStream): String {
         val out = StringBuilder()
         while (true) {
@@ -185,5 +171,41 @@ class ScpDownloader @Inject constructor(private val logger: AppLogger) {
         return out.toString()
     }
 
-    companion object { private const val TAG = "ScpDownloader" }
+    companion object {
+        private const val TAG = "ScpDownloader"
+        internal const val REMOTE_DIR_MISSING_MARKER = "AITERM_REMOTE_DIR_MISSING"
+    }
 }
+
+/**
+ * Force the glob loop through POSIX sh. A remote account may use zsh with NOMATCH enabled, which
+ * aborts the whole command when one of the optional hidden-file globs has no matches.
+ */
+internal fun remoteFileListCommand(remoteDir: String): String {
+    val script = "if [ ! -d \"\$1\" ]; then " +
+        "printf '${ScpDownloader.REMOTE_DIR_MISSING_MARKER}\\n' >&2; exit 3; fi; " +
+        "for f in \"\$1\"/* \"\$1\"/.[!.]* \"\$1\"/..?*; do " +
+        "[ -f \"\$f\" ] || continue; " +
+        "size=\$(wc -c < \"\$f\" | tr -d ' '); " +
+        "name=\${f##*/}; " +
+        "printf '%s\\t%s\\n' \"\$name\" \"\$size\"; " +
+        "done"
+    return "sh -c ${shellSingleQuote(script)} sh ${shellRemotePath(remoteDir)}"
+}
+
+internal fun shellRemotePath(path: String): String {
+    fun escapeDoubleQuoted(value: String): String = value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("`", "\\`")
+        .replace("\$", "\\\$")
+
+    return if (path.startsWith("~/")) {
+        "\"\$HOME/${escapeDoubleQuoted(path.removePrefix("~/"))}\""
+    } else {
+        "\"${escapeDoubleQuoted(path)}\""
+    }
+}
+
+private fun shellSingleQuote(value: String): String =
+    "'" + value.replace("'", "'\\''") + "'"
