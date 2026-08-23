@@ -1,5 +1,9 @@
 package se.joynes.terminalhub.ui.screen.download
 
+import android.content.ClipData
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -171,6 +175,11 @@ fun FloatingFileDownloadDialog(
                             fontFamily = MonoFontFamily
                         )
                         RetroButton(
+                            text = "OPEN",
+                            onClick = { openDownloadedFile(context, downloadState) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        RetroButton(
                             text = "CLOSE",
                             onClick = { viewModel.reset(projectId); onDismiss() },
                             modifier = Modifier.fillMaxWidth()
@@ -192,6 +201,55 @@ fun FloatingFileDownloadDialog(
                 }
             }
         }
+    }
+}
+
+private fun openDownloadedFile(context: Context, download: DownloadState.Done) {
+    val reportedType = context.contentResolver.getType(download.uri)
+    val mimeType = reportedType
+        ?.takeUnless { it.equals("application/octet-stream", ignoreCase = true) }
+        ?: downloadedFileMimeType(download.fileName)
+    val viewIntent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(download.uri, mimeType)
+        clipData = ClipData.newUri(context.contentResolver, download.fileName, download.uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    val chooser = Intent.createChooser(viewIntent, "Open ${download.fileName}").apply {
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    runCatching { context.startActivity(chooser) }
+        .onFailure {
+            Toast.makeText(context, "No app can open this file", Toast.LENGTH_LONG).show()
+        }
+}
+
+internal fun downloadedFileMimeType(fileName: String): String {
+    val extension = fileName.substringAfterLast('.', "").lowercase()
+    return when (extension) {
+        "aac" -> "audio/aac"
+        "flac" -> "audio/flac"
+        "m4a" -> "audio/mp4"
+        "mid", "midi" -> "audio/midi"
+        "mp3" -> "audio/mpeg"
+        "ogg", "oga" -> "audio/ogg"
+        "wav" -> "audio/wav"
+        "webm" -> "audio/webm"
+        "avi" -> "video/x-msvideo"
+        "m4v", "mp4" -> "video/mp4"
+        "mov" -> "video/quicktime"
+        "gif" -> "image/gif"
+        "jpeg", "jpg" -> "image/jpeg"
+        "png" -> "image/png"
+        "svg" -> "image/svg+xml"
+        "webp" -> "image/webp"
+        "csv" -> "text/csv"
+        "htm", "html" -> "text/html"
+        "json" -> "application/json"
+        "log", "md", "sh", "txt" -> "text/plain"
+        "pdf" -> "application/pdf"
+        "zip" -> "application/zip"
+        else -> "*/*"
     }
 }
 

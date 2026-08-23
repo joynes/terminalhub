@@ -25,7 +25,7 @@ sealed interface DownloadState {
     object LoadingList : DownloadState
     data class Listed(val files: List<RemoteFileEntry>) : DownloadState
     data class Downloading(val fileName: String, val progress: Float) : DownloadState
-    data class Done(val fileName: String, val bytes: Long) : DownloadState
+    data class Done(val fileName: String, val bytes: Long, val uri: Uri) : DownloadState
     data class Error(val message: String) : DownloadState
 }
 
@@ -87,7 +87,7 @@ class FileDownloadViewModel @Inject constructor(
                     bytes = progress.bytesTransferred
                     setState(projectId, DownloadState.Downloading(progress.fileName, progress.percent / 100f))
                 }
-                setState(projectId, DownloadState.Done(fileName, bytes))
+                setState(projectId, DownloadState.Done(fileName, bytes, uri))
             } catch (e: Exception) {
                 setState(projectId, DownloadState.Error(e.message ?: "Download failed"))
             }
