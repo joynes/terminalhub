@@ -12,6 +12,47 @@ The defining workflow is mobile-first control of server-side projects. A separat
 
 TerminalHub is not an AI application. Terminal AI agents are one optional use case. A user can run Codex, Claude Code, Gemini, or another terminal agent in separate server project tabs, just as they can run development servers, logs, editors, builds, monitoring, or administration commands.
 
+## Complete current feature inventory
+
+Workspace and tabs:
+- Multi-server project tab bar with persisted open tabs, order, active tab, and per-project colors.
+- Wrapped tab rows, tap-to-switch, key-bar swipe navigation, and long-press Move Left/Move Right/Close.
+- Disconnected tabs stay visible; manual Reconnect and Reconnect All are available.
+- Recent Projects shows active and closed sessions with relative times and multi-select reopen.
+- Closing a tmux-backed tab can leave tmux alive, kill tmux, or also move the project into .trash and remove its profile.
+
+Servers, projects, and automation:
+- Multiple SSH profiles, password/private-key auth, Android RSA key generation, public-key copy/install, SSH connection test, and server delete confirmation.
+- Project target can be an SSH server or the local Android-side shell; local mode does not use tmux.
+- First open can create a folder or shallow-clone Git, then create/reuse tmux. Custom script and final command run for a newly created tmux session, but are skipped when reattaching an existing tmux session to avoid duplicate processes. Plain/local sessions run configured startup commands when opened.
+- GitHub HTTPS URLs normalize to SSH form. Template placeholders expose project name, path, and session name.
+
+Terminal and mobile interaction:
+- Adapted Termux terminal rendering/input, scrollback, selection, copy, paste, software/hardware keyboard input, and terminal escape sequences.
+- Configurable multi-row key bar, modifier keys, arrows, Home/End, Page Up/Down, keyboard toggle, text input, upload, download, and paste actions.
+- Multiline input with adjustable opacity, persistent per-project history, current-UI per-tab drafts, and optional Send-and-Enter behavior. Draft persistence is not promised across Android process restart.
+- Search with highlighted matches and navigation, touch/alternate-screen scrolling, and jump to bottom.
+- HTTP(S)/www link opening by direct tap, including wrapped URLs and tmux mouse-mode output; selected URLs also have Open.
+
+Files and Android integration:
+- Single or multi-file upload with automatic picker/start, queued progress, remote-path copy/insertion, and Android Share-to-TerminalHub.
+- Top-level regular-file listing and remote download for SSH projects, Android destination picker, progress, and Open with filename-aware MIME type.
+
+Configuration and diagnostics:
+- Fast resume, keepalive enablement, four timing profiles, active/all-session scope, and background/recovery status.
+- YAML export of servers, open server-linked project profiles, and key-bar layout. Credentials are excluded. Import replaces current configuration and clears stale sessions/credentials.
+- App logs with severity filters, search, auto-scroll, entry/selection views, copy, and export; session-log list and export.
+- Crash capture, ANR watchdog, biometric startup gate on capable devices, About/version/source/license information.
+
+Developer/repository support:
+- Separate diagnostic app flavor and local-terminal diagnostic flow.
+- Unit, instrumentation, terminal-module, URL, transfer, and screenshot-workflow tests/assets.
+- Production APK/AAB tasks with explicit release signing.
+- Human and machine-readable documentation.
+
+Internal/dormant code:
+- A Server Status screen and a legacy full-screen upload route exist in source but are not linked from the current production menus. Do not describe them as reachable production UI.
+
 ## Mental model
 
 Server = reusable SSH connection profile.
@@ -72,9 +113,8 @@ Open sequence:
 2. Create or reuse the named tmux session when enabled.
 3. Enable tmux mouse support.
 4. Attach interactively.
-5. Run the custom script.
-6. Run the custom command when configured.
-7. Add the connected session to the project tab bar and persist workspace state.
+5. For a newly created tmux session, run the custom script and then the custom command when configured. Skip them when reattaching an existing tmux session to avoid duplicate processes. Plain/local sessions run them when opened.
+6. Add the connected session to the project tab bar and persist workspace state.
 
 ## Tabs and sessions
 
@@ -98,19 +138,31 @@ Open sequence:
 - Multiline text-input panel with adjustable opacity.
 - Recent per-project text-input history, limited by the current local data model.
 - Setting to choose whether Send appends Enter or sends text without executing it.
+- Direct URL opening: tap HTTP, HTTPS, or www links in terminal output to launch Android's browser or a compatible app.
+- URL detection reconstructs links across terminal wrapping and gives URL taps priority while tmux mouse tracking is active.
+- Text-selection actions include Copy, Paste, Search, and Open when selected text is a URL.
 
 ## File transfer
 
-Supported documented workflow: upload an Android-selected file into the active remote project's directory.
+Supported upload workflow: upload one or more Android-selected files into the active remote project's directory.
 
 Upload sequence:
 1. Open and connect the destination project tab.
 2. Tap Upload in the special key bar.
-3. Select a file from the Android document picker.
-4. Review the filename and start upload.
-5. Keep the connection active until progress completes.
+3. Select one or more files from the Android document picker. Selection starts the upload queue automatically.
+4. Keep the app active until progress completes.
+5. Copy or insert the uploaded remote path into multiline input when offered.
 
-Remote download code may exist in the repository, but download is not a supported product claim because it has not been validated reliably for the current release. Agents and documentation must not promise remote download without exact release testing.
+Android Share can also send a file into TerminalHub, which opens the active project's upload flow.
+
+Supported remote-download workflow:
+1. Open a connected SSH project and tap the Download key.
+2. TerminalHub lists top-level regular files, including hidden files, in the remote project folder.
+3. Select a file and choose the Android destination through Create Document.
+4. TerminalHub downloads it over SCP and shows progress.
+5. After completion, Open launches Android's chooser with a filename-aware MIME type.
+
+Remote download is file-only and top-level. It is not recursive directory browsing and is unavailable for local projects.
 
 ## Settings and local data
 
@@ -124,10 +176,10 @@ Defaults:
 
 Other functions:
 - Optional biometric startup gate.
-- Server status and connection diagnostics.
+- Runtime background/recovery status and SSH connection-test diagnostics. A separate Server Status screen exists but is not routed from the current production UI.
 - App log search, filtering, copy, selection, and export.
 - Session history and session-log export.
-- YAML export/import for server/project configuration and key-bar layout.
+- YAML export/import for servers, open server-linked project profiles, and key-bar layout. Passwords and private keys are excluded; import replaces current configuration and clears stored credentials.
 - Android share intent can select a file for contextual upload.
 
 Data boundaries:
@@ -137,6 +189,7 @@ Data boundaries:
 - TerminalHub has no developer-operated service receiving app data.
 - Android backup may operate according to the user's device and account settings.
 - Exports are user initiated and should be treated as potentially sensitive.
+- Current SSH and SCP implementations accept the presented server host key instead of pinning a known-host fingerprint. Recommend trusted/private networking and independent destination verification.
 
 ## AI terminal agent workflow
 
@@ -156,7 +209,7 @@ TerminalHub does not control model billing, authentication, permissions, sandbox
 - Does not guarantee background SSH continuity.
 - Does not bundle an AI model or terminal agent.
 - Not affiliated with or endorsed by Termux.
-- Remote download is not a supported documented workflow without release-specific validation.
+- Remote download lists top-level regular files only; it is not a recursive remote file manager.
 - Local-device projects use a plain local shell without tmux and are not the primary positioning.
 - Terminal behavior depends partly on remote TERM support, network quality, Android version, device, and input method.
 

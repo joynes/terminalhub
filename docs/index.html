@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Complete TerminalHub documentation: setup, persistent SSH project tabs, tmux recovery, terminal controls, file upload, security, troubleshooting, architecture, and AI-agent guidance.">
+  <meta name="description" content="Complete TerminalHub documentation: persistent SSH project tabs, tmux recovery, terminal controls, uploads, remote downloads, mobile link opening, security, architecture, and agent guidance.">
   <meta name="theme-color" content="#080912">
   <link rel="canonical" href="https://joynes.github.io/terminalhub/">
   <link rel="icon" href="assets/icon.png">
@@ -34,6 +34,7 @@
       </div>
       <nav class="section-nav">
         <a href="#overview">Overview</a>
+        <a href="#feature-inventory">Complete feature inventory</a>
         <a href="#mental-model">Mental model</a>
         <a href="#requirements">Requirements</a>
         <a href="#quick-start">Quick start</a>
@@ -41,7 +42,7 @@
         <a href="#projects">Projects</a>
         <a href="#sessions">Tabs &amp; persistence</a>
         <a href="#terminal">Terminal controls</a>
-        <a href="#files">File upload</a>
+        <a href="#files">File transfer</a>
         <a href="#configuration">Settings &amp; data</a>
         <a href="#ai-workflows">AI workflows</a>
         <a href="#troubleshooting">Troubleshooting</a>
@@ -77,6 +78,120 @@
           </dl>
         </div>
         <img class="hero-shot" src="assets/screenshots/01-persistent-project-tabs.png" alt="TerminalHub showing four persistent project tabs connected to three servers">
+      </section>
+
+      <section class="doc-section" id="feature-inventory" data-search-title="Complete feature inventory">
+        <p class="eyebrow">CURRENT USER-VISIBLE CAPABILITIES</p>
+        <h2>Complete feature inventory</h2>
+        <p>This inventory is derived from the current source tree and the full Git history—not only from the marketing description. “Shipped” means the capability is implemented and reachable in the current production UI. Release-specific device behavior can still vary.</p>
+        <div class="inventory-grid">
+          <article class="inventory-card">
+            <h3>Workspace and tabs <span class="status shipped">Shipped</span></h3>
+            <ul>
+              <li>Open projects from one or many servers in a shared tab bar.</li>
+              <li>Persist open tabs, their order, active project and per-project tab colors.</li>
+              <li>Wrap tabs across rows when the workspace grows.</li>
+              <li>Tap to switch; swipe the key bar for previous/next connected tab.</li>
+              <li>Long-press a tab to close it or move it left/right.</li>
+              <li>Keep disconnected tabs visible and reconnect one or all.</li>
+              <li>Recent Projects sheet with active/closed sessions, relative times and multi-select reopen.</li>
+              <li>Close only the tab, optionally kill its tmux session, or move the project to <code>.trash</code> and remove its profile.</li>
+            </ul>
+          </article>
+          <article class="inventory-card">
+            <h3>Servers and SSH <span class="status shipped">Shipped</span></h3>
+            <ul>
+              <li>Multiple saved server profiles with name, host, port, username and projects folder.</li>
+              <li>Password and private-key authentication.</li>
+              <li>Generate an RSA SSH key on Android, copy its public key, or install it using a one-time password.</li>
+              <li>Test SSH from the server editor with detailed failure feedback.</li>
+              <li>Edit or delete a server with confirmation; linked credentials and project profiles are removed.</li>
+              <li>SSH keepalives with four timing profiles and active-tab/all-session scope.</li>
+              <li>Manual reconnect, reconnect-all and recovery state diagnostics.</li>
+            </ul>
+          </article>
+          <article class="inventory-card">
+            <h3>Project automation <span class="status shipped">Shipped</span></h3>
+            <ul>
+              <li>SSH-server or local-device project target.</li>
+              <li>Choose a server independently for every project.</li>
+              <li>Create a project directory or shallow-clone an optional Git repository on first open.</li>
+              <li>Normalize GitHub HTTPS repository URLs to SSH form.</li>
+              <li>Create/reuse tmux sessions, recover dead panes and enable tmux mouse support.</li>
+              <li>Optional plain SSH shell without tmux.</li>
+              <li>Custom setup script, post-connect script and final custom command.</li>
+              <li>Template placeholders for project name, path and session name.</li>
+            </ul>
+          </article>
+          <article class="inventory-card">
+            <h3>Terminal and mobile input <span class="status shipped">Shipped</span></h3>
+            <ul>
+              <li>Adapted Termux terminal emulator/view with ANSI/VT behavior and scrollback.</li>
+              <li>Software and hardware keyboards, clipboard paste and touch focus.</li>
+              <li>Configurable multi-row special-key bar with modifier and navigation keys.</li>
+              <li>Multiline input panel, adjustable opacity and per-project history.</li>
+              <li>Optional Send-and-Enter mode, plus voice-dictation-safe text handling.</li>
+              <li>Text selection, Copy, Paste, Search and Open actions.</li>
+              <li>Search with highlighted matches and previous/next navigation.</li>
+              <li>Touch scroll, alternate-screen/tmux scrolling, Page Up/Down and jump to bottom.</li>
+            </ul>
+          </article>
+          <article class="inventory-card">
+            <h3>Links and Android browser <span class="status shipped">Shipped</span></h3>
+            <ul>
+              <li>Tap <code>http://</code>, <code>https://</code> and <code>www.</code> links in terminal output.</li>
+              <li>Open links in the phone's default browser or compatible Android app.</li>
+              <li>Recognize URLs split across terminal soft wraps and several visible rows.</li>
+              <li>Give URL taps priority even when a tmux application has mouse tracking enabled.</li>
+              <li>Select URL text and choose <em>Open</em> from the selection action menu.</li>
+            </ul>
+          </article>
+          <article class="inventory-card">
+            <h3>Files and Android sharing <span class="status shipped">Shipped</span></h3>
+            <ul>
+              <li>Upload one or multiple Android-selected files to the active remote project.</li>
+              <li>Auto-open the picker, auto-start transfers and show per-file progress.</li>
+              <li>Share a file from another Android app directly into the active TerminalHub project.</li>
+              <li>Copy or insert the uploaded remote path into the project's multiline input.</li>
+              <li>List top-level regular files—including hidden files—in the remote project folder.</li>
+              <li>Download a selected remote file using Android's destination picker with progress.</li>
+              <li>Open a completed download in a compatible Android app using filename-aware MIME types.</li>
+            </ul>
+          </article>
+          <article class="inventory-card">
+            <h3>Configuration and observability <span class="status shipped">Shipped</span></h3>
+            <ul>
+              <li>Fast-resume behavior and live background/recovery status display.</li>
+              <li>YAML export of servers, currently open server-linked project profiles and key-bar layout; credentials are excluded.</li>
+              <li>YAML import that replaces configuration and clears stale sessions/credentials.</li>
+              <li>App logs with search, severity filters, auto-scroll, entry view, selection, copy and export.</li>
+              <li>Session log list and export.</li>
+              <li>Crash capture for the next launch and an ANR watchdog for diagnostics.</li>
+              <li>About dialog with version, license, Termux attribution and source link.</li>
+              <li>Biometric startup authentication when supported by the device.</li>
+            </ul>
+          </article>
+          <article class="inventory-card">
+            <h3>Developer and diagnostic support <span class="status shipped">Repository</span></h3>
+            <ul>
+              <li>Separate diagnostic application flavor, including local terminal workflow.</li>
+              <li>Unit, UI/instrumentation and terminal-module tests.</li>
+              <li>Repeatable emulator screenshot capture script.</li>
+              <li>Production APK/AAB builds with explicit release signing.</li>
+              <li>GPL-3.0 source and Termux third-party attribution.</li>
+              <li>Human docs, <code>llms.txt</code>, full agent context and JSON topic index.</li>
+            </ul>
+          </article>
+        </div>
+        <details><summary>Git-history evidence for the corrected file and link features</summary>
+          <ul>
+            <li><strong>Remote download:</strong> introduced in <code>aee9339</code>, repaired in <code>8bebc88</code> and <code>4cab703</code>, and extended to open completed downloads in <code>81de921</code>.</li>
+            <li><strong>Open terminal links:</strong> repaired in <code>8bebc88</code>, made available from selected URL text in <code>38bdef6</code>, and made compatible with tmux mouse mode in <code>b7116da</code>.</li>
+            <li><strong>Multi-file upload and Android sharing:</strong> added in <code>206509b</code> and <code>b8d5391</code>, with remote-path copy/insertion in <code>61cafee</code>.</li>
+          </ul>
+          <p>The current source remains authoritative; commit identifiers are included so maintainers and agents can trace why these capabilities are documented.</p>
+        </details>
+        <div class="callout warning"><strong>Implemented but not currently routed</strong><p>A Server Status screen and a legacy full-screen upload route remain in the source tree, but no current production menu links to them. They are documented as internal/dormant code, not as reachable production features.</p></div>
       </section>
 
       <section class="doc-section" id="mental-model" data-search-title="Mental model">
@@ -174,7 +289,7 @@ tmux -V</code></pre></details>
           <li>Keep the private key on Android. Never paste the private key into <code>authorized_keys</code> or copy it to the server.</li>
           <li>Run <em>Test SSH</em>, then clear the one-time password if it is no longer needed.</li>
         </ol>
-        <div class="callout warning"><strong>Host-key behavior</strong><p>Review the app's current source and security model before using it for high-sensitivity infrastructure. TerminalHub is open source, but it is not a managed enterprise SSH policy product.</p></div>
+        <div class="callout warning"><strong>Host-key verification is not pinned.</strong><p>The current SSH and SCP connections accept the server host key presented during connection instead of comparing it with a pinned known-host fingerprint. Use a trusted/private network, verify the destination through other controls, and do not treat TerminalHub as a managed enterprise SSH policy product.</p></div>
       </section>
 
       <section class="doc-section" id="projects" data-search-title="Projects">
@@ -188,8 +303,8 @@ tmux -V</code></pre></details>
             <tr><td>Name</td><td>Used for the tab, remote folder, and normalized tmux session name.</td></tr>
             <tr><td>Git repository URL</td><td>If set and no checkout exists, TerminalHub performs a shallow clone on first connect. GitHub HTTPS URLs are normalized to SSH form when saved.</td></tr>
             <tr><td>Use tmux</td><td>Creates a named tmux session or attaches to it when it already exists. Enabled by default for SSH projects.</td></tr>
-            <tr><td>Custom script</td><td>Runs after connection inside the session. Default: <code>cd {{PROJECT_PATH}}</code>.</td></tr>
-            <tr><td>Custom command</td><td>Runs last. Use it for a development server, monitor, editor or optional AI terminal agent.</td></tr>
+            <tr><td>Custom script</td><td>Runs after connection when a new tmux session is created, or on each plain-shell/local start. Default: <code>cd {{PROJECT_PATH}}</code>.</td></tr>
+            <tr><td>Custom command</td><td>Runs last under the same startup rule. Use it for a development server, monitor, editor or optional AI terminal agent.</td></tr>
           </tbody>
         </table></div>
         <h3>Template placeholders</h3>
@@ -204,8 +319,9 @@ tmux -V</code></pre></details>
    └─ if tmux is enabled: create or reuse the named session
       └─ enable tmux mouse support
          └─ attach interactively
-            └─ run custom script
+            └─ for a newly created tmux session: run custom script
                └─ run custom command, when configured</code></pre>
+        <p>When TerminalHub reattaches to an already running tmux session, it deliberately skips the custom script and custom command so it does not start duplicate processes. Plain SSH and local projects run their startup commands when a new terminal session is opened.</p>
         <p>Deleting a project profile is designed to move its remote directory under a <code>.trash</code> folder rather than immediately destroying it. Always verify behavior against the current build before relying on recovery.</p>
       </section>
 
@@ -219,7 +335,7 @@ tmux -V</code></pre></details>
             <li>Server and project profiles.</li>
             <li>Which project tabs are open.</li>
             <li>Tab order and active project.</li>
-            <li>Per-project text-input history and drafts where applicable.</li>
+            <li>Per-project text-input history. A draft stays associated with its tab while the current app UI remains alive, but is not promised across an Android process restart.</li>
           </ul>
           <h3>What tmux persists</h3>
           <ul class="check-list">
@@ -241,24 +357,36 @@ tmux -V</code></pre></details>
           <article class="card"><h4>Multiline input</h4><p>Compose commands or pasted text in a larger panel, adjust panel opacity, recall recent per-project entries and choose whether Send also executes with Enter.</p></article>
           <article class="card"><h4>Search and scroll</h4><p>Search terminal buffer text, move among matches and jump back to the bottom after reviewing earlier output.</p></article>
           <article class="card"><h4>Tab gestures</h4><p>Tap tabs directly, reorder them, or swipe horizontally on the key bar to move to the previous or next connected tab.</p></article>
-          <article class="card"><h4>Clipboard and keyboard</h4><p>Paste clipboard content, show or hide the Android keyboard, and use hardware-key mappings including function keys.</p></article>
+          <article class="card"><h4>Clipboard and keyboard</h4><p>Select and copy terminal text, paste clipboard content, show or hide the Android keyboard, and use hardware-key mappings including function keys.</p></article>
+          <article class="card"><h4>Open terminal links</h4><p>Tap HTTP(S) or <code>www.</code> URLs to open them in the phone's browser. Wrapped links are reconstructed, and taps still work when tmux mouse tracking is active.</p></article>
+          <article class="card"><h4>Selection actions</h4><p>Long-press to select text, then Copy, Paste, Search the selected text, or Open it when the selection is a URL.</p></article>
         </div>
         <figure class="wide-figure"><img src="assets/screenshots/03-multiline-project-input.png" alt="TerminalHub multiline text input panel with three commands"><figcaption>Real Android emulator capture: multiline input inside a project tab.</figcaption></figure>
       </section>
 
-      <section class="doc-section split-feature" id="files" data-search-title="File upload">
+      <section class="doc-section split-feature" id="files" data-search-title="File upload and remote download">
         <div>
-          <p class="eyebrow">PHONE → ACTIVE PROJECT</p>
-          <h2>File upload</h2>
-          <p>Use the upload action in the terminal key bar to select a document from Android and send it into the active project's remote directory. The dialog keeps the operation in the context of the tab and reports progress.</p>
+          <p class="eyebrow">ANDROID ↔ ACTIVE PROJECT</p>
+          <h2>File upload and remote download</h2>
+          <h3>Upload from Android</h3>
+          <p>Use the upload action in the terminal key bar to select one or several documents from Android and send them into the active project's remote directory. The picker opens automatically, transfer starts after selection, and the dialog reports progress.</p>
           <ol>
             <li>Open the destination project tab and confirm it is connected.</li>
             <li>Tap the upload control in the key bar.</li>
-            <li>Choose a file using Android's document picker.</li>
-            <li>Review the filename and start upload.</li>
-            <li>Wait for completion before closing the connection.</li>
+            <li>Choose one or more files using Android's document picker.</li>
+            <li>Wait while TerminalHub uploads the queue to the project root.</li>
+            <li>For a single file, copy the remote path or let TerminalHub insert it into multiline input.</li>
           </ol>
-          <div class="callout warning"><strong>Remote download is not a supported documented workflow.</strong><p>The current product documentation intentionally directs users to upload. Do not promise remote download functionality without validating it in the exact release being used.</p></div>
+          <p>You can also use Android's Share action in another app and choose TerminalHub. The shared file is prepared for upload into the currently active project tab.</p>
+          <h3>Download to Android</h3>
+          <ol>
+            <li>Open a connected SSH project and tap the download key (down-arrow in the default key bar).</li>
+            <li>TerminalHub lists regular files in the project's top-level remote folder, including hidden files.</li>
+            <li>Tap a file and choose its Android destination and name.</li>
+            <li>Wait for SCP progress to complete.</li>
+            <li>Tap <em>Open</em> to launch the downloaded file in a compatible Android app.</li>
+          </ol>
+          <div class="callout"><strong>Current download scope</strong><p>Remote download is available for SSH projects. The browser lists files—not subdirectories—in the top level of the active project folder. Opening after download depends on an installed Android app that supports the detected file type.</p></div>
         </div>
         <figure><img src="assets/screenshots/04-file-upload.png" alt="TerminalHub file upload progress at 72 percent"><figcaption>Real Android emulator capture: upload progress in the active tab.</figcaption></figure>
       </section>
@@ -276,7 +404,7 @@ tmux -V</code></pre></details>
             <tr><td>Keepalive scope</td><td>Active tab only or all current sessions.</td><td>Active tab only</td></tr>
             <tr><td>Terminal key bar</td><td>Edit rows and actions, then persist the layout.</td><td>Two-row touch layout</td></tr>
             <tr><td>Biometric gate</td><td>Startup authentication when Android biometric authentication is available; bypassed on unsupported devices.</td><td>Availability controlled</td></tr>
-            <tr><td>Export/import</td><td>Move server/project configuration and key-bar layout through YAML.</td><td>Manual action</td></tr>
+            <tr><td>Export/import</td><td>Move server, open server-linked project, and key-bar configuration through YAML. Passwords and private keys are excluded.</td><td>Manual action</td></tr>
             <tr><td>Logs</td><td>Inspect/search/copy/export app logs and view session history.</td><td>Stored locally</td></tr>
           </tbody>
         </table></div>
@@ -286,7 +414,7 @@ tmux -V</code></pre></details>
           <li>App preferences store user settings and key-bar layout.</li>
           <li>SSH private-key material and credentials use Android-local protected storage mechanisms implemented in the security package.</li>
           <li>Project repositories, shell history, build artifacts and running processes remain on the configured server.</li>
-          <li>Configuration export is user initiated. Treat exported files as sensitive and inspect them before sharing.</li>
+          <li>Configuration export is user initiated and excludes passwords/private keys, but still contains server addresses, usernames, paths, scripts and repository URLs. Treat exports as sensitive.</li>
         </ul>
         <p><a href="privacy-policy.html">Read the privacy policy</a> for the user-facing data statement.</p>
       </section>
@@ -334,7 +462,7 @@ Custom command: codex</code></pre>
           <li><strong>It does not supply servers.</strong> You configure machines and credentials you control.</li>
           <li><strong>It does not include AI.</strong> AI terminal tools are optional server-side programs.</li>
           <li><strong>It is not affiliated with Termux.</strong> It adapts open-source Termux terminal components under their licenses.</li>
-          <li><strong>Remote file download is not currently documented as supported.</strong> File upload is the supported mobile file-transfer workflow.</li>
+          <li><strong>Remote download is currently top-level and file-only.</strong> It lists regular files in the active project folder; it is not a recursive remote file manager.</li>
           <li><strong>Local projects have a narrower model.</strong> The local target uses a plain Android-side shell and does not provide tmux persistence.</li>
           <li><strong>Interactive full-screen terminal programs vary.</strong> Behavior depends on the remote shell, TERM capabilities, network quality and Android input method.</li>
         </ul>

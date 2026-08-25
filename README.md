@@ -45,6 +45,12 @@ least one machine that the phone can reach over SSH.
   repository without first opening a laptop.
 - **Upload files in context.** Send Android files directly into the active remote
   project.
+- **Download and open remote files.** Browse regular files in the active project's
+  top-level folder, save one through Android's document picker, and open it in a
+  compatible mobile app.
+- **Open terminal links on the phone.** Tap HTTP(S) and `www.` links in terminal
+  output, including wrapped links and links shown inside tmux mouse-mode apps, to
+  open them with Android's browser or a compatible app.
 - **A terminal designed for touch.** Use a configurable keybar for Ctrl, Alt,
   Esc, arrows, and common actions, plus a larger multiline input with per-project
   history.

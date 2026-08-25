@@ -11,6 +11,7 @@ License: GPL-3.0-only
 ## Documentation routes
 
 - [Overview and complete human documentation](https://joynes.github.io/terminalhub/): Product model, setup, workflows, settings, security boundaries, troubleshooting, architecture, and build instructions.
+- [Complete feature inventory](https://joynes.github.io/terminalhub/#feature-inventory): Current user-visible capabilities plus internal/dormant routes.
 - [Full plain-text context](https://joynes.github.io/terminalhub/llms-full.txt): Consolidated facts and operating instructions without visual layout.
 - [Machine-readable documentation index](https://joynes.github.io/terminalhub/docs-index.json): Topic routing, stable anchors, keywords, and source paths.
 - [Privacy policy](https://joynes.github.io/terminalhub/privacy-policy.html): User-facing data handling policy.
@@ -28,20 +29,23 @@ License: GPL-3.0-only
 - TerminalHub stores project/server profiles and open tab order on Android.
 - tmux on the server keeps remote shells and processes alive across disconnects.
 - TerminalHub reconnects saved tabs; it does not promise a permanently live background SSH socket.
-- File upload from Android into the active remote project is supported.
-- Remote download must not be promised without release-specific validation.
+- Multi-file upload from Android into the active remote project is supported, including Android Share-to-TerminalHub.
+- Remote download is supported for top-level regular files in an SSH project's folder. Android chooses the destination, and a completed download can be opened in a compatible app.
+- HTTP(S) and www links in terminal output can be tapped to open in Android's browser or a compatible app. Selected URL text also provides an Open action.
 - AI tools are optional server-side terminal programs. No model is included.
 - A local target exists but uses a plain device shell without tmux; remote projects are the primary product workflow.
 - Terminal rendering/input uses adapted open-source Termux components. TerminalHub is independent and is not endorsed by Termux.
 - Minimum Android API is 24. Current target SDK is 36.
+- Current SSH/SCP connections accept the presented server host key rather than pinning a known-host fingerprint.
 
 ## Agent routing rules
 
 1. For user setup, read #requirements, #quick-start, #servers, and #projects.
 2. For missing sessions, separate Android tab state, SSH transport state, and tmux state; read #sessions and #troubleshooting.
 3. For input problems, read #terminal and request Android version, device model, app version, screenshot, and sanitized log excerpt.
-4. For file transfer, use #files and discuss upload only unless download was verified in the exact release.
+4. For file transfer, use #files. Distinguish multi-file upload from top-level, file-only remote download.
 5. For AI-agent workflows, read #ai-workflows and preserve the boundary that agent software runs on the user's server.
 6. For implementation help, first read repository AGENTS.md, then #architecture and #build, then inspect current source.
 7. Never ask a user to reveal a password, private key, passphrase, token, or unredacted sensitive log.
-8. Treat this file as a routing map, llms-full.txt as broad context, and current source as authoritative for version-sensitive behavior.
+8. For security guidance, disclose the current lack of host-key pinning and recommend trusted/private networking plus independent destination verification.
+9. Treat this file as a routing map, llms-full.txt as broad context, and current source as authoritative for version-sensitive behavior.
