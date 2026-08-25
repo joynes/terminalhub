@@ -90,7 +90,7 @@ For the Android build machine:
 - Git.
 - Android Studio, or the Android SDK command-line tools.
 - JDK 17 or newer. Android Studio's bundled JDK works.
-- Android SDK Platform 35.
+- Android SDK Platform 36.
 - Android SDK Build Tools installed by Android Studio/SDK Manager.
 
 ## Fresh Setup
@@ -112,7 +112,7 @@ If you use Android Studio:
 
 1. Open the repository folder.
 2. Let Gradle sync finish.
-3. Install Android SDK Platform 35 if Android Studio asks for it.
+3. Install Android SDK Platform 36 if Android Studio asks for it.
 4. Select the `app` run configuration.
 5. Run on an emulator or a connected Android device.
 

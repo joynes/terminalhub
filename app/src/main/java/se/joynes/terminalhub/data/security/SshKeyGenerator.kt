@@ -5,7 +5,8 @@ import java.math.BigInteger
 import java.security.KeyPairGenerator
 import java.security.interfaces.RSAPrivateCrtKey
 import java.security.interfaces.RSAPublicKey
-import java.util.Base64
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -15,6 +16,7 @@ data class GeneratedSshKey(
 )
 
 @Singleton
+@OptIn(ExperimentalEncodingApi::class)
 class SshKeyGenerator @Inject constructor() {
     fun generate(comment: String): GeneratedSshKey {
         val generator = KeyPairGenerator.getInstance("RSA")
@@ -40,7 +42,7 @@ class SshKeyGenerator @Inject constructor() {
             derInteger(key.primeExponentQ),
             derInteger(key.crtCoefficient)
         )
-        val body = Base64.getEncoder().encodeToString(der)
+        val body = Base64.encode(der)
             .chunked(64)
             .joinToString("\n")
         return "-----BEGIN RSA PRIVATE KEY-----\n$body\n-----END RSA PRIVATE KEY-----"
@@ -52,7 +54,7 @@ class SshKeyGenerator @Inject constructor() {
             writeSshMpInt(key.publicExponent)
             writeSshMpInt(key.modulus)
         }.toByteArray()
-        val encoded = Base64.getEncoder().encodeToString(blob)
+        val encoded = Base64.encode(blob)
         return "ssh-rsa $encoded $comment"
     }
 

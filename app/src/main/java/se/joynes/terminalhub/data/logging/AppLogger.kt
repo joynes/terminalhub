@@ -10,7 +10,6 @@ import kotlinx.coroutines.launch
 import se.joynes.terminalhub.data.db.dao.AppLogDao
 import se.joynes.terminalhub.data.db.entity.AppLogEntity
 import android.util.Log
-import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,7 +23,7 @@ class AppLogger @Inject constructor(
 
     fun log(level: LogLevel, tag: String, msg: String, event: LogEvent? = null) {
         val entity = AppLogEntity(
-            timestamp = Instant.now().toEpochMilli(),
+            timestamp = System.currentTimeMillis(),
             level = level.name,
             tag = tag,
             message = msg,

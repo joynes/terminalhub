@@ -47,13 +47,13 @@ gradle.taskGraph.whenReady {
 
 android {
     namespace = "se.joynes.terminalhub"
-    compileSdk = 35
+    compileSdk = 36
     flavorDimensions += "mode"
 
     defaultConfig {
         applicationId = "se.joynes.terminalhub"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = legacyExportFixVersionCode()
         versionName = "1.${legacyExportFixVersionCode()}"
 

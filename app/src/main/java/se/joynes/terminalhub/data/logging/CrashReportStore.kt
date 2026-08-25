@@ -5,7 +5,6 @@ import se.joynes.terminalhub.BuildConfig
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.time.Instant
 
 object CrashReportStore {
     private const val CRASH_DIR = "crash-reports"
@@ -53,7 +52,7 @@ object CrashReportStore {
     private fun writePendingCrash(context: Context, thread: Thread, throwable: Throwable) {
         val crashDir = File(context.filesDir, CRASH_DIR).apply { mkdirs() }
         val report = buildString {
-            append("timestamp=").append(Instant.now()).append('\n')
+            append("timestamp=").append(currentUtcTimestamp()).append('\n')
             append("versionName=").append(BuildConfig.VERSION_NAME).append('\n')
             append("versionCode=").append(BuildConfig.VERSION_CODE).append('\n')
             append("thread=").append(thread.name).append('\n')

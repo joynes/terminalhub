@@ -2,6 +2,6 @@
 <resources>
 
     <style name="Theme.TerminalHub" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/mega_drive_bg</item>
+        <item name="android:forceDarkAllowed">false</item>
     </style>
 </resources>

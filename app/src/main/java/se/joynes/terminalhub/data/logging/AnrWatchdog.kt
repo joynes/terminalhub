@@ -6,7 +6,6 @@ import android.os.Looper
 import android.os.SystemClock
 import se.joynes.terminalhub.BuildConfig
 import java.io.File
-import java.time.Instant
 import java.util.concurrent.atomic.AtomicLong
 
 object AnrWatchdog {
@@ -86,7 +85,7 @@ object AnrWatchdog {
     private fun writePendingAnr(context: Context, lagMs: Long) {
         val crashDir = File(context.filesDir, CRASH_DIR).apply { mkdirs() }
         val report = buildString {
-            append("timestamp=").append(Instant.now()).append('\n')
+            append("timestamp=").append(currentUtcTimestamp()).append('\n')
             append("versionName=").append(BuildConfig.VERSION_NAME).append('\n')
             append("versionCode=").append(BuildConfig.VERSION_CODE).append('\n')
             append("detectedLagMs=").append(lagMs).append('\n')
