@@ -13,16 +13,14 @@ TerminalHub can store app data on your device, including:
 - SSH authentication data such as passwords, private keys, and key passphrases.
 - Terminal sessions, command input history, session logs, app logs, and crash or
   diagnostic logs.
-- Files that you explicitly select for upload to a remote server, or files that
-  you explicitly download from a remote server.
+- Files that you explicitly select for upload to a remote server.
 - Optional biometric lock settings used to protect access to the app on your
   device.
 
 ## How information is used
 
 The app uses this information to provide SSH connections, restore sessions,
-upload and download files, diagnose connection issues, and protect access to the
-app.
+upload files, diagnose connection issues, and protect access to the app.
 
 TerminalHub does not use advertising, does not sell personal data, and does not
 use your data for cross-app tracking.

@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Complete TerminalHub documentation: setup, persistent SSH project tabs, tmux recovery, terminal controls, file upload, security, troubleshooting, architecture, and AI-agent guidance.">
+  <meta name="theme-color" content="#080912">
+  <link rel="canonical" href="https://joynes.github.io/terminalhub/">
+  <link rel="icon" href="assets/icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <title>TerminalHub Documentation</title>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to documentation</a>
+
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="TerminalHub documentation home">
+      <img src="assets/icon.png" width="38" height="38" alt="">
+      <span>TerminalHub <em>/ docs</em></span>
+    </a>
+    <nav class="header-links" aria-label="External links">
+      <a href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Google Play</a>
+      <a href="https://github.com/joynes/terminalhub">Source</a>
+      <a href="https://github.com/joynes/terminalhub/issues">Issues</a>
+    </nav>
+  </header>
+
+  <div class="layout" id="top">
+    <aside class="sidebar" aria-label="Documentation navigation">
+      <div class="search-wrap">
+        <label for="doc-search">Find in documentation</label>
+        <input id="doc-search" type="search" placeholder="Try “tmux” or “upload”" autocomplete="off">
+        <p id="search-status" role="status" aria-live="polite"></p>
+      </div>
+      <nav class="section-nav">
+        <a href="#overview">Overview</a>
+        <a href="#mental-model">Mental model</a>
+        <a href="#requirements">Requirements</a>
+        <a href="#quick-start">Quick start</a>
+        <a href="#servers">Servers &amp; SSH</a>
+        <a href="#projects">Projects</a>
+        <a href="#sessions">Tabs &amp; persistence</a>
+        <a href="#terminal">Terminal controls</a>
+        <a href="#files">File upload</a>
+        <a href="#configuration">Settings &amp; data</a>
+        <a href="#ai-workflows">AI workflows</a>
+        <a href="#troubleshooting">Troubleshooting</a>
+        <a href="#limitations">Limits &amp; non-goals</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#build">Build &amp; test</a>
+        <a href="#agent-interface">AI-agent interface</a>
+        <a href="#reference">Reference</a>
+      </nav>
+      <div class="machine-links">
+        <strong>Machine-readable</strong>
+        <a href="llms.txt">llms.txt</a>
+        <a href="llms-full.txt">llms-full.txt</a>
+        <a href="docs-index.json">docs-index.json</a>
+      </div>
+    </aside>
+
+    <main id="content">
+      <section class="hero doc-section" id="overview" data-search-title="Overview">
+        <div class="hero-copy">
+          <p class="eyebrow">OPEN-SOURCE ANDROID SSH WORKSPACE</p>
+          <h1>Start server projects from your phone. Keep every project in a persistent tab.</h1>
+          <p class="lead">TerminalHub organizes SSH-based projects across one or more servers. The Android app remembers your tab workspace; tmux keeps the actual remote processes alive.</p>
+          <div class="actions">
+            <a class="button primary" href="#quick-start">Set up your first project</a>
+            <a class="button" href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Install from Google Play</a>
+          </div>
+          <dl class="fact-strip">
+            <div><dt>Primary device</dt><dd>Android phone or tablet</dd></div>
+            <div><dt>Execution</dt><dd>Your SSH server</dd></div>
+            <div><dt>Persistence</dt><dd>Saved tabs + tmux</dd></div>
+            <div><dt>License</dt><dd>GPL-3.0</dd></div>
+          </dl>
+        </div>
+        <img class="hero-shot" src="assets/screenshots/01-persistent-project-tabs.png" alt="TerminalHub showing four persistent project tabs connected to three servers">
+      </section>
+
+      <section class="doc-section" id="mental-model" data-search-title="Mental model">
+        <p class="eyebrow">START HERE</p>
+        <h2>The mental model</h2>
+        <div class="model-flow" aria-label="TerminalHub data flow">
+          <div><strong>Android</strong><span>TerminalHub UI, saved profiles and tab order</span></div>
+          <b aria-hidden="true">→</b>
+          <div><strong>SSH</strong><span>Encrypted connection to a machine you control</span></div>
+          <b aria-hidden="true">→</b>
+          <div><strong>Server project</strong><span>Folder, tools, Git checkout and processes</span></div>
+          <b aria-hidden="true">→</b>
+          <div><strong>tmux</strong><span>Session survives app and network disconnects</span></div>
+        </div>
+        <div class="callout important">
+          <strong>The computer is not used as a controller.</strong>
+          <p>You create projects, start commands, switch tabs, type, inspect output and upload files from Android. A reachable server is still required for the main workflow because that is where the shell and processes run.</p>
+        </div>
+        <h3>Core objects</h3>
+        <div class="card-grid">
+          <article class="card"><h4>Server</h4><p>A reusable SSH profile: name, host, port, username, authentication, root project folder and optional setup script.</p></article>
+          <article class="card"><h4>Project</h4><p>A named workspace assigned to a server, with an optional Git URL, tmux choice, post-connect script and startup command.</p></article>
+          <article class="card"><h4>Tab</h4><p>An open project session. TerminalHub stores open tabs, active tab and order so the mobile workspace can be reconstructed.</p></article>
+          <article class="card"><h4>Remote session</h4><p>The SSH transport and, normally, a named tmux session. This is the part that keeps work running remotely.</p></article>
+        </div>
+      </section>
+
+      <section class="doc-section" id="requirements" data-search-title="Requirements">
+        <p class="eyebrow">BEFORE INSTALLING</p>
+        <h2>Requirements</h2>
+        <div class="two-col">
+          <div>
+            <h3>Android</h3>
+            <ul class="check-list">
+              <li>Android 7.0 / API 24 or newer.</li>
+              <li>Network access to at least one server for remote projects.</li>
+              <li>Optional biometric hardware for the startup gate.</li>
+            </ul>
+          </div>
+          <div>
+            <h3>Remote machine</h3>
+            <ul class="check-list">
+              <li>Linux or macOS workstation, home server, VPS or lab machine.</li>
+              <li>SSH server and a user account.</li>
+              <li><code>tmux</code> for persistent sessions.</li>
+              <li>Optional <code>git</code> and any project-specific tools.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="callout"><strong>Network recommendation</strong><p>Prefer a private network or VPN such as Tailscale. Avoid exposing password-based SSH directly to the public internet.</p></div>
+      </section>
+
+      <section class="doc-section" id="quick-start" data-search-title="Quick start">
+        <p class="eyebrow">FIRST PROJECT</p>
+        <h2>Quick start</h2>
+        <ol class="steps">
+          <li><div><strong>Prepare the server.</strong><p>Confirm that you can reach it over SSH and install tmux. For Debian/Ubuntu: <code>sudo apt install tmux</code>. For macOS: <code>brew install tmux</code>.</p></div></li>
+          <li><div><strong>Add a server in TerminalHub.</strong><p>Enter its host, port and username. Generate an SSH key in the app or paste an existing private key.</p></div></li>
+          <li><div><strong>Test SSH.</strong><p>Use <em>Test SSH</em> before creating projects. Fix authentication or routing errors here first.</p></div></li>
+          <li><div><strong>Add a project.</strong><p>Choose the server, name the project, and optionally provide a Git repository URL and a command such as <code>npm run dev</code>, <code>htop</code> or <code>codex</code>.</p></div></li>
+          <li><div><strong>Open the project.</strong><p>TerminalHub creates or clones the remote folder, creates or attaches to tmux, runs the project script, and opens a tab.</p></div></li>
+          <li><div><strong>Add more tabs.</strong><p>Repeat for projects on the same server or other servers. Swipe the key bar or tap a tab to switch.</p></div></li>
+        </ol>
+        <details><summary>Minimal remote preparation example</summary><pre><code># Debian or Ubuntu server
+sudo apt update
+sudo apt install openssh-server tmux git
+mkdir -p "$HOME/terminalhub"
+
+# Verify from another machine before configuring the app
+ssh your-user@your-server
+tmux -V</code></pre></details>
+      </section>
+
+      <section class="doc-section" id="servers" data-search-title="Servers and SSH">
+        <p class="eyebrow">CONNECTION PROFILES</p>
+        <h2>Servers and SSH</h2>
+        <h3>Server fields</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Field</th><th>Purpose</th><th>Default / example</th></tr></thead>
+          <tbody>
+            <tr><td>Display name</td><td>Human-readable name used in the UI.</td><td><code>Home PC</code></td></tr>
+            <tr><td>Host or IP</td><td>DNS name, LAN IP, public address or private-VPN address.</td><td><code>workstation.tailnet.ts.net</code></td></tr>
+            <tr><td>SSH port</td><td>TCP port used by the SSH server.</td><td><code>22</code></td></tr>
+            <tr><td>Username</td><td>User account on the remote machine.</td><td><code>developer</code></td></tr>
+            <tr><td>Private key</td><td>SSH private key stored locally on Android.</td><td>Generated or pasted PEM key</td></tr>
+            <tr><td>One-time password</td><td>Optional password used to install a generated public key.</td><td>Leave blank after key setup</td></tr>
+            <tr><td>Projects folder</td><td>Parent folder for projects created through this server profile.</td><td><code>~/terminalhub</code></td></tr>
+            <tr><td>Setup script</td><td>Advanced server-level script template.</td><td>Built-in setup behavior</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Recommended key workflow</h3>
+        <ol>
+          <li>Tap <em>Generate key</em>.</li>
+          <li>Either copy the public key to <code>~/.ssh/authorized_keys</code>, or provide a one-time password and tap <em>Install public key</em>.</li>
+          <li>Keep the private key on Android. Never paste the private key into <code>authorized_keys</code> or copy it to the server.</li>
+          <li>Run <em>Test SSH</em>, then clear the one-time password if it is no longer needed.</li>
+        </ol>
+        <div class="callout warning"><strong>Host-key behavior</strong><p>Review the app's current source and security model before using it for high-sensitivity infrastructure. TerminalHub is open source, but it is not a managed enterprise SSH policy product.</p></div>
+      </section>
+
+      <section class="doc-section" id="projects" data-search-title="Projects">
+        <p class="eyebrow">REUSABLE WORKSPACES</p>
+        <h2>Projects</h2>
+        <p>A project answers four questions: where should it run, which folder should it use, how should that folder be prepared, and which command should start last?</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Setting</th><th>Behavior</th></tr></thead>
+          <tbody>
+            <tr><td>Target</td><td>Normally an SSH server. A local-device target also exists and uses a plain local shell without tmux.</td></tr>
+            <tr><td>Name</td><td>Used for the tab, remote folder, and normalized tmux session name.</td></tr>
+            <tr><td>Git repository URL</td><td>If set and no checkout exists, TerminalHub performs a shallow clone on first connect. GitHub HTTPS URLs are normalized to SSH form when saved.</td></tr>
+            <tr><td>Use tmux</td><td>Creates a named tmux session or attaches to it when it already exists. Enabled by default for SSH projects.</td></tr>
+            <tr><td>Custom script</td><td>Runs after connection inside the session. Default: <code>cd {{PROJECT_PATH}}</code>.</td></tr>
+            <tr><td>Custom command</td><td>Runs last. Use it for a development server, monitor, editor or optional AI terminal agent.</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Template placeholders</h3>
+        <ul>
+          <li><code>{{PROJECT_NAME}}</code> — the configured project name.</li>
+          <li><code>{{PROJECT_PATH}}</code> — the resolved project directory.</li>
+          <li><code>{{SESSION_NAME}}</code> — the lowercase, shell-safe tmux name derived from the project name.</li>
+        </ul>
+        <h3>First-open sequence</h3>
+        <pre><code>ensure project directory exists
+└─ if Git URL is set and .git is absent: shallow-clone repository
+   └─ if tmux is enabled: create or reuse the named session
+      └─ enable tmux mouse support
+         └─ attach interactively
+            └─ run custom script
+               └─ run custom command, when configured</code></pre>
+        <p>Deleting a project profile is designed to move its remote directory under a <code>.trash</code> folder rather than immediately destroying it. Always verify behavior against the current build before relying on recovery.</p>
+      </section>
+
+      <section class="doc-section split-feature" id="sessions" data-search-title="Tabs and persistence">
+        <div>
+          <p class="eyebrow">THE MAIN FEATURE</p>
+          <h2>Tabs and persistence</h2>
+          <p>Each open project becomes a tab containing the project identity, target and terminal-session state. You can open several projects across several servers and move between them without rebuilding context.</p>
+          <h3>What TerminalHub persists</h3>
+          <ul class="check-list">
+            <li>Server and project profiles.</li>
+            <li>Which project tabs are open.</li>
+            <li>Tab order and active project.</li>
+            <li>Per-project text-input history and drafts where applicable.</li>
+          </ul>
+          <h3>What tmux persists</h3>
+          <ul class="check-list">
+            <li>The remote shell and its running processes.</li>
+            <li>Terminal state on the remote server.</li>
+            <li>Work across SSH disconnects, app restarts and network changes.</li>
+          </ul>
+          <div class="callout"><strong>Important distinction</strong><p>Android cannot guarantee a live SSH socket when the app is not active. TerminalHub restores saved tabs and reconnects; tmux is what keeps remote work alive in between.</p></div>
+        </div>
+        <figure><img src="assets/screenshots/02-tmux-resume.png" alt="A TerminalHub project tab showing that its tmux session was restored"><figcaption>Real Android emulator capture: a saved tab reattaching to tmux.</figcaption></figure>
+      </section>
+
+      <section class="doc-section" id="terminal" data-search-title="Terminal controls">
+        <p class="eyebrow">TOUCH-FIRST INPUT</p>
+        <h2>Terminal controls</h2>
+        <div class="card-grid">
+          <article class="card"><h4>Configurable key bar</h4><p>Add, remove and arrange rows containing Esc, Tab, Enter, Backspace, Ctrl, Alt, Shift, arrows, Home, End, Page Up/Down, paste and input actions.</p></article>
+          <article class="card"><h4>Modifier handling</h4><p>Ctrl, Alt and Shift can modify the next printable or navigation key. Common terminal escape sequences are sent directly.</p></article>
+          <article class="card"><h4>Multiline input</h4><p>Compose commands or pasted text in a larger panel, adjust panel opacity, recall recent per-project entries and choose whether Send also executes with Enter.</p></article>
+          <article class="card"><h4>Search and scroll</h4><p>Search terminal buffer text, move among matches and jump back to the bottom after reviewing earlier output.</p></article>
+          <article class="card"><h4>Tab gestures</h4><p>Tap tabs directly, reorder them, or swipe horizontally on the key bar to move to the previous or next connected tab.</p></article>
+          <article class="card"><h4>Clipboard and keyboard</h4><p>Paste clipboard content, show or hide the Android keyboard, and use hardware-key mappings including function keys.</p></article>
+        </div>
+        <figure class="wide-figure"><img src="assets/screenshots/03-multiline-project-input.png" alt="TerminalHub multiline text input panel with three commands"><figcaption>Real Android emulator capture: multiline input inside a project tab.</figcaption></figure>
+      </section>
+
+      <section class="doc-section split-feature" id="files" data-search-title="File upload">
+        <div>
+          <p class="eyebrow">PHONE → ACTIVE PROJECT</p>
+          <h2>File upload</h2>
+          <p>Use the upload action in the terminal key bar to select a document from Android and send it into the active project's remote directory. The dialog keeps the operation in the context of the tab and reports progress.</p>
+          <ol>
+            <li>Open the destination project tab and confirm it is connected.</li>
+            <li>Tap the upload control in the key bar.</li>
+            <li>Choose a file using Android's document picker.</li>
+            <li>Review the filename and start upload.</li>
+            <li>Wait for completion before closing the connection.</li>
+          </ol>
+          <div class="callout warning"><strong>Remote download is not a supported documented workflow.</strong><p>The current product documentation intentionally directs users to upload. Do not promise remote download functionality without validating it in the exact release being used.</p></div>
+        </div>
+        <figure><img src="assets/screenshots/04-file-upload.png" alt="TerminalHub file upload progress at 72 percent"><figcaption>Real Android emulator capture: upload progress in the active tab.</figcaption></figure>
+      </section>
+
+      <section class="doc-section" id="configuration" data-search-title="Settings and stored data">
+        <p class="eyebrow">CONTROL &amp; RECOVERY</p>
+        <h2>Settings and stored data</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Area</th><th>Available behavior</th><th>Default</th></tr></thead>
+          <tbody>
+            <tr><td>Fast resume</td><td>Prefer restoring the previous mobile tab workspace quickly on launch.</td><td>Enabled</td></tr>
+            <tr><td>Text-input Send</td><td>Choose whether sending text also appends Enter and executes it.</td><td>Send text only</td></tr>
+            <tr><td>SSH keepalive</td><td>Send keepalive traffic while a connection exists.</td><td>Enabled</td></tr>
+            <tr><td>Keepalive profile</td><td>Aggressive, Balanced, Battery Saver or Ultra Battery Saver.</td><td>Balanced</td></tr>
+            <tr><td>Keepalive scope</td><td>Active tab only or all current sessions.</td><td>Active tab only</td></tr>
+            <tr><td>Terminal key bar</td><td>Edit rows and actions, then persist the layout.</td><td>Two-row touch layout</td></tr>
+            <tr><td>Biometric gate</td><td>Startup authentication when Android biometric authentication is available; bypassed on unsupported devices.</td><td>Availability controlled</td></tr>
+            <tr><td>Export/import</td><td>Move server/project configuration and key-bar layout through YAML.</td><td>Manual action</td></tr>
+            <tr><td>Logs</td><td>Inspect/search/copy/export app logs and view session history.</td><td>Stored locally</td></tr>
+          </tbody>
+        </table></div>
+        <h3>Data locations and responsibilities</h3>
+        <ul>
+          <li>Structured profiles, open-tab state, logs and text-input history are stored in app-local Android data.</li>
+          <li>App preferences store user settings and key-bar layout.</li>
+          <li>SSH private-key material and credentials use Android-local protected storage mechanisms implemented in the security package.</li>
+          <li>Project repositories, shell history, build artifacts and running processes remain on the configured server.</li>
+          <li>Configuration export is user initiated. Treat exported files as sensitive and inspect them before sharing.</li>
+        </ul>
+        <p><a href="privacy-policy.html">Read the privacy policy</a> for the user-facing data statement.</p>
+      </section>
+
+      <section class="doc-section" id="ai-workflows" data-search-title="AI terminal agent workflows">
+        <p class="eyebrow">ONE OF MANY USE CASES</p>
+        <h2>Working with terminal AI agents</h2>
+        <p>TerminalHub does not include an AI model. It is a practical mobile workspace for terminal agents installed on your servers, alongside any other command-line workflow.</p>
+        <div class="card-grid">
+          <article class="card"><h4>One agent per project</h4><p>Create separate tabs for an API, Android app, website and operations repository. Configure <code>codex</code>, <code>claude</code>, <code>gemini</code> or another tool as each project's custom command.</p></article>
+          <article class="card"><h4>Parallel visibility</h4><p>Switch tabs to review output, answer prompts and keep track of several long-running sessions from one phone.</p></article>
+          <article class="card"><h4>Server-side context</h4><p>Agents operate in the actual repository and toolchain on your server. TerminalHub transports terminal input and output; it does not proxy model data through a TerminalHub cloud.</p></article>
+          <article class="card"><h4>Persistent execution</h4><p>Run each agent inside tmux so it can continue when Android disconnects. Reattach from the saved project tab later.</p></article>
+        </div>
+        <h3>Suggested project configuration</h3>
+        <pre><code>Project name: api-agent
+Server: vps
+Git URL: git@github.com:your-org/api.git
+Use tmux: yes
+Custom script: cd {{PROJECT_PATH}}
+Custom command: codex</code></pre>
+        <div class="callout warning"><strong>Know the boundaries.</strong><p>Agent authentication, model billing, permissions, sandboxing and safety are controlled by the agent tool and server environment—not by TerminalHub.</p></div>
+      </section>
+
+      <section class="doc-section" id="troubleshooting" data-search-title="Troubleshooting">
+        <p class="eyebrow">DIAGNOSE IN ORDER</p>
+        <h2>Troubleshooting</h2>
+        <div class="troubleshooting-list">
+          <details open><summary>SSH test fails</summary><div><ol><li>Confirm host, port and username.</li><li>Verify Android can reach the address on its current network.</li><li>Test the same account with another SSH client.</li><li>Check the private-key format and the matching public key in <code>~/.ssh/authorized_keys</code>.</li><li>Inspect TerminalHub's app log for the exact authentication or transport error.</li></ol></div></details>
+          <details><summary>A saved tab does not reconnect</summary><div><ol><li>Confirm the server is reachable.</li><li>Tap <em>Reconnect</em>; use <em>Reconnect all</em> if several tabs are disconnected.</li><li>SSH into the server and run <code>tmux ls</code>.</li><li>Verify that the project still has tmux enabled and that its name still maps to the expected session.</li><li>Review app and session logs.</li></ol></div></details>
+          <details><summary>The process stopped while the app was closed</summary><div><p>The Android app does not keep a foreground service running. The remote process must run inside tmux. Confirm with <code>tmux ls</code> on the server and start the project again if the tmux session itself exited.</p></div></details>
+          <details><summary>Git clone fails</summary><div><ol><li>Confirm Git is installed on the server.</li><li>For a private repository, confirm the server—not Android—has credentials or an SSH deploy key for that Git host.</li><li>Test <code>git clone</code> manually on the server.</li><li>Inspect whether TerminalHub created the target folder after reporting clone failure.</li></ol></div></details>
+          <details><summary>Upload fails</summary><div><ol><li>Confirm the active project is connected.</li><li>Verify write permission in the project directory and free disk space.</li><li>Try a small file with a simple filename.</li><li>Keep the app active until the progress dialog completes.</li><li>Inspect the app log for SFTP/SCP errors.</li></ol></div></details>
+          <details><summary>Terminal sizing, keyboard or rendering is wrong</summary><div><ol><li>Hide and reopen the Android keyboard.</li><li>Switch tabs and return to force a terminal size synchronization.</li><li>Rotate the device once if allowed.</li><li>Capture Android version, device model, screenshot and relevant logs when opening an issue.</li></ol></div></details>
+        </div>
+        <p><a class="button" href="https://github.com/joynes/terminalhub/issues/new">Open a GitHub issue</a></p>
+      </section>
+
+      <section class="doc-section" id="limitations" data-search-title="Limitations and non-goals">
+        <p class="eyebrow">ACCURATE EXPECTATIONS</p>
+        <h2>Limitations and non-goals</h2>
+        <ul class="boundary-list">
+          <li><strong>A server is required for the main product workflow.</strong> TerminalHub is not a full Linux distribution running entirely on Android.</li>
+          <li><strong>It does not guarantee a live background SSH connection.</strong> Tabs are restored and reconnected; tmux provides remote persistence.</li>
+          <li><strong>It does not supply servers.</strong> You configure machines and credentials you control.</li>
+          <li><strong>It does not include AI.</strong> AI terminal tools are optional server-side programs.</li>
+          <li><strong>It is not affiliated with Termux.</strong> It adapts open-source Termux terminal components under their licenses.</li>
+          <li><strong>Remote file download is not currently documented as supported.</strong> File upload is the supported mobile file-transfer workflow.</li>
+          <li><strong>Local projects have a narrower model.</strong> The local target uses a plain Android-side shell and does not provide tmux persistence.</li>
+          <li><strong>Interactive full-screen terminal programs vary.</strong> Behavior depends on the remote shell, TERM capabilities, network quality and Android input method.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="architecture" data-search-title="Architecture">
+        <p class="eyebrow">FOR CONTRIBUTORS AND AGENTS</p>
+        <h2>Architecture</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Layer</th><th>Responsibilities</th><th>Primary paths</th></tr></thead>
+          <tbody>
+            <tr><td>UI</td><td>Jetpack Compose screens, terminal host, tabs, dialogs and settings.</td><td><code>app/src/main/.../ui/</code></td></tr>
+            <tr><td>Domain</td><td>Session orchestration, script templating and focused use cases.</td><td><code>app/src/main/.../domain/</code></td></tr>
+            <tr><td>SSH</td><td>Connections, reconnect policy, tmux, status polling and transfer.</td><td><code>app/src/main/.../data/ssh/</code></td></tr>
+            <tr><td>Persistence</td><td>Room entities/DAOs, repositories, runtime snapshots and settings.</td><td><code>app/src/main/.../data/db/</code>, <code>repository/</code>, <code>runtime/</code></td></tr>
+            <tr><td>Security</td><td>Biometric gate, key generation, protected preferences and key storage.</td><td><code>app/src/main/.../data/security/</code></td></tr>
+            <tr><td>Terminal</td><td>Adapted Termux terminal emulator/view modules and Android bridge.</td><td><code>terminal-emulator/</code>, <code>terminal-view/</code></td></tr>
+          </tbody>
+        </table></div>
+        <h3>Session lifecycle</h3>
+        <pre><code>saved project tab
+  → SessionHostViewModel requests restore/connect
+  → TerminalSessionManager selects local or SSH target
+  → SshManager opens transport and shell
+  → ScriptTemplateEngine prepares folder / clone / tmux
+  → terminal session is attached to the project tab
+  → Room/runtime state records the open workspace
+  → on return: restore tabs, reconnect SSH, reattach tmux</code></pre>
+        <h3>Technology</h3>
+        <ul>
+          <li>Kotlin, coroutines and StateFlow.</li>
+          <li>Jetpack Compose and Navigation Compose.</li>
+          <li>Hilt dependency injection.</li>
+          <li>Room for structured local persistence.</li>
+          <li>Trilead-based SSH transport and SFTP/SCP helpers.</li>
+          <li>Adapted Termux terminal emulator and view components.</li>
+        </ul>
+      </section>
+
+      <section class="doc-section" id="build" data-search-title="Build and test">
+        <p class="eyebrow">CONTRIBUTING</p>
+        <h2>Build and test</h2>
+        <p>Use JDK 17 or newer and Android SDK Platform 36. The repository contains a Gradle wrapper.</p>
+        <pre><code>git clone https://github.com/joynes/terminalhub.git
+cd terminalhub
+
+# Diagnostic build: separate app ID, safe for repeated local testing
+./gradlew assembleDiagnosticDebug
+
+# Production debug build
+./gradlew assembleProductionDebug
+
+# Unit tests and lint
+./gradlew app:testProductionDebugUnitTest lintProductionDebug
+
+# Production release artifacts
+./gradlew assembleProductionRelease bundleProductionRelease</code></pre>
+        <p>Use the diagnostic flavor for device or emulator investigation so it does not overwrite the installed Play Store app. The repository also includes <code>scripts/capture-play-screenshots.sh</code> for repeatable emulator screenshot capture.</p>
+        <div class="link-row">
+          <a href="https://github.com/joynes/terminalhub/blob/main/AGENTS.md">Agent instructions</a>
+          <a href="https://github.com/joynes/terminalhub/blob/main/THIRD_PARTY_NOTICES.md">Third-party notices</a>
+          <a href="https://github.com/joynes/terminalhub/blob/main/TERMUX_INTEGRATION.md">Termux integration</a>
+        </div>
+      </section>
+
+      <section class="doc-section" id="agent-interface" data-search-title="AI-agent interface">
+        <p class="eyebrow">MACHINE-READABLE BY DESIGN</p>
+        <h2>How AI agents should use these docs</h2>
+        <p>The human page and machine-readable files describe the same product boundaries. Agents should prefer explicit facts and source links over inferring behavior from screenshots or marketing copy.</p>
+        <ol class="agent-protocol">
+          <li><strong>Load <a href="llms.txt"><code>/llms.txt</code></a>.</strong> It identifies canonical documents, repository paths and decision rules.</li>
+          <li><strong>Use <a href="docs-index.json"><code>/docs-index.json</code></a> for routing.</strong> Select the smallest section matching the user's task.</li>
+          <li><strong>Use <a href="llms-full.txt"><code>/llms-full.txt</code></a> when broad context is needed.</strong> It is plain text, stable and free of layout noise.</li>
+          <li><strong>Verify version-sensitive claims in source.</strong> UI behavior and build settings can change after this page is published.</li>
+          <li><strong>State operational boundaries.</strong> Do not imply that Android hosts the remote project, that SSH remains permanently alive, or that AI is bundled.</li>
+          <li><strong>Ask for safe diagnostic evidence.</strong> Prefer app version, Android version, target type, exact error, app log excerpt and whether <code>tmux ls</code> shows the session. Never request private keys or passwords.</li>
+        </ol>
+        <h3>Agent answer contract</h3>
+        <pre><code>When helping a TerminalHub user:
+1. Identify whether the target is SSH or local.
+2. Separate Android app state, SSH transport state, and tmux/server state.
+3. Give the shortest safe diagnostic sequence.
+4. Never request or reproduce secrets.
+5. Mark unsupported or unverified behavior explicitly.
+6. Link the relevant stable section of this documentation.
+7. For code changes, inspect AGENTS.md and current source before editing.</code></pre>
+      </section>
+
+      <section class="doc-section" id="reference" data-search-title="Reference">
+        <p class="eyebrow">QUICK REFERENCE</p>
+        <h2>Canonical facts</h2>
+        <div class="table-wrap"><table>
+          <tbody>
+            <tr><th>Product name</th><td>TerminalHub: SSH Project Tabs</td></tr>
+            <tr><th>Android package</th><td><code>se.joynes.terminalhub</code></td></tr>
+            <tr><th>Repository</th><td><a href="https://github.com/joynes/terminalhub">github.com/joynes/terminalhub</a></td></tr>
+            <tr><th>Store</th><td><a href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Google Play listing</a></td></tr>
+            <tr><th>License</th><td>GNU GPL v3.0 only</td></tr>
+            <tr><th>Minimum Android</th><td>API 24 / Android 7.0</td></tr>
+            <tr><th>Current target SDK</th><td>API 36</td></tr>
+            <tr><th>Primary execution target</th><td>User-controlled SSH server</td></tr>
+            <tr><th>Remote persistence</th><td>tmux</td></tr>
+            <tr><th>Terminal foundation</th><td>Adapted open-source Termux components; independent and not endorsed by Termux</td></tr>
+            <tr><th>AI dependency</th><td>None; terminal AI tools are optional server-side use cases</td></tr>
+          </tbody>
+        </table></div>
+        <p class="updated">Documentation snapshot: 2026-08-25 · <a href="https://github.com/joynes/terminalhub/edit/main/docs/index.html">Edit this page on GitHub</a></p>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>TerminalHub is open source under GPL-3.0. Built on adapted terminal components from Termux; not affiliated with or endorsed by Termux.</p>
+  </footer>
+  <script src="app.js" defer></script>
+</body>
+</html>

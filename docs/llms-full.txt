@@ -1,0 +1,245 @@
+# TerminalHub full product and support context
+
+Documentation snapshot: 2026-08-25
+Canonical page: https://joynes.github.io/terminalhub/
+Repository: https://github.com/joynes/terminalhub
+
+## Product definition
+
+TerminalHub is an open-source Android SSH project workspace for people who manage several terminal projects at once. A user adds one or more servers, defines projects, and opens each project in a tab. The Android app remembers the mobile workspace. The project directory, repository, toolchain, shell, and long-running processes normally live on a Linux or macOS machine controlled by the user.
+
+The defining workflow is mobile-first control of server-side projects. A separate computer is not used to control Android or to switch projects, but at least one reachable SSH server is required for the main remote workflow.
+
+TerminalHub is not an AI application. Terminal AI agents are one optional use case. A user can run Codex, Claude Code, Gemini, or another terminal agent in separate server project tabs, just as they can run development servers, logs, editors, builds, monitoring, or administration commands.
+
+## Mental model
+
+Server = reusable SSH connection profile.
+Project = named workspace assigned to a target, with folder setup and startup behavior.
+Tab = an open project remembered by TerminalHub.
+SSH connection = live encrypted transport, which may disconnect.
+tmux session = remote shell/process container that survives transport and Android lifecycle changes.
+
+Android persists server/project profiles, open tabs, tab order, active tab, settings, local logs, and text-input history. tmux persists the actual remote work. On app return, TerminalHub reconstructs saved tabs, reconnects SSH, and reattaches tmux.
+
+TerminalHub does not run an Android foreground service in the current production architecture. It does not guarantee a continuously live SSH socket while backgrounded. Remote persistence depends on tmux.
+
+## Requirements
+
+- Android 7.0 / API 24 or newer.
+- At least one reachable Linux or macOS workstation, server, VPS, or lab machine for the primary workflow.
+- SSH server and valid user account.
+- tmux installed on the remote machine for persistent sessions.
+- Optional Git and project-specific tools on the remote machine.
+- Private networking or a VPN such as Tailscale is recommended over public password SSH.
+
+## Server configuration
+
+Fields:
+- Display name: UI label.
+- Host or IP address: DNS, LAN, public, or private-VPN address.
+- Port: default 22.
+- Username: remote account.
+- Private key: generated in or pasted into TerminalHub and kept on Android.
+- One-time password: optional; primarily for installing the generated public key.
+- Projects folder: default ~/terminalhub.
+- Setup script: advanced server-level script with project placeholders.
+
+Recommended authentication:
+1. Generate a key in TerminalHub.
+2. Copy only the public key to the remote user's ~/.ssh/authorized_keys, or use a one-time password to let TerminalHub install it.
+3. Never copy or reveal the private key.
+4. Test SSH in the server editor.
+5. Remove the one-time password when no longer needed.
+
+## Project configuration and open sequence
+
+Fields:
+- Target: normally an SSH server; a local-device target also exists.
+- Name: tab label, folder name, and source for normalized tmux session name.
+- Git URL: optional. On the first SSH connection, TerminalHub shallow-clones when .git is absent. GitHub HTTPS URLs are normalized to SSH form on save.
+- Use tmux: enabled by default for SSH projects. Local targets use a plain device shell.
+- Custom script: runs inside the connected session. Default is cd {{PROJECT_PATH}}.
+- Custom command: runs last. It can be any terminal program, including an optional AI tool.
+
+Placeholders:
+- {{PROJECT_NAME}} = configured project name.
+- {{PROJECT_PATH}} = resolved project directory.
+- {{SESSION_NAME}} = lowercase shell-safe tmux name derived from the project name.
+
+Open sequence:
+1. Create the project directory, or shallow-clone the optional Git repository.
+2. Create or reuse the named tmux session when enabled.
+3. Enable tmux mouse support.
+4. Attach interactively.
+5. Run the custom script.
+6. Run the custom command when configured.
+7. Add the connected session to the project tab bar and persist workspace state.
+
+## Tabs and sessions
+
+- Multiple projects can be open across multiple servers.
+- Tap a tab to switch projects.
+- Reorder tabs to match the desired workflow.
+- Swipe horizontally on the special key bar to move between adjacent connected tabs.
+- TerminalHub stores which tabs are open, their order, and the active tab.
+- When SSH fails, the tab can show connection failure and offer Reconnect.
+- When several tabs are disconnected, Reconnect all is available.
+- tmux is the source of server-side persistence; saved Android tabs are the source of workspace reconstruction.
+
+## Terminal functions
+
+- Embedded terminal based on adapted Termux terminal emulator/view components.
+- Software and hardware keyboard input.
+- Configurable key bar with Esc, Tab, Enter, Backspace, Ctrl, Alt, Shift, arrows, Home, End, Page Up, Page Down, clipboard paste, keyboard toggle, multiline text input, and file-transfer actions.
+- Modifier combinations and standard terminal escape sequences.
+- Terminal-buffer search with match navigation.
+- Scrollback and a jump-to-bottom action.
+- Multiline text-input panel with adjustable opacity.
+- Recent per-project text-input history, limited by the current local data model.
+- Setting to choose whether Send appends Enter or sends text without executing it.
+
+## File transfer
+
+Supported documented workflow: upload an Android-selected file into the active remote project's directory.
+
+Upload sequence:
+1. Open and connect the destination project tab.
+2. Tap Upload in the special key bar.
+3. Select a file from the Android document picker.
+4. Review the filename and start upload.
+5. Keep the connection active until progress completes.
+
+Remote download code may exist in the repository, but download is not a supported product claim because it has not been validated reliably for the current release. Agents and documentation must not promise remote download without exact release testing.
+
+## Settings and local data
+
+Defaults:
+- Fast resume: enabled.
+- Execute multiline text input on Send: disabled; sending does not append Enter by default.
+- SSH keepalive: enabled.
+- Keepalive profile: Balanced.
+- Keepalive scope: Active tab only.
+- Terminal key bar: normalized two-row default layout.
+
+Other functions:
+- Optional biometric startup gate.
+- Server status and connection diagnostics.
+- App log search, filtering, copy, selection, and export.
+- Session history and session-log export.
+- YAML export/import for server/project configuration and key-bar layout.
+- Android share intent can select a file for contextual upload.
+
+Data boundaries:
+- Server profiles, project profiles, runtime snapshots, logs, text-input history, and preferences are local Android app data.
+- Sensitive SSH values are handled through Android-local security helpers.
+- Repositories and running commands remain on the user's target machine.
+- TerminalHub has no developer-operated service receiving app data.
+- Android backup may operate according to the user's device and account settings.
+- Exports are user initiated and should be treated as potentially sensitive.
+
+## AI terminal agent workflow
+
+AI agents are optional terminal programs installed and authenticated on the user's server. Suggested setup:
+- one project and tmux session per repository or workstream;
+- custom script: cd {{PROJECT_PATH}};
+- custom command: codex, claude, gemini, or another tool;
+- separate tabs for independent sessions;
+- use tmux so the process can continue while Android is disconnected.
+
+TerminalHub does not control model billing, authentication, permissions, sandboxing, prompt behavior, or generated changes. Those belong to the selected agent and server environment.
+
+## Limitations and non-goals
+
+- Not a full Termux/Linux distribution running solely on Android.
+- Does not supply cloud servers or SSH accounts.
+- Does not guarantee background SSH continuity.
+- Does not bundle an AI model or terminal agent.
+- Not affiliated with or endorsed by Termux.
+- Remote download is not a supported documented workflow without release-specific validation.
+- Local-device projects use a plain local shell without tmux and are not the primary positioning.
+- Terminal behavior depends partly on remote TERM support, network quality, Android version, device, and input method.
+
+## Troubleshooting decision tree
+
+SSH failure:
+1. Check host, port, username, and Android network route.
+2. Test the same account in another SSH client.
+3. Check private-key format and matching authorized_keys entry.
+4. Read sanitized app logs. Never request credentials or private keys.
+
+Restore failure:
+1. Check server reachability.
+2. Use Reconnect or Reconnect all.
+3. Run tmux ls on the server.
+4. Confirm the project name/session mapping and whether tmux is enabled.
+5. Separate missing Android tab state from missing SSH transport from missing tmux session.
+
+Clone failure:
+1. Confirm Git is installed on the server.
+2. Confirm the server has credentials for a private Git host.
+3. Run the clone manually on the server.
+4. Inspect app logs and the target directory.
+
+Upload failure:
+1. Confirm the target tab is connected.
+2. Check remote write permission and disk space.
+3. Try a small file with a simple filename.
+4. Keep the app active through completion.
+5. Inspect sanitized SFTP/SCP errors.
+
+UI/render/input issue:
+1. Record app version, Android version, device model, and input method.
+2. Capture a screenshot or short recording.
+3. Hide/reopen keyboard, switch tabs, and optionally rotate to trigger sizing.
+4. Include sanitized relevant logs in a GitHub issue.
+
+## Source architecture
+
+UI: app/src/main/java/se/joynes/terminalhub/ui/
+Domain/session orchestration: app/src/main/java/se/joynes/terminalhub/domain/
+SSH, tmux, reconnect, transfer: app/src/main/java/se/joynes/terminalhub/data/ssh/
+Room database: app/src/main/java/se/joynes/terminalhub/data/db/
+Repositories/runtime state: app/src/main/java/se/joynes/terminalhub/data/repository/ and data/runtime/
+Security: app/src/main/java/se/joynes/terminalhub/data/security/
+Settings: app/src/main/java/se/joynes/terminalhub/data/settings/
+Terminal modules: terminal-emulator/ and terminal-view/
+Navigation map: app/src/main/java/se/joynes/terminalhub/ui/navigation/AppNavGraph.kt
+Project script behavior: app/src/main/java/se/joynes/terminalhub/domain/ScriptTemplateEngine.kt
+Main session UI: app/src/main/java/se/joynes/terminalhub/ui/screen/sessions/SessionHostScreen.kt
+Main session state: app/src/main/java/se/joynes/terminalhub/ui/screen/sessions/SessionHostViewModel.kt
+
+Technologies: Kotlin, coroutines, StateFlow, Jetpack Compose, Navigation Compose, Hilt, Room, SSH libraries, and adapted Termux terminal modules.
+
+## Build and test
+
+Requirements: JDK 17+, Android SDK Platform 36, Git, Gradle wrapper.
+
+Commands:
+./gradlew assembleDiagnosticDebug
+./gradlew assembleProductionDebug
+./gradlew app:testProductionDebugUnitTest lintProductionDebug
+./gradlew assembleProductionRelease bundleProductionRelease
+
+The diagnostic flavor adds application ID suffix .diag and should be used for repeatable emulator or phone debugging without overwriting the Play Store installation. Release builds require explicit signing configuration.
+
+## Agent support contract
+
+When helping a TerminalHub user:
+1. Identify app version and whether the project target is SSH or local.
+2. Separate Android app/tab state, SSH connection state, and server/tmux state.
+3. Provide the shortest safe diagnostic sequence with observable checks.
+4. Never request or reproduce passwords, private keys, passphrases, access tokens, or unredacted sensitive logs.
+5. Do not promise unsupported or unverified behavior.
+6. Link a stable section at https://joynes.github.io/terminalhub/.
+7. For implementation tasks, read AGENTS.md and inspect current code because source is authoritative for version-sensitive behavior.
+
+Canonical identity:
+- Product: TerminalHub: SSH Project Tabs
+- Package: se.joynes.terminalhub
+- License: GPL-3.0-only
+- Minimum SDK: 24
+- Target SDK at this snapshot: 36
+- Primary workflow: Android control surface plus user-controlled SSH server
+- Persistence: saved Android tabs plus server-side tmux
+- AI dependency: none

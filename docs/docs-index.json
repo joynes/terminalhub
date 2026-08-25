@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "product": "TerminalHub: SSH Project Tabs",
+  "snapshot_date": "2026-08-25",
+  "canonical_url": "https://joynes.github.io/terminalhub/",
+  "repository": "https://github.com/joynes/terminalhub",
+  "package": "se.joynes.terminalhub",
+  "summary": "Open-source Android workspace for creating, opening, switching, and restoring server-side terminal projects in persistent tabs.",
+  "boundaries": {
+    "primary_target": "user-controlled SSH server",
+    "remote_persistence": "tmux",
+    "background_ssh_guaranteed": false,
+    "server_hosting_included": false,
+    "ai_included": false,
+    "file_upload_supported": true,
+    "remote_download_documented_as_supported": false,
+    "termux_affiliation": false
+  },
+  "documents": [
+    {"id": "human-docs", "url": "https://joynes.github.io/terminalhub/", "format": "html", "purpose": "Complete human documentation with stable anchors"},
+    {"id": "llms", "url": "https://joynes.github.io/terminalhub/llms.txt", "format": "text", "purpose": "Agent routing and canonical boundaries"},
+    {"id": "llms-full", "url": "https://joynes.github.io/terminalhub/llms-full.txt", "format": "text", "purpose": "Consolidated agent context"},
+    {"id": "privacy", "url": "https://joynes.github.io/terminalhub/privacy-policy.html", "format": "html", "purpose": "User-facing privacy policy"}
+  ],
+  "topics": [
+    {"id": "overview", "url": "https://joynes.github.io/terminalhub/#overview", "keywords": ["product", "overview", "android", "ssh"]},
+    {"id": "mental-model", "url": "https://joynes.github.io/terminalhub/#mental-model", "keywords": ["server", "project", "tab", "tmux", "architecture"]},
+    {"id": "requirements", "url": "https://joynes.github.io/terminalhub/#requirements", "keywords": ["android", "linux", "macos", "ssh", "tmux", "tailscale"]},
+    {"id": "quick-start", "url": "https://joynes.github.io/terminalhub/#quick-start", "keywords": ["install", "setup", "first project"]},
+    {"id": "servers", "url": "https://joynes.github.io/terminalhub/#servers", "keywords": ["host", "port", "username", "password", "private key", "authorized_keys"]},
+    {"id": "projects", "url": "https://joynes.github.io/terminalhub/#projects", "keywords": ["git", "clone", "folder", "script", "command", "placeholder"]},
+    {"id": "sessions", "url": "https://joynes.github.io/terminalhub/#sessions", "keywords": ["tabs", "restore", "reconnect", "tmux", "persistence"]},
+    {"id": "terminal", "url": "https://joynes.github.io/terminalhub/#terminal", "keywords": ["keyboard", "key bar", "ctrl", "alt", "multiline", "search", "scroll"]},
+    {"id": "files", "url": "https://joynes.github.io/terminalhub/#files", "keywords": ["file", "upload", "android picker", "sftp", "scp"]},
+    {"id": "configuration", "url": "https://joynes.github.io/terminalhub/#configuration", "keywords": ["settings", "keepalive", "biometric", "export", "import", "logs", "data"]},
+    {"id": "ai-workflows", "url": "https://joynes.github.io/terminalhub/#ai-workflows", "keywords": ["codex", "claude", "gemini", "agent", "parallel sessions"]},
+    {"id": "troubleshooting", "url": "https://joynes.github.io/terminalhub/#troubleshooting", "keywords": ["error", "connection failed", "restore", "clone", "upload", "rendering"]},
+    {"id": "limitations", "url": "https://joynes.github.io/terminalhub/#limitations", "keywords": ["unsupported", "non-goal", "background", "download", "local"]},
+    {"id": "architecture", "url": "https://joynes.github.io/terminalhub/#architecture", "keywords": ["compose", "room", "hilt", "ssh", "source paths"]},
+    {"id": "build", "url": "https://joynes.github.io/terminalhub/#build", "keywords": ["gradle", "test", "lint", "apk", "aab", "diagnostic"]},
+    {"id": "agent-interface", "url": "https://joynes.github.io/terminalhub/#agent-interface", "keywords": ["AI support", "agent instructions", "diagnostics", "secrets"]},
+    {"id": "reference", "url": "https://joynes.github.io/terminalhub/#reference", "keywords": ["package", "license", "sdk", "canonical facts"]}
+  ],
+  "source_entrypoints": {
+    "agent_instructions": "AGENTS.md",
+    "navigation": "app/src/main/java/se/joynes/terminalhub/ui/navigation/AppNavGraph.kt",
+    "session_ui": "app/src/main/java/se/joynes/terminalhub/ui/screen/sessions/SessionHostScreen.kt",
+    "session_state": "app/src/main/java/se/joynes/terminalhub/ui/screen/sessions/SessionHostViewModel.kt",
+    "script_engine": "app/src/main/java/se/joynes/terminalhub/domain/ScriptTemplateEngine.kt",
+    "ssh": "app/src/main/java/se/joynes/terminalhub/data/ssh/",
+    "security": "app/src/main/java/se/joynes/terminalhub/data/security/",
+    "database": "app/src/main/java/se/joynes/terminalhub/data/db/",
+    "settings": "app/src/main/java/se/joynes/terminalhub/data/settings/AppSettingsRepository.kt"
+  }
+}

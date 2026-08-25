@@ -9,6 +9,7 @@ tabs and their order, while tmux keeps remote work available after disconnects,
 app restarts, and network changes.
 
 [Get TerminalHub on Google Play](https://play.google.com/store/apps/details?id=se.joynes.terminalhub)
+· [Read the complete documentation](https://joynes.github.io/terminalhub/)
 · [View the open-source code](https://github.com/joynes/terminalhub)
 
 The phone is where you configure, start, and switch projects. The shell,
@@ -55,7 +56,20 @@ least one machine that the phone can reach over SSH.
 
 Other useful parts include terminal search, app and session logs, SSH
 diagnostics, password and private-key authentication, export/import of workspace
-configuration, and an optional biometric gate on startup.
+configuration, and a biometric startup gate on supported devices.
+
+## Documentation
+
+The full user, support, architecture, and contributor documentation is published
+at [joynes.github.io/terminalhub](https://joynes.github.io/terminalhub/). It also
+provides machine-readable entry points for AI assistants:
+
+- [`llms.txt`](https://joynes.github.io/terminalhub/llms.txt) for routing and
+  canonical product boundaries.
+- [`llms-full.txt`](https://joynes.github.io/terminalhub/llms-full.txt) for broad
+  plain-text context.
+- [`docs-index.json`](https://joynes.github.io/terminalhub/docs-index.json) for
+  topic, anchor, and source-path discovery.
 
 ## Relationship To Termux
 
