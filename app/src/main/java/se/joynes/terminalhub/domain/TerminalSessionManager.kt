@@ -296,6 +296,32 @@ class TerminalSessionManager @Inject constructor(
     fun sendBytesToActive(bytes: ByteArray) {
         val id = _activeId.value?.value ?: return
         val entry = entries[id] ?: return
+        sendBytes(entry, bytes)
+    }
+
+    /** Send bytes to the session that originally received input, even if another tab is selected. */
+    fun sendBytesToSession(id: TerminalSessionId, bytes: ByteArray) {
+        val entry = entries[id.value] ?: return
+        sendBytes(entry, bytes)
+    }
+
+    /**
+     * Paste into the active terminal using its current DECSET 2004 state. Interactive programs
+     * such as Codex then receive one bracketed paste event instead of a burst of typed keys.
+     */
+    fun pasteTextToActive(text: String): TerminalSessionId? {
+        val id = _activeId.value ?: return null
+        val entry = entries[id.value] ?: return null
+        val emulator = entry.terminalSession.emulator
+        if (emulator != null) {
+            emulator.paste(text)
+        } else {
+            sendBytes(entry, text.toByteArray(Charsets.UTF_8))
+        }
+        return id
+    }
+
+    private fun sendBytes(entry: SessionEntry, bytes: ByteArray) {
         if (entry.conn != null) {
             entry.conn.sendBytes(bytes)
         } else {

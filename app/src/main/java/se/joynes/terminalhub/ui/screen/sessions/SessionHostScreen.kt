@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
@@ -116,6 +117,7 @@ fun SessionHostScreen(
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
     val exportImportState by exportImportViewModel.state.collectAsState()
+    val textInputSendScope = rememberCoroutineScope()
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")
@@ -242,6 +244,20 @@ fun SessionHostScreen(
         } else {
             context.getSystemService(InputMethodManager::class.java)
                 ?.hideSoftInputFromWindow(tv.windowToken, 0)
+        }
+    }
+
+    fun sendTextInputToTerminal(text: String) {
+        val submission = terminalTextInputSubmission(text, executeTextInputOnSend)
+        val targetSessionId = viewModel.pasteTextToActive(submission.pasteText) ?: return
+        if (submission.sendEnter) {
+            textInputSendScope.launch {
+                delay(submission.enterDelayMs)
+                viewModel.sendBytesToSession(
+                    targetSessionId,
+                    byteArrayOf('\r'.code.toByte())
+                )
+            }
         }
     }
 
@@ -902,13 +918,12 @@ fun SessionHostScreen(
                                     )
                                 },
                                 onSend = { text ->
-                                    val payload = terminalTextInputPayload(text, executeTextInputOnSend)
                                     // Clear and close before handing the bytes to the terminal. Some IMEs emit
                                     // a final stale onValueChange after their Send action; the visibility guard
                                     // above prevents that callback from restoring the submitted command.
                                     textInputDraftByProject[textInputProjectId] = TextFieldValue()
                                     textInputVisibleByProject[textInputProjectId] = false
-                                    viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
+                                    sendTextInputToTerminal(text)
                                 },
                                 onDismiss = {
                                     textInputVisibleByProject[textInputProjectId] = false
@@ -997,10 +1012,9 @@ fun SessionHostScreen(
                                             val draft = textInputDraftByProject[activeProjectId] ?: TextFieldValue()
                                             if (draft.text.isNotEmpty()) {
                                                 viewModel.saveTextInput(activeProjectId, draft.text)
-                                                val payload = terminalTextInputPayload(draft.text, executeTextInputOnSend)
                                                 textInputDraftByProject[activeProjectId] = TextFieldValue()
                                                 textInputVisibleByProject[activeProjectId] = false
-                                                viewModel.sendBytesToActive(payload.toByteArray(Charsets.UTF_8))
+                                                sendTextInputToTerminal(draft.text)
                                             }
                                         }
                                         (keyStr.length == 1 && keyStr[0] >= ' ' && keyStr[0] != '\u007F') || keyStr == "\t" -> {

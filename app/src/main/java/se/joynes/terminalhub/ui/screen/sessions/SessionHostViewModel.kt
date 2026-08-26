@@ -558,6 +558,11 @@ class SessionHostViewModel @Inject constructor(
     }
 
     fun sendBytesToActive(bytes: ByteArray) = sessionManager.sendBytesToActive(bytes)
+
+    fun pasteTextToActive(text: String): TerminalSessionId? = sessionManager.pasteTextToActive(text)
+
+    fun sendBytesToSession(id: TerminalSessionId, bytes: ByteArray) =
+        sessionManager.sendBytesToSession(id, bytes)
     fun resizeActivePty(cols: Int, rows: Int) = sessionManager.resizeActivePty(cols, rows)
 
     /** Returns the last 10 text-input history entries for a given project. */

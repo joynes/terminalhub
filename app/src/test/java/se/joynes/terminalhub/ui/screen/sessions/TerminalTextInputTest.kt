@@ -7,24 +7,41 @@ import org.junit.Test
 
 class TerminalTextInputTest {
     @Test
-    fun sendOnlyLeavesCommandWaitingInTerminal() {
-        assertEquals("git status", terminalTextInputPayload("git status", executeImmediately = false))
+    fun sendOnlyPastesCommandWithoutTerminalEnter() {
+        assertEquals(
+            TerminalTextInputSubmission("git status", sendEnter = false, enterDelayMs = 0L),
+            terminalTextInputSubmission("git status", executeImmediately = false)
+        )
     }
 
     @Test
-    fun executeImmediatelyAppendsTerminalEnter() {
-        assertEquals("git status\r", terminalTextInputPayload("git status", executeImmediately = true))
+    fun executeImmediatelySendsTerminalEnterSeparatelyAfterPasteSettles() {
+        assertEquals(
+            TerminalTextInputSubmission("git status", sendEnter = true, enterDelayMs = 350L),
+            terminalTextInputSubmission("git status", executeImmediately = true)
+        )
     }
 
     @Test
-    fun executeImmediatelyDoesNotDuplicateExistingLineEnding() {
-        assertEquals("git status\r", terminalTextInputPayload("git status\r", executeImmediately = true))
-        assertEquals("git status\n", terminalTextInputPayload("git status\n", executeImmediately = true))
+    fun executeImmediatelyMovesExistingLineEndingToSeparateEnter() {
+        assertEquals("git status", terminalTextInputSubmission("git status\r", true).pasteText)
+        assertEquals("git status", terminalTextInputSubmission("git status\n", true).pasteText)
+        assertEquals("git status", terminalTextInputSubmission("git status\r\n", true).pasteText)
     }
 
     @Test
-    fun executeImmediatelyPreservesMultilineTextAndAddsFinalEnter() {
-        assertEquals("first\nsecond\r", terminalTextInputPayload("first\nsecond", executeImmediately = true))
+    fun executeImmediatelyPreservesMultilinePasteAndSendsFinalEnterSeparately() {
+        val submission = terminalTextInputSubmission("first\nsecond", executeImmediately = true)
+
+        assertEquals("first\nsecond", submission.pasteText)
+        assertEquals(true, submission.sendEnter)
+    }
+
+    @Test
+    fun longInteractivePromptsGetEnoughTimeToLeavePasteMode() {
+        val submission = terminalTextInputSubmission("x".repeat(2_000), executeImmediately = true)
+
+        assertEquals(MAX_TEXT_INPUT_SUBMIT_DELAY_MS, submission.enterDelayMs)
     }
 
     @Test
