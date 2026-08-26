@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose an improvement to TerminalHub's mobile server-project workflow
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or workflow
+      description: Explain the server-project task that is difficult today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Product boundary
+      options:
+        - label: I understand that remote projects require a user-controlled SSH server.
+          required: true
+        - label: I have not included credentials or private server information.
+          required: true

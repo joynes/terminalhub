@@ -77,6 +77,21 @@ provides machine-readable entry points for AI assistants:
 - [`docs-index.json`](https://joynes.github.io/terminalhub/docs-index.json) for
   topic, anchor, and source-path discovery.
 
+## Community and Security
+
+- Use [GitHub Discussions](https://github.com/joynes/terminalhub/discussions)
+  for setup questions, workflow ideas, and general feedback.
+- Use [GitHub Issues](https://github.com/joynes/terminalhub/issues) for
+  reproducible bugs and implementation work.
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting code or detailed
+  diagnostics.
+- Read [SECURITY.md](SECURITY.md) for private vulnerability reporting and the
+  current SSH host-key trust limitation.
+- Read [ROADMAP.md](ROADMAP.md) for current priorities and product boundaries.
+
+Never post passwords, private keys, passphrases, tokens, private server details,
+or unredacted logs in a public issue or discussion.
+
 ## Relationship To Termux
 
 TerminalHub uses adapted terminal rendering and input components from the

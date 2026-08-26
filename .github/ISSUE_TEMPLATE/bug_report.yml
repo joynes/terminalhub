@@ -1,0 +1,67 @@
+name: Bug report
+description: Report reproducible behavior in the latest TerminalHub release
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include passwords, private keys, tokens, private server addresses, or unredacted logs. Report security vulnerabilities privately from the Security tab.
+  - type: input
+    id: version
+    attributes:
+      label: TerminalHub version
+      placeholder: "For example: 1.251"
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Android device and version
+      placeholder: "For example: Pixel 8, Android 16"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Server setup or authentication
+        - Project creation or Git clone
+        - Tabs, reconnect, or tmux
+        - Terminal rendering or input
+        - Upload, download, or Android sharing
+        - Link opening
+        - Import, export, logs, or settings
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Use sanitized example names and addresses.
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Optional. Remove credentials, hostnames, IP addresses, usernames, paths, repository URLs, and personal data.
+      render: shell

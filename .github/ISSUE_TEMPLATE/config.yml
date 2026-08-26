@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup and workflow questions
+    url: https://github.com/joynes/terminalhub/discussions
+    about: Ask for help or discuss an idea before turning it into an issue.
+  - name: Security vulnerability
+    url: https://github.com/joynes/terminalhub/security/advisories/new
+    about: Report vulnerabilities privately. Never put credentials in a report.
+  - name: Documentation
+    url: https://joynes.github.io/terminalhub/
+    about: Read setup, feature, security, troubleshooting, and architecture documentation.
