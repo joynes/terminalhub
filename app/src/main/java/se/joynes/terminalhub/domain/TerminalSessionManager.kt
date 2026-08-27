@@ -19,9 +19,13 @@ import kotlinx.coroutines.launch
 import se.joynes.terminalhub.data.logging.AppLogger
 import se.joynes.terminalhub.data.logging.LogLevel
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
+import se.joynes.terminalhub.data.runtime.BackgroundSshCommand
+import se.joynes.terminalhub.data.runtime.BackgroundSshEvent
+import se.joynes.terminalhub.data.runtime.BackgroundSshModeController
 import se.joynes.terminalhub.data.ssh.SshConnection
 import se.joynes.terminalhub.data.ssh.SshManager
 import se.joynes.terminalhub.data.ssh.TerminalSessionClientImpl
+import se.joynes.terminalhub.service.BackgroundSshService
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.UUID
@@ -55,7 +59,8 @@ class TerminalSessionManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sshManager: SshManager,
     private val logger: AppLogger,
-    private val runtimeRepository: AppRuntimeRepository
+    private val runtimeRepository: AppRuntimeRepository,
+    private val backgroundSshModeController: BackgroundSshModeController
 ) {
     private val prefs = context.getSharedPreferences("session_manager", Context.MODE_PRIVATE)
     private val _sessions = MutableStateFlow<List<TerminalSessionMeta>>(emptyList())
@@ -166,6 +171,7 @@ class TerminalSessionManager @Inject constructor(
             createdAt = now
         )
         entries[sessionId] = SessionEntry(meta, conn, terminalSession, scope, tmuxSessionName)
+        backgroundSshModeController.dispatch(BackgroundSshEvent.SshTabConnected)
         publishSessions()
         logger.log(LogLevel.INFO, TAG, "Session registered: $projectName")
         if (_activeId.value == null) switchTo(TerminalSessionId(sessionId))
@@ -273,6 +279,26 @@ class TerminalSessionManager @Inject constructor(
             _activeSession.value = next?.let { entries[it]?.terminalSession }
         }
         logger.log(LogLevel.INFO, TAG, "Session closed: $closedProjectName")
+        if (entries.values.none { it.conn != null }) {
+            val transition = backgroundSshModeController.dispatch(BackgroundSshEvent.LastSshTabClosed)
+            if (transition.command == BackgroundSshCommand.STOP_SERVICE_ONLY &&
+                runtimeRepository.state.value.foregroundServiceRunning
+            ) {
+                BackgroundSshService.requestStop(
+                    context,
+                    BackgroundSshService.STOP_REASON_LAST_SESSION_CLOSED,
+                    closeTransports = false
+                )
+            }
+        }
+    }
+
+    /** Closes SSH transports while deliberately leaving their remote tmux sessions alive. */
+    fun closeAllRemoteTransports() {
+        entries.values
+            .filter { it.conn != null }
+            .map { it.meta.id }
+            .forEach { close(it, killTmuxSession = false) }
     }
 
     /** Move session at [fromIndex] to [toIndex] in tab bar order. */

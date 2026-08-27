@@ -1,5 +1,13 @@
 package se.joynes.terminalhub.ui.screen.settings
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,16 +23,24 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveProfile
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveScope
+import se.joynes.terminalhub.data.runtime.BackgroundSshMode
 import se.joynes.terminalhub.ui.components.RetroButton
 import se.joynes.terminalhub.ui.components.RetroCard
 import se.joynes.terminalhub.ui.components.RetroTopBar
@@ -44,6 +60,64 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     val runtimeState by viewModel.runtimeState.collectAsState()
+    val backgroundSshMode by viewModel.backgroundSshMode.collectAsState()
+    val context = LocalContext.current
+    var showBackgroundSshConfirmation by remember { mutableStateOf(false) }
+
+    fun showStartResult(result: BackgroundSshStartResult) {
+        val message = when (result) {
+            BackgroundSshStartResult.STARTED -> "Background SSH started"
+            BackgroundSshStartResult.NO_ACTIVE_SSH_SESSIONS -> "Open an SSH terminal first"
+            BackgroundSshStartResult.NOTIFICATION_PERMISSION_REQUIRED -> "Notification permission is required"
+            BackgroundSshStartResult.START_FAILED -> "Could not start background SSH"
+        }
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    }
+
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            showStartResult(viewModel.startBackgroundSsh(notificationPermissionGranted = true))
+        } else {
+            viewModel.notificationPermissionDenied()
+            showStartResult(BackgroundSshStartResult.NOTIFICATION_PERMISSION_REQUIRED)
+        }
+    }
+
+    fun requestBackgroundSshStart() {
+        val notificationGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        if (notificationGranted) {
+            showStartResult(viewModel.startBackgroundSsh(notificationPermissionGranted = true))
+        } else {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    if (showBackgroundSshConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showBackgroundSshConfirmation = false },
+            title = { Text("KEEP SSH ACTIVE IN BACKGROUND?") },
+            text = {
+                Text(
+                    "TerminalHub will show an ongoing notification and may use battery and mobile data. " +
+                        "You can stop it from Settings or the notification; stopping closes SSH transports " +
+                        "but leaves tmux sessions running. Android or the network can still interrupt it, " +
+                        "so tmux remains the reliable fallback."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBackgroundSshConfirmation = false
+                    requestBackgroundSshStart()
+                }) { Text("START") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBackgroundSshConfirmation = false }) { Text("CANCEL") }
+            }
+        )
+    }
     Scaffold(
         topBar = { RetroTopBar(title = "SETTINGS", onBack = onBack) },
         containerColor = MegaDriveBg
@@ -81,15 +155,62 @@ fun SettingsScreen(
                 item {
                     SettingsCard(
                         title = "BACKGROUND STATUS",
-                        description = "Shows the runtime state used to explain the next reconnect. TerminalHub does not run a foreground service: tmux keeps remote work alive and the app reconnects when Android restarts its process."
+                        description = "Shows the current process and explicitly user-started background SSH state. tmux remains the fallback if Android or the network interrupts the app."
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             SettingsValue("App state", if (runtimeState.appInForeground) "Foreground" else "Background/unknown")
+                            SettingsValue("Background SSH", backgroundSshMode.name.lowercase().replaceFirstChar { it.uppercase() })
+                            SettingsValue("Foreground service", if (runtimeState.foregroundServiceRunning) "Running" else "Stopped")
                             SettingsValue("Tracked remote projects", runtimeState.remoteProjectIds.sorted().joinToString().ifBlank { "None" })
                             SettingsValue("Recovery pending", if (runtimeState.recoveryPending) "Yes" else "No")
                             SettingsValue("Last restart reason", runtimeState.lastProcessRestartReason ?: "None recorded")
                             SettingsValue("Last SSH drop", runtimeState.lastSshDisconnectSummary ?: "None recorded")
                         }
+                    }
+                }
+                item {
+                    SettingsCard(
+                        title = "KEEP SSH ACTIVE IN BACKGROUND",
+                        description = "Optional and off by default. Starts only after you enable it here while an SSH tab is open. It shows an ongoing notification and may use battery and mobile data."
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (settings.keepSshActiveInBackground) "Active" else "Off",
+                                color = MegaDriveOnSurface,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 12.sp
+                            )
+                            Switch(
+                                checked = settings.keepSshActiveInBackground,
+                                onCheckedChange = { enabled ->
+                                    if (enabled) showBackgroundSshConfirmation = true
+                                    else viewModel.stopBackgroundSsh()
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        RetroButton(
+                            text = "ANDROID BATTERY SETTINGS",
+                            onClick = {
+                                runCatching {
+                                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                }.onFailure {
+                                    Toast.makeText(context, "Battery settings are unavailable", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Optional: review Android battery settings if connections are interrupted. TerminalHub never requests exemption automatically.",
+                            color = MegaDriveDim,
+                            fontFamily = MonoFontFamily,
+                            fontSize = 11.sp
+                        )
                     }
                 }
                 item {

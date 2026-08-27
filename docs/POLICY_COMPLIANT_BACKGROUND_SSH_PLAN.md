@@ -1,8 +1,17 @@
 # Policy-compliant background SSH plan
 
-Status: implementation proposal
+Status: implemented in code; Google Play declaration and Internal-track validation pending
 
 Last reviewed: 2026-08-27
+
+Implementation notes (2026-08-27):
+
+- Added an off-by-default, user-started setting with an explanatory confirmation.
+- Added a `specialUse` `START_NOT_STICKY` foreground service and ongoing Stop notification.
+- Added notification permission handling, live SSH tab counts, and automatic stop after the final SSH tab.
+- Stop closes SSH transports without issuing `tmux kill-session`.
+- Process startup resets the mode to off, so it cannot silently restart.
+- Added reducer and notification-count tests for the required state transitions.
 
 ## Objective
 
