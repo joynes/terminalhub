@@ -15,7 +15,7 @@
     "file_upload_supported": true,
     "remote_download_documented_as_supported": true,
     "terminal_links_open_on_android": true,
-    "host_key_pinning": false,
+    "host_key_pinning": true,
     "termux_affiliation": false
   },
   "documents": [

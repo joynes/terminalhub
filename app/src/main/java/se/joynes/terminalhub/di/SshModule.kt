@@ -19,8 +19,9 @@ object SshModule {
     fun provideConnectionFactory(
         logger: AppLogger,
         settingsRepository: AppSettingsRepository,
-        runtimeRepository: AppRuntimeRepository
-    ): SshConnectionFactory = SshConnectionFactory(logger, settingsRepository, runtimeRepository)
+        runtimeRepository: AppRuntimeRepository,
+        hostKeyVerifier: TerminalHubHostKeyVerifier
+    ): SshConnectionFactory = SshConnectionFactory(logger, settingsRepository, runtimeRepository, hostKeyVerifier)
 
     @Provides
     @Singleton
@@ -40,5 +41,6 @@ object SshModule {
     fun provideSftpUploader(logger: AppLogger): SftpUploader = SftpUploader(logger)
 
     @Provides
-    fun provideScpDownloader(logger: AppLogger): ScpDownloader = ScpDownloader(logger)
+    fun provideScpDownloader(logger: AppLogger, hostKeyVerifier: TerminalHubHostKeyVerifier): ScpDownloader =
+        ScpDownloader(logger, hostKeyVerifier)
 }

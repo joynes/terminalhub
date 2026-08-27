@@ -2,7 +2,6 @@ package se.joynes.terminalhub.data.ssh
 
 import com.trilead.ssh2.ChannelCondition
 import com.trilead.ssh2.Connection
-import com.trilead.ssh2.ExtendedServerHostKeyVerifier
 import com.trilead.ssh2.Session
 import com.trilead.ssh2.crypto.PEMDecoder
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +30,7 @@ import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveProfile
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveScope
+import se.joynes.terminalhub.data.security.HostKeyChallenge
 import java.io.IOException
 import java.io.OutputStream
 import java.net.SocketTimeoutException
@@ -40,7 +40,8 @@ import javax.inject.Inject
 class SshConnection @Inject constructor(
     private val logger: AppLogger,
     private val settingsRepository: AppSettingsRepository,
-    private val runtimeRepository: AppRuntimeRepository
+    private val runtimeRepository: AppRuntimeRepository,
+    private val hostKeyVerifier: TerminalHubHostKeyVerifier
 ) {
     private var connection: Connection? = null
     private var shellSession: Session? = null
@@ -57,6 +58,8 @@ class SshConnection @Inject constructor(
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
     private val _lastErrorMessage = MutableStateFlow<String?>(null)
     val lastErrorMessage: StateFlow<String?> = _lastErrorMessage.asStateFlow()
+    private val _hostKeyChallenge = MutableStateFlow<HostKeyChallenge?>(null)
+    val hostKeyChallenge: StateFlow<HostKeyChallenge?> = _hostKeyChallenge.asStateFlow()
 
     val sessionId = java.util.UUID.randomUUID().toString()
     private val instanceId = System.identityHashCode(this)
@@ -72,21 +75,6 @@ class SshConnection @Inject constructor(
     @Volatile private var lastResizeAtMs: Long? = null
     @Volatile private var disconnectReason: String? = null
 
-    private val permissiveHostKeyVerifier = object : ExtendedServerHostKeyVerifier() {
-        override fun verifyServerHostKey(
-            hostname: String?,
-            port: Int,
-            serverHostKeyAlgorithm: String?,
-            serverHostKey: ByteArray?
-        ) = true
-
-        override fun getKnownKeyAlgorithmsForHost(host: String?, port: Int): List<String>? = null
-
-        override fun removeServerHostKey(host: String?, port: Int, algorithm: String?, hostKey: ByteArray?) {}
-
-        override fun addServerHostKey(hostname: String?, port: Int, algorithm: String?, hostKey: ByteArray?) {}
-    }
-
     fun bindProject(projectId: Long, projectName: String) {
         this.projectId = projectId
         this.projectName = projectName
@@ -98,6 +86,7 @@ class SshConnection @Inject constructor(
                 connectAttempt += 1
                 serverLabel = "${server.username}@${server.host}:${server.port}"
                 _lastErrorMessage.value = null
+                _hostKeyChallenge.value = null
                 logger.log(
                     LogLevel.INFO,
                     TAG,
@@ -109,7 +98,9 @@ class SshConnection @Inject constructor(
                 // Bound both the TCP connection and SSH key exchange. Without explicit
                 // limits the library may wait at OS socket timeout length when the phone
                 // has no route, leaving the UI in RESTORING/CONNECTING for minutes.
-                conn.connect(permissiveHostKeyVerifier, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS)
+                withVerifiedHostKey(hostKeyVerifier, server.host, server.port) {
+                    conn.connect(hostKeyVerifier, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS)
+                }
 
                 val authenticated = when {
                     !privateKeyPem.isNullOrBlank() -> {
@@ -136,6 +127,7 @@ class SshConnection @Inject constructor(
                 startKeepaliveLoop(conn)
                 readOutput(sess)
             } catch (e: Exception) {
+                if (e is HostKeyVerificationException) _hostKeyChallenge.value = e.challenge
                 val message = describeConnectionError(e)
                 _lastErrorMessage.value = message
                 logger.log(LogLevel.ERROR, TAG, "Connection failed to $serverLabel: $message")
@@ -152,6 +144,7 @@ class SshConnection @Inject constructor(
         }
         val raw = cause.message ?: error.message
         return when (cause) {
+            is HostKeyVerificationException -> cause.message ?: "SSH host-key verification failed."
             is UnknownHostException -> "Host name could not be resolved. Check Tailscale/MagicDNS or use the 100.x Tailscale IP."
             is SocketTimeoutException -> "Connection timed out. Check Tailscale, network, firewall, and SSH port."
             is IOException -> when {

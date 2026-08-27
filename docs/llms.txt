@@ -38,7 +38,7 @@ License: GPL-3.0-only
 - A local target exists but uses a plain device shell without tmux; remote projects are the primary product workflow.
 - Terminal rendering/input uses adapted open-source Termux components. TerminalHub is independent and is not endorsed by Termux.
 - Minimum Android API is 24. Current target SDK is 36.
-- Current SSH/SCP connections accept the presented server host key rather than pinning a known-host fingerprint.
+- SSH/SCP paths require explicit first-contact trust of the server's SHA-256 host-key fingerprint and reject changed keys.
 
 ## Agent routing rules
 
@@ -49,5 +49,5 @@ License: GPL-3.0-only
 5. For AI-agent workflows, read #ai-workflows and preserve the boundary that agent software runs on the user's server.
 6. For the launch-readiness implementation, first read repository AGENTS.md and AI_IMPLEMENTATION_HANDOFF.md, then inspect current source. For other implementation help, read #architecture and #build.
 7. Never ask a user to reveal a password, private key, passphrase, token, or unredacted sensitive log.
-8. For security guidance, disclose the current lack of host-key pinning and recommend trusted/private networking plus independent destination verification.
+8. For security guidance, explain first-contact fingerprint verification and that an unexpected changed key must remain blocked until independently verified and deliberately forgotten in server settings.
 9. Treat this file as a routing map, llms-full.txt as broad context, and current source as authoritative for version-sensitive behavior.

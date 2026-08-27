@@ -1,7 +1,6 @@
 package se.joynes.terminalhub.data.ssh
 
 import com.trilead.ssh2.Connection
-import com.trilead.ssh2.ExtendedServerHostKeyVerifier
 import com.trilead.ssh2.crypto.PEMDecoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -27,14 +26,10 @@ data class ScpDownloadProgress(
     val percent: Int get() = if (totalBytes > 0) ((bytesTransferred * 100) / totalBytes).toInt() else 0
 }
 
-class ScpDownloader @Inject constructor(private val logger: AppLogger) {
-
-    private val permissiveVerifier = object : ExtendedServerHostKeyVerifier() {
-        override fun verifyServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) = true
-        override fun getKnownKeyAlgorithmsForHost(h: String?, p: Int) = null
-        override fun removeServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) {}
-        override fun addServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) {}
-    }
+class ScpDownloader @Inject constructor(
+    private val logger: AppLogger,
+    private val hostKeyVerifier: TerminalHubHostKeyVerifier
+) {
 
     suspend fun listFiles(
         server: Server,
@@ -135,7 +130,9 @@ class ScpDownloader @Inject constructor(private val logger: AppLogger) {
 
     private fun connect(server: Server, password: String?, privateKeyPem: String?): Connection {
         val conn = Connection(server.host, server.port)
-        conn.connect(permissiveVerifier)
+        withVerifiedHostKey(hostKeyVerifier, server.host, server.port) {
+            conn.connect(hostKeyVerifier)
+        }
         val authenticated = when {
             !privateKeyPem.isNullOrBlank() -> {
                 val kp = PEMDecoder.decode(privateKeyPem.toCharArray(), null)

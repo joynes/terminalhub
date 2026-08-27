@@ -26,35 +26,31 @@ observed behavior, and the smallest sanitized log excerpt needed to understand
 the problem. Never include passwords, private keys, passphrases, tokens, or
 unredacted server data.
 
-## Current SSH trust limitation
+## SSH host-key trust
 
-Production release 1.251 and the current source at the time this policy was
-written accept the host key presented by an SSH or SCP server without comparing
-it with a previously trusted fingerprint. That means the app does not currently
-detect a server-key change and must not be treated as providing OpenSSH-style
-known-host protection.
+Current TerminalHub builds use explicit, OpenSSH-style host identity trust for
+terminal SSH, connection tests, SCP upload/download, and public-key installation.
+On first contact with a host and port, the connection is rejected until the user
+compares and explicitly trusts the displayed algorithm and `SHA256:` fingerprint.
 
-Until host-key pinning is shipped and verified:
+The trusted key is app-private and shared by profiles using the same normalized
+host and port; usernames do not create separate trust. A changed algorithm or
+key is blocked and never overwrites the trusted record. Verify a legitimate
+server replacement outside TerminalHub, then use **Forget trusted key** in the
+server editor and perform a fresh Test SSH verification. Treat an unexpected
+change as a possible interception attempt.
 
-- prefer a trusted private network or a private VPN;
-- verify that the hostname or IP address reaches the intended machine through
-  an independent control;
-- avoid using TerminalHub for high-sensitivity infrastructure over an untrusted
-  network; and
-- keep the app, Android device, remote SSH server, and authentication keys up to
-  date.
-
-This limitation is tracked as a release-readiness blocker. Documentation and
-marketing must not claim pinned host identity until the implementation and its
-key-change recovery flow have been tested.
+Older production builds which predate the host-key-trust release remain
+permissive. Check the installed release notes before relying on this protection.
 
 ## Local data boundary
 
 Server profiles, credentials, private keys, terminal history, logs, and project
 workspace state can be stored on the Android device. Project repositories and
 remote processes remain on the user's server. Configuration exports exclude
-passwords and private keys but can contain hostnames, usernames, paths, scripts,
-and repository URLs, so exports should still be treated as sensitive.
+passwords, private keys, and trusted host-key records, but can contain hostnames,
+usernames, paths, scripts, and repository URLs, so exports should still be
+treated as sensitive.
 
 See the [privacy policy](https://joynes.github.io/terminalhub/privacy-policy.html)
 and [complete documentation](https://joynes.github.io/terminalhub/) for the

@@ -14,6 +14,8 @@ The files in this directory are published at
   for another AI agent or maintainer.
 - `POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md` contains the Android and Google Play
   design for restoring optional background SSH continuity.
+- `RELEASE_NOTES_HOST_KEY_TRUST.md` documents first-contact fingerprint trust
+  and changed-key recovery.
 - `privacy-policy.html` is the web version of `privacy-policy.md`; keep their
   claims synchronized.
 - `assets/screenshots/` contains real Android emulator captures used in Google

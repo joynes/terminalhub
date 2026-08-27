@@ -86,7 +86,7 @@ provides machine-readable entry points for AI assistants:
 - Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting code or detailed
   diagnostics.
 - Read [SECURITY.md](SECURITY.md) for private vulnerability reporting and the
-  current SSH host-key trust limitation.
+  SSH host-key fingerprint trust and changed-key recovery model.
 - Read [ROADMAP.md](ROADMAP.md) for current priorities and product boundaries.
 
 Never post passwords, private keys, passphrases, tokens, private server details,

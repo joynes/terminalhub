@@ -289,7 +289,13 @@ tmux -V</code></pre></details>
           <li>Keep the private key on Android. Never paste the private key into <code>authorized_keys</code> or copy it to the server.</li>
           <li>Run <em>Test SSH</em>, then clear the one-time password if it is no longer needed.</li>
         </ol>
-        <div class="callout warning"><strong>Host-key verification is not pinned.</strong><p>The current SSH and SCP connections accept the server host key presented during connection instead of comparing it with a pinned known-host fingerprint. Use a trusted/private network, verify the destination through other controls, and do not treat TerminalHub as a managed enterprise SSH policy product.</p></div>
+        <h3>Verify the server host key</h3>
+        <ol>
+          <li>On first Test SSH or project connection, TerminalHub blocks the attempt and shows the host-key algorithm and <code>SHA256:</code> fingerprint.</li>
+          <li>Compare it with a fingerprint obtained independently from the intended server, then choose <em>Trust and retry</em>.</li>
+          <li>The same host and port must present that exact key for terminal, upload, download, and public-key installation connections.</li>
+        </ol>
+        <div class="callout warning"><strong>A changed host key is blocked.</strong><p>TerminalHub shows the trusted and newly presented fingerprints and never replaces the trusted key automatically. Verify a legitimate server replacement outside the app, open the server editor, confirm <em>Forget trusted key</em>, and run Test SSH again. The trust record is shared by profiles using the same host and port and is not included in configuration exports.</p></div>
       </section>
 
       <section class="doc-section" id="projects" data-search-title="Projects">

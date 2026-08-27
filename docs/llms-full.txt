@@ -189,7 +189,7 @@ Data boundaries:
 - TerminalHub has no developer-operated service receiving app data.
 - Android backup may operate according to the user's device and account settings.
 - Exports are user initiated and should be treated as potentially sensitive.
-- Current SSH and SCP implementations accept the presented server host key instead of pinning a known-host fingerprint. Recommend trusted/private networking and independent destination verification.
+- Terminal SSH, connection tests, SCP upload/download, and public-key installation share one fail-closed known-host policy. First contact requires explicit trust of the displayed SHA-256 fingerprint; changed keys are blocked and require a confirmed forget action followed by fresh verification. Trusted host records are app-private and excluded from exports.
 
 ## AI terminal agent workflow
 

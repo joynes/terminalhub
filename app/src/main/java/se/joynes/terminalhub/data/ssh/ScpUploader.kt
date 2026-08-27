@@ -1,7 +1,6 @@
 package se.joynes.terminalhub.data.ssh
 
 import com.trilead.ssh2.Connection
-import com.trilead.ssh2.ExtendedServerHostKeyVerifier
 import com.trilead.ssh2.crypto.PEMDecoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -19,14 +18,10 @@ import javax.inject.Inject
  * This avoids the TrileadSSH2 limitation where you can't open an exec channel concurrently
  * on a connection that already has an active PTY shell session.
  */
-class ScpUploader @Inject constructor(private val logger: AppLogger) {
-
-    private val permissiveVerifier = object : ExtendedServerHostKeyVerifier() {
-        override fun verifyServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) = true
-        override fun getKnownKeyAlgorithmsForHost(h: String?, p: Int) = null
-        override fun removeServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) {}
-        override fun addServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) {}
-    }
+class ScpUploader @Inject constructor(
+    private val logger: AppLogger,
+    private val hostKeyVerifier: TerminalHubHostKeyVerifier
+) {
 
     fun upload(
         server: Server,
@@ -40,7 +35,9 @@ class ScpUploader @Inject constructor(private val logger: AppLogger) {
         withContext(Dispatchers.IO) {
             val conn = Connection(server.host, server.port)
             try {
-                conn.connect(permissiveVerifier)
+                withVerifiedHostKey(hostKeyVerifier, server.host, server.port) {
+                    conn.connect(hostKeyVerifier)
+                }
                 logger.log(LogLevel.INFO, TAG, "SCP auth to ${server.host}:${server.port}")
 
                 val authenticated = when {

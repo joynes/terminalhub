@@ -15,6 +15,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -86,6 +87,7 @@ fun SessionHostScreen(
     val serverId by viewModel.serverId.collectAsState()
     val homeState by viewModel.homeState.collectAsState()
     val runtimeState by viewModel.runtimeState.collectAsState()
+    val hostKeyChallenges by viewModel.hostKeyChallenges.collectAsState()
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
     val executeTextInputOnSend by viewModel.executeTextInputOnSend.collectAsState()
@@ -118,6 +120,41 @@ fun SessionHostScreen(
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
     val exportImportState by exportImportViewModel.state.collectAsState()
     val textInputSendScope = rememberCoroutineScope()
+
+    hostKeyChallenges.entries.firstOrNull()?.let { (projectId, challenge) ->
+        val changed = challenge.kind == se.joynes.terminalhub.data.security.HostKeyChallengeKind.CHANGED
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissHostKeyChallenge(projectId) },
+            title = { Text(if (changed) "SSH HOST KEY CHANGED" else "TRUST SSH HOST?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (changed) {
+                            "Connection blocked. Verify the server outside TerminalHub. Open Servers, edit this endpoint, and deliberately forget its trusted key before testing again."
+                        } else {
+                            "First contact. Compare this fingerprint with the SSH server before trusting it."
+                        }
+                    )
+                    challenge.trustedFingerprint?.let {
+                        Text("Trusted: $it", fontFamily = MonoFontFamily, fontSize = 11.sp)
+                    }
+                    Text("Algorithm: ${challenge.presentedAlgorithm}", fontFamily = MonoFontFamily, fontSize = 11.sp)
+                    Text("Presented: ${challenge.presentedFingerprint}", fontFamily = MonoFontFamily, fontSize = 11.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (changed) viewModel.dismissHostKeyChallenge(projectId)
+                        else viewModel.trustHostKeyAndReconnect(projectId)
+                    }
+                ) { Text(if (changed) "OK" else "TRUST AND RECONNECT") }
+            },
+            dismissButton = if (changed) null else {
+                { TextButton(onClick = { viewModel.dismissHostKeyChallenge(projectId) }) { Text("CANCEL") } }
+            }
+        )
+    }
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain")

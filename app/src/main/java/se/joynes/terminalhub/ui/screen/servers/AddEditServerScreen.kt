@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.terminalhub.data.db.entity.ServerEntity
+import se.joynes.terminalhub.data.security.HostKeyChallengeKind
 import se.joynes.terminalhub.ui.components.*
 import se.joynes.terminalhub.ui.theme.*
 
@@ -24,9 +25,57 @@ fun AddEditServerScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val clipboardManager = LocalClipboardManager.current
+    var showForgetConfirmation by remember { mutableStateOf(false) }
 
     LaunchedEffect(serverId) { viewModel.loadServer(serverId) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
+
+    state.hostKeyChallenge?.let { challenge ->
+        val changed = challenge.kind == HostKeyChallengeKind.CHANGED
+        AlertDialog(
+            onDismissRequest = viewModel::cancelHostKeyChallenge,
+            title = { Text(if (changed) "SSH HOST KEY CHANGED" else "TRUST SSH HOST?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        if (changed) {
+                            "Connection blocked. This can indicate a reinstalled server or an attack. Verify the change outside TerminalHub. To continue, cancel, use Forget trusted key, then test SSH again."
+                        } else {
+                            "First contact with this host and port. Compare this fingerprint with the server before trusting it."
+                        }
+                    )
+                    challenge.trustedFingerprint?.let { Text("Trusted: $it", fontFamily = MonoFontFamily, fontSize = 11.sp) }
+                    Text("Presented algorithm: ${challenge.presentedAlgorithm}", fontFamily = MonoFontFamily, fontSize = 11.sp)
+                    Text("Presented: ${challenge.presentedFingerprint}", fontFamily = MonoFontFamily, fontSize = 11.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = if (changed) viewModel::cancelHostKeyChallenge else viewModel::trustPresentedHostKey
+                ) { Text(if (changed) "OK" else "TRUST AND RETRY") }
+            },
+            dismissButton = if (changed) null else {
+                { TextButton(onClick = viewModel::cancelHostKeyChallenge) { Text("CANCEL") } }
+            }
+        )
+    }
+
+    if (showForgetConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showForgetConfirmation = false },
+            title = { Text("FORGET TRUSTED KEY?") },
+            text = { Text("This affects every server profile using this host and port. The next connection will be blocked until you verify and trust its fingerprint again.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showForgetConfirmation = false
+                    viewModel.forgetTrustedHostKey()
+                }) { Text("FORGET") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgetConfirmation = false }) { Text("CANCEL") }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -60,6 +109,36 @@ fun AddEditServerScreen(
             HelpText("Usually 22. Change only if your SSH server uses another port.")
             RetroTextField(state.username, { viewModel.update { copy(username = it) } }, "SSH username *", Modifier.fillMaxWidth())
             HelpText("The user on the remote computer, not your Android user.")
+
+            SectionTitle("SSH HOST IDENTITY")
+            when {
+                state.knownHostStoreCorrupt -> {
+                    NeonStatusBadge("TRUST RECORD ERROR", MegaDriveError)
+                    HelpText("The local trusted-host record is corrupt. Forget it, then test SSH and verify the fingerprint again.")
+                }
+                state.knownHost != null -> {
+                    NeonStatusBadge("HOST KEY TRUSTED", MegaDriveGreen)
+                    state.knownHost?.let { knownHost ->
+                        Text(
+                            "${knownHost.algorithm}\n${knownHost.fingerprint}",
+                            color = MegaDriveOnSurface,
+                            fontSize = 10.sp,
+                            fontFamily = MonoFontFamily
+                        )
+                    }
+                }
+                else -> {
+                    NeonStatusBadge("HOST KEY NOT TRUSTED", MegaDriveWarning)
+                    HelpText("Test SSH to see and verify the server's SHA-256 host-key fingerprint.")
+                }
+            }
+            if (state.knownHost != null || state.knownHostStoreCorrupt) {
+                RetroButton(
+                    text = "[ FORGET TRUSTED KEY ]",
+                    onClick = { showForgetConfirmation = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             SectionTitle("2. AUTHENTICATION")
             RetroTextField(state.password, { viewModel.update { copy(password = it) } }, "One-time password (optional)", Modifier.fillMaxWidth(), isPassword = true)

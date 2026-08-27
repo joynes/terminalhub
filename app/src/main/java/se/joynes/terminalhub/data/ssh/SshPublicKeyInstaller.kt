@@ -1,7 +1,6 @@
 package se.joynes.terminalhub.data.ssh
 
 import com.trilead.ssh2.Connection
-import com.trilead.ssh2.ExtendedServerHostKeyVerifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import se.joynes.terminalhub.data.logging.AppLogger
@@ -14,15 +13,9 @@ import javax.inject.Singleton
 
 @Singleton
 class SshPublicKeyInstaller @Inject constructor(
-    private val logger: AppLogger
+    private val logger: AppLogger,
+    private val hostKeyVerifier: TerminalHubHostKeyVerifier
 ) {
-    private val permissiveVerifier = object : ExtendedServerHostKeyVerifier() {
-        override fun verifyServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) = true
-        override fun getKnownKeyAlgorithmsForHost(h: String?, p: Int) = null
-        override fun removeServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) {}
-        override fun addServerHostKey(h: String?, p: Int, a: String?, k: ByteArray?) {}
-    }
-
     suspend fun install(server: Server, password: String, publicKey: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -31,7 +24,9 @@ class SshPublicKeyInstaller @Inject constructor(
 
                 val conn = Connection(server.host, server.port)
                 try {
-                    conn.connect(permissiveVerifier)
+                    withVerifiedHostKey(hostKeyVerifier, server.host, server.port) {
+                        conn.connect(hostKeyVerifier)
+                    }
                     if (!conn.authenticateWithPassword(server.username, password)) {
                         throw IOException("SSH password authentication failed.")
                     }

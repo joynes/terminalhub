@@ -25,6 +25,9 @@ import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
+import se.joynes.terminalhub.data.security.HostKeyChallenge
+import se.joynes.terminalhub.data.security.HostKeyChallengeKind
+import se.joynes.terminalhub.data.security.KnownHostRepository
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.ssh.SshManager
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
@@ -99,7 +102,8 @@ class SessionHostViewModel @Inject constructor(
     val sessionManager: TerminalSessionManager,
     private val textInputHistoryDao: TextInputHistoryDao,
     private val settingsRepository: AppSettingsRepository,
-    private val runtimeRepository: AppRuntimeRepository
+    private val runtimeRepository: AppRuntimeRepository,
+    private val knownHosts: KnownHostRepository
 ) : ViewModel() {
     private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
     private val tabOrderKey = "project_tab_order"
@@ -112,6 +116,8 @@ class SessionHostViewModel @Inject constructor(
     private val _projectOrder = MutableStateFlow(loadProjectOrder())
     private val connectingProjectIds = MutableStateFlow<Set<Long>>(emptySet())
     private val connectionErrors = MutableStateFlow<Map<Long, String>>(emptyMap())
+    private val _hostKeyChallenges = MutableStateFlow<Map<Long, HostKeyChallenge>>(emptyMap())
+    val hostKeyChallenges: StateFlow<Map<Long, HostKeyChallenge>> = _hostKeyChallenges.asStateFlow()
 
     /** Combined tab list: open project tabs merged with live session state. */
     val projectTabs: StateFlow<List<ProjectTabState>> = combine(
@@ -329,6 +335,9 @@ class SessionHostViewModel @Inject constructor(
                 connectionErrors.value = connectionErrors.value - project.id
             }
             is SshConnectionAttemptResult.Failed -> {
+                conn.hostKeyChallenge.value?.let { challenge ->
+                    _hostKeyChallenges.value = _hostKeyChallenges.value + (project.id to challenge)
+                }
                 recordConnectionError(project, attempt.message)
                 sshManager.destroySession(conn.sessionId)
                 return
@@ -386,6 +395,24 @@ class SessionHostViewModel @Inject constructor(
             conn.awaitTransportQuiescence()
             conn.send("$aiCmd\n")
         }
+    }
+
+    fun trustHostKeyAndReconnect(projectId: Long) {
+        val challenge = _hostKeyChallenges.value[projectId] ?: return
+        if (challenge.kind != HostKeyChallengeKind.UNKNOWN) return
+        runCatching { knownHosts.trust(challenge) }
+            .onSuccess {
+                _hostKeyChallenges.value = _hostKeyChallenges.value - projectId
+                reconnectProject(projectId)
+            }
+            .onFailure { error ->
+                connectionErrors.value = connectionErrors.value +
+                    (projectId to (error.message ?: "Could not save the trusted host key."))
+            }
+    }
+
+    fun dismissHostKeyChallenge(projectId: Long) {
+        _hostKeyChallenges.value = _hostKeyChallenges.value - projectId
     }
 
     private fun activateLocalProject(project: Project, autoSwitch: Boolean) {
