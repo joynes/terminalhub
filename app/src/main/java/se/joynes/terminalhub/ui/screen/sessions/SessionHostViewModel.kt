@@ -7,7 +7,6 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -71,6 +70,14 @@ internal suspend fun awaitSshConnectionAttempt(
 } ?: SshConnectionAttemptResult.Failed(
     "Connection timed out. Check phone network, Tailscale, host, and SSH port, then try again."
 )
+
+internal fun recoveryProjectsInPriorityOrder(
+    projects: List<Project>,
+    preferredProjectId: Long?
+): List<Project> {
+    val primary = projects.firstOrNull { it.id == preferredProjectId } ?: projects.firstOrNull()
+    return if (primary == null) emptyList() else listOf(primary) + projects.filterNot { it.id == primary.id }
+}
 
 data class SessionHomeState(
     val serverCount: Int = 0,
@@ -150,8 +157,6 @@ class SessionHostViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.keyBarRows)
     val runtimeState = runtimeRepository.state
     private val connectingJobs = mutableMapOf<Long, Job>()
-    private var deferredRecoveryScheduled = false
-
     private val _serverId = MutableStateFlow<Long?>(null)
     val serverId: StateFlow<Long?> = _serverId.asStateFlow()
     private var selectedServerId: Long? = null
@@ -212,32 +217,21 @@ class SessionHostViewModel @Inject constructor(
                     val recoveryRemoteProjects = visible.filter {
                         it.targetType == ProjectTargetType.SSH && it.id in recoveryRemoteIds
                     }
-                    val primaryRecoveryProject = recoveryRemoteProjects.firstOrNull { it.id == preferredActive }
-                        ?: recoveryRemoteProjects.firstOrNull()
+                    val orderedRecoveryProjects = recoveryProjectsInPriorityOrder(
+                        recoveryRemoteProjects,
+                        preferredActive
+                    )
+                    val primaryRecoveryProject = orderedRecoveryProjects.firstOrNull()
 
                     visible.filter { it.targetType == ProjectTargetType.LOCAL }.forEach { localProject ->
                         activateProject(localProject, autoSwitch = primaryRecoveryProject == null && localProject.id == preferredActive)
                     }
 
-                    primaryRecoveryProject?.let { project ->
-                        activateProject(project, autoSwitch = true)
-                    }
-
-                    if (!deferredRecoveryScheduled) {
-                        deferredRecoveryScheduled = true
-                        val deferredProjects = recoveryRemoteProjects.filterNot { it.id == primaryRecoveryProject?.id }
-                        viewModelScope.launch {
-                            if (primaryRecoveryProject != null) delay(1500)
-                            deferredProjects.forEach { project ->
-                                logger.log(
-                                    LogLevel.INFO,
-                                    "SessionRecovery",
-                                    "Deferred recovery activation project=${project.name} reason=process-restart-followup"
-                                )
-                                activateProject(project, autoSwitch = false)
-                                delay(1200)
-                            }
-                        }
+                    // activateProject creates one coroutine and one SSH connection per project.
+                    // Invoke every activation immediately so reconnects proceed in parallel while
+                    // only the previously active project is allowed to take UI focus.
+                    orderedRecoveryProjects.forEachIndexed { index, project ->
+                        activateProject(project, autoSwitch = index == 0)
                     }
                 } else {
                     visible.filter { it.id in newlyAddedIds }.forEach { project ->
@@ -524,6 +518,10 @@ class SessionHostViewModel @Inject constructor(
     }
 
     fun reconnectProject(projectId: Long) {
+        reconnectProject(projectId, autoSwitch = true)
+    }
+
+    private fun reconnectProject(projectId: Long, autoSwitch: Boolean) {
         val project = _allDbProjects.value.find { it.id == projectId } ?: return
         val existingSessionId = sessionManager.sessions.value.firstOrNull { it.projectId == projectId }?.id
         existingSessionId?.let { sessionManager.close(it, killTmuxSession = false) }
@@ -532,14 +530,21 @@ class SessionHostViewModel @Inject constructor(
         sessionManager.markProjectOpen(projectId)
         logger.log(LogLevel.INFO, "SessionRecovery", "Manual reconnect requested for projectId=$projectId")
         viewModelScope.launch { projectRepo.updateLastOpenedAt(projectId, System.currentTimeMillis()) }
-        activateProject(project, autoSwitch = true)
+        activateProject(project, autoSwitch = autoSwitch)
     }
 
     fun reconnectAllDisconnected() {
+        val activeProjectId = sessionManager.sessions.value
+            .firstOrNull { it.id == activeId.value }
+            ?.projectId
         val disconnected = projectTabs.value.filter { tab ->
             tab.targetType == ProjectTargetType.SSH && !tab.isConnected && !tab.isConnecting
         }
-        disconnected.forEach { tab -> reconnectProject(tab.projectId) }
+        // Each call launches its own connection job immediately. Keep focus on the tab that was
+        // active when reconnect-all started instead of switching tabs as each connection finishes.
+        disconnected.forEach { tab ->
+            reconnectProject(tab.projectId, autoSwitch = tab.projectId == activeProjectId)
+        }
     }
 
     fun moveSession(fromIndex: Int, toIndex: Int) {
