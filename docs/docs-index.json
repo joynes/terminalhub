@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "product": "TerminalHub: SSH Project Tabs",
-  "snapshot_date": "2026-08-25",
+  "snapshot_date": "2026-08-27",
   "canonical_url": "https://joynes.github.io/terminalhub/",
   "repository": "https://github.com/joynes/terminalhub",
   "package": "se.joynes.terminalhub",
@@ -22,6 +22,8 @@
     {"id": "human-docs", "url": "https://joynes.github.io/terminalhub/", "format": "html", "purpose": "Complete human documentation with stable anchors"},
     {"id": "llms", "url": "https://joynes.github.io/terminalhub/llms.txt", "format": "text", "purpose": "Agent routing and canonical boundaries"},
     {"id": "llms-full", "url": "https://joynes.github.io/terminalhub/llms-full.txt", "format": "text", "purpose": "Consolidated agent context"},
+    {"id": "implementation-handoff", "url": "https://joynes.github.io/terminalhub/AI_IMPLEMENTATION_HANDOFF.md", "format": "markdown", "purpose": "Ordered implementation plan and acceptance criteria for launch-readiness work"},
+    {"id": "background-ssh-plan", "url": "https://joynes.github.io/terminalhub/POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md", "format": "markdown", "purpose": "Policy-compliant background SSH design and Play submission plan"},
     {"id": "privacy", "url": "https://joynes.github.io/terminalhub/privacy-policy.html", "format": "html", "purpose": "User-facing privacy policy"}
   ],
   "topics": [
@@ -41,11 +43,14 @@
     {"id": "limitations", "url": "https://joynes.github.io/terminalhub/#limitations", "keywords": ["unsupported", "non-goal", "background", "download", "local"]},
     {"id": "architecture", "url": "https://joynes.github.io/terminalhub/#architecture", "keywords": ["compose", "room", "hilt", "ssh", "source paths"]},
     {"id": "build", "url": "https://joynes.github.io/terminalhub/#build", "keywords": ["gradle", "test", "lint", "apk", "aab", "diagnostic"]},
+    {"id": "implementation-handoff", "url": "https://joynes.github.io/terminalhub/AI_IMPLEMENTATION_HANDOFF.md", "keywords": ["implementation", "host key", "fingerprint", "known hosts", "foreground service", "background SSH", "Google Play", "acceptance criteria"]},
     {"id": "agent-interface", "url": "https://joynes.github.io/terminalhub/#agent-interface", "keywords": ["AI support", "agent instructions", "diagnostics", "secrets"]},
     {"id": "reference", "url": "https://joynes.github.io/terminalhub/#reference", "keywords": ["package", "license", "sdk", "canonical facts"]}
   ],
   "source_entrypoints": {
     "agent_instructions": "AGENTS.md",
+    "launch_implementation_handoff": "docs/AI_IMPLEMENTATION_HANDOFF.md",
+    "background_ssh_plan": "docs/POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md",
     "navigation": "app/src/main/java/se/joynes/terminalhub/ui/navigation/AppNavGraph.kt",
     "session_ui": "app/src/main/java/se/joynes/terminalhub/ui/screen/sessions/SessionHostScreen.kt",
     "session_state": "app/src/main/java/se/joynes/terminalhub/ui/screen/sessions/SessionHostViewModel.kt",

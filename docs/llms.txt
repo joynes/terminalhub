@@ -14,6 +14,8 @@ License: GPL-3.0-only
 - [Complete feature inventory](https://joynes.github.io/terminalhub/#feature-inventory): Current user-visible capabilities plus internal/dormant routes.
 - [Full plain-text context](https://joynes.github.io/terminalhub/llms-full.txt): Consolidated facts and operating instructions without visual layout.
 - [Machine-readable documentation index](https://joynes.github.io/terminalhub/docs-index.json): Topic routing, stable anchors, keywords, and source paths.
+- [Implementation handoff](https://joynes.github.io/terminalhub/AI_IMPLEMENTATION_HANDOFF.md): Ordered, testable work plan for host-key trust, policy-compliant background SSH, releases, and launch artifacts.
+- [Background SSH policy plan](https://joynes.github.io/terminalhub/POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md): Android architecture, Play declaration, tests, rollout, and rollback.
 - [Privacy policy](https://joynes.github.io/terminalhub/privacy-policy.html): User-facing data handling policy.
 - [Repository README](https://github.com/joynes/terminalhub/blob/main/README.md): Product summary and contributor quick start.
 - [Agent instructions](https://github.com/joynes/terminalhub/blob/main/AGENTS.md): Rules that apply before changing this repository.
@@ -45,7 +47,7 @@ License: GPL-3.0-only
 3. For input problems, read #terminal and request Android version, device model, app version, screenshot, and sanitized log excerpt.
 4. For file transfer, use #files. Distinguish multi-file upload from top-level, file-only remote download.
 5. For AI-agent workflows, read #ai-workflows and preserve the boundary that agent software runs on the user's server.
-6. For implementation help, first read repository AGENTS.md, then #architecture and #build, then inspect current source.
+6. For the launch-readiness implementation, first read repository AGENTS.md and AI_IMPLEMENTATION_HANDOFF.md, then inspect current source. For other implementation help, read #architecture and #build.
 7. Never ask a user to reveal a password, private key, passphrase, token, or unredacted sensitive log.
 8. For security guidance, disclose the current lack of host-key pinning and recommend trusted/private networking plus independent destination verification.
 9. Treat this file as a routing map, llms-full.txt as broad context, and current source as authoritative for version-sensitive behavior.

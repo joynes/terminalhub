@@ -10,6 +10,10 @@ The files in this directory are published at
 - `llms.txt` is the short AI-agent routing file.
 - `llms-full.txt` is consolidated plain-text product and support context.
 - `docs-index.json` is the machine-readable topic and source-code map.
+- `AI_IMPLEMENTATION_HANDOFF.md` is the ordered, testable launch-readiness handoff
+  for another AI agent or maintainer.
+- `POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md` contains the Android and Google Play
+  design for restoring optional background SSH continuity.
 - `privacy-policy.html` is the web version of `privacy-policy.md`; keep their
   claims synchronized.
 - `assets/screenshots/` contains real Android emulator captures used in Google
