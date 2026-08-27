@@ -7,6 +7,8 @@ change after user feedback, security review, or Android platform changes.
 
 - Add explicit SSH host-key trust and changed-key rejection across terminal,
   upload, download, connection test, and public-key installation flows.
+- Design and validate the optional user-started background SSH mode described in
+  [docs/POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md](docs/POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md).
 - Provide a clear recovery flow when a server is intentionally rebuilt or its
   SSH host key changes.
 - Improve first-server and first-project guidance using feedback from real SSH
