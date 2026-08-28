@@ -9,9 +9,11 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -30,9 +32,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -51,6 +55,23 @@ import se.joynes.terminalhub.ui.theme.MegaDrivePrimary
 import se.joynes.terminalhub.ui.theme.MegaDriveSurface
 import se.joynes.terminalhub.ui.theme.MonoFontFamily
 
+internal enum class SettingsSectionId {
+    CONNECTIONS,
+    TERMINAL_INPUT,
+    ADVANCED,
+    STATUS
+}
+
+internal val settingsSectionOrder = listOf(
+    SettingsSectionId.CONNECTIONS,
+    SettingsSectionId.TERMINAL_INPUT,
+    SettingsSectionId.ADVANCED,
+    SettingsSectionId.STATUS
+)
+
+internal fun isSettingsSectionExpandedByDefault(section: SettingsSectionId): Boolean =
+    section == SettingsSectionId.CONNECTIONS || section == SettingsSectionId.TERMINAL_INPUT
+
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -63,6 +84,18 @@ fun SettingsScreen(
     val backgroundSshMode by viewModel.backgroundSshMode.collectAsState()
     val context = LocalContext.current
     var showBackgroundSshConfirmation by remember { mutableStateOf(false) }
+    var connectionsExpanded by rememberSaveable {
+        mutableStateOf(isSettingsSectionExpandedByDefault(SettingsSectionId.CONNECTIONS))
+    }
+    var terminalInputExpanded by rememberSaveable {
+        mutableStateOf(isSettingsSectionExpandedByDefault(SettingsSectionId.TERMINAL_INPUT))
+    }
+    var advancedExpanded by rememberSaveable {
+        mutableStateOf(isSettingsSectionExpandedByDefault(SettingsSectionId.ADVANCED))
+    }
+    var statusExpanded by rememberSaveable {
+        mutableStateOf(isSettingsSectionExpandedByDefault(SettingsSectionId.STATUS))
+    }
 
     fun showStartResult(result: BackgroundSshStartResult) {
         val message = when (result) {
@@ -134,65 +167,116 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    SettingsCard(
-                        title = "NAVIGATION",
-                        description = "Jump between active terminal sessions and server configuration from here."
+                    QuickAccessCard(
+                        onOpenSessions = onOpenSessions,
+                        onOpenServers = onOpenServers
+                    )
+                }
+                item {
+                    ExpandableSettingsSection(
+                        title = "CONNECTION & BACKGROUND",
+                        summary = "Background ${if (settings.keepSshActiveInBackground) "active" else "off"} · SSH keepalive ${if (settings.sshKeepaliveEnabled) "on" else "off"}",
+                        importance = "MOST IMPORTANT",
+                        expanded = connectionsExpanded,
+                        onExpandedChange = { connectionsExpanded = it }
                     ) {
+                        SettingsToggleRow(
+                            title = "Keep SSH active in background",
+                            description = "Recommended when switching apps. Uses an ongoing notification and may use battery and mobile data.",
+                            status = if (settings.keepSshActiveInBackground) "Active" else "Off",
+                            checked = settings.keepSshActiveInBackground,
+                            onCheckedChange = { enabled ->
+                                if (enabled) showBackgroundSshConfirmation = true
+                                else viewModel.stopBackgroundSsh()
+                            }
+                        )
+                        SettingsSeparator()
+                        SettingsToggleRow(
+                            title = "SSH keepalive",
+                            description = "Reduces silent disconnects while Android keeps TerminalHub running.",
+                            status = if (settings.sshKeepaliveEnabled) "Enabled" else "Disabled",
+                            checked = settings.sshKeepaliveEnabled,
+                            onCheckedChange = viewModel::setSshKeepaliveEnabled
+                        )
+                        SettingsSeparator()
+                        SettingsToggleRow(
+                            title = "Fast resume",
+                            description = "Restores terminal focus and redraw behavior quickly when returning to the app.",
+                            status = if (settings.preferFastResume) "Enabled" else "Disabled",
+                            checked = settings.preferFastResume,
+                            onCheckedChange = viewModel::setPreferFastResume
+                        )
+                    }
+                }
+                item {
+                    ExpandableSettingsSection(
+                        title = "TERMINAL & INPUT",
+                        summary = "Enter: ${if (settings.executeTextInputOnSend) "execute" else "text only"} · ${settings.keyBarRows.size} key bar rows",
+                        importance = "EVERYDAY CONTROLS",
+                        expanded = terminalInputExpanded,
+                        onExpandedChange = { terminalInputExpanded = it }
+                    ) {
+                        SettingsToggleRow(
+                            title = "Execute text input with Enter",
+                            description = "Runs text immediately in the terminal. Disable it when composing or reviewing multiline commands.",
+                            status = if (settings.executeTextInputOnSend) "Execute immediately" else "Send text only",
+                            checked = settings.executeTextInputOnSend,
+                            onCheckedChange = viewModel::setExecuteTextInputOnSend
+                        )
+                        SettingsSeparator()
+                        SettingsSubheading(
+                            title = "KEY BAR LAYOUT",
+                            description = "Tap a key to replace or remove it. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows. Included in export/import."
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        KeyBarSettingsEditor(
+                            rows = settings.keyBarRows,
+                            onRowsChange = viewModel::setKeyBarRows
+                        )
+                    }
+                }
+                item {
+                    ExpandableSettingsSection(
+                        title = "ADVANCED CONNECTION TUNING",
+                        summary = "${backgroundProfileLabel(settings.backgroundKeepaliveProfile)} · ${backgroundScopeLabel(settings.backgroundKeepaliveScope)}",
+                        importance = "OPTIONAL",
+                        expanded = advancedExpanded,
+                        onExpandedChange = { advancedExpanded = it }
+                    ) {
+                        SettingsSubheading(
+                            title = "KEEPALIVE PROFILE",
+                            description = "How often opportunistic keepalives run while the app remains in memory."
+                        )
+                        SettingsValue("Current", backgroundProfileLabel(settings.backgroundKeepaliveProfile))
+                        Spacer(Modifier.height(10.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            RetroButton(
-                                text = "SESSIONS",
-                                onClick = onOpenSessions,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            RetroButton(
-                                text = "SERVERS",
-                                onClick = onOpenServers,
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            BackgroundKeepaliveProfile.entries.forEach { profile ->
+                                RetroButton(
+                                    text = backgroundProfileLabel(profile).uppercase(),
+                                    onClick = { viewModel.setBackgroundKeepaliveProfile(profile) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = settings.backgroundKeepaliveProfile != profile
+                                )
+                            }
                         }
-                    }
-                }
-                item {
-                    SettingsCard(
-                        title = "BACKGROUND STATUS",
-                        description = "Shows the current process and explicitly user-started background SSH state. tmux remains the fallback if Android or the network interrupts the app."
-                    ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            SettingsValue("App state", if (runtimeState.appInForeground) "Foreground" else "Background/unknown")
-                            SettingsValue("Background SSH", backgroundSshMode.name.lowercase().replaceFirstChar { it.uppercase() })
-                            SettingsValue("Foreground service", if (runtimeState.foregroundServiceRunning) "Running" else "Stopped")
-                            SettingsValue("Tracked remote projects", runtimeState.remoteProjectIds.sorted().joinToString().ifBlank { "None" })
-                            SettingsValue("Recovery pending", if (runtimeState.recoveryPending) "Yes" else "No")
-                            SettingsValue("Last restart reason", runtimeState.lastProcessRestartReason ?: "None recorded")
-                            SettingsValue("Last SSH drop", runtimeState.lastSshDisconnectSummary ?: "None recorded")
+                        SettingsSeparator()
+                        SettingsSubheading(
+                            title = "KEEPALIVE SCOPE",
+                            description = "Active tab only uses the least background network traffic."
+                        )
+                        SettingsValue("Current", backgroundScopeLabel(settings.backgroundKeepaliveScope))
+                        Spacer(Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BackgroundKeepaliveScope.entries.forEach { scope ->
+                                RetroButton(
+                                    text = backgroundScopeLabel(scope).uppercase(),
+                                    onClick = { viewModel.setBackgroundKeepaliveScope(scope) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = settings.backgroundKeepaliveScope != scope
+                                )
+                            }
                         }
-                    }
-                }
-                item {
-                    SettingsCard(
-                        title = "KEEP SSH ACTIVE IN BACKGROUND",
-                        description = "Optional and off by default. Starts only after you enable it here while an SSH tab is open. It shows an ongoing notification and may use battery and mobile data."
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                if (settings.keepSshActiveInBackground) "Active" else "Off",
-                                color = MegaDriveOnSurface,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 12.sp
-                            )
-                            Switch(
-                                checked = settings.keepSshActiveInBackground,
-                                onCheckedChange = { enabled ->
-                                    if (enabled) showBackgroundSshConfirmation = true
-                                    else viewModel.stopBackgroundSsh()
-                                }
-                            )
-                        }
-                        Spacer(Modifier.height(12.dp))
+                        SettingsSeparator()
                         RetroButton(
                             text = "ANDROID BATTERY SETTINGS",
                             onClick = {
@@ -206,7 +290,7 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Optional: review Android battery settings if connections are interrupted. TerminalHub never requests exemption automatically.",
+                            "TerminalHub never requests a battery-optimization exemption automatically.",
                             color = MegaDriveDim,
                             fontFamily = MonoFontFamily,
                             fontSize = 11.sp
@@ -214,154 +298,21 @@ fun SettingsScreen(
                     }
                 }
                 item {
-                    SettingsCard(
-                        title = "FAST RESUME",
-                        description = "Keeps terminal focus and redraw behavior snappier when the app returns to foreground. It no longer stays active in background, so it should not keep burning battery while the app is hidden."
+                    ExpandableSettingsSection(
+                        title = "STATUS & DIAGNOSTICS",
+                        summary = "${if (runtimeState.appInForeground) "Foreground" else "Background"} · service ${if (runtimeState.foregroundServiceRunning) "running" else "stopped"}",
+                        importance = "TROUBLESHOOTING",
+                        expanded = statusExpanded,
+                        onExpandedChange = { statusExpanded = it }
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                if (settings.preferFastResume) "Enabled" else "Disabled",
-                                color = MegaDriveOnSurface,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 12.sp
-                            )
-                            Switch(
-                                checked = settings.preferFastResume,
-                                onCheckedChange = viewModel::setPreferFastResume
-                            )
-                        }
-                    }
-                }
-                item {
-                    SettingsCard(
-                        title = "TEXT INPUT ENTER",
-                        description = "When enabled, Send/Enter in the large text input also sends Enter to the terminal, so the command runs immediately. Keep it disabled when composing multi-line text or when you want to review the command in the terminal first."
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                if (settings.executeTextInputOnSend) "Execute immediately" else "Send text only",
-                                color = MegaDriveOnSurface,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 12.sp
-                            )
-                            Switch(
-                                checked = settings.executeTextInputOnSend,
-                                onCheckedChange = viewModel::setExecuteTextInputOnSend
-                            )
-                        }
-                    }
-                }
-                item {
-                    SettingsCard(
-                        title = "TERMINAL KEY BAR",
-                        description = "Tap a key to replace or remove it. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows. The layout is included in app export/import backups."
-                    ) {
-                        KeyBarSettingsEditor(
-                            rows = settings.keyBarRows,
-                            onRowsChange = viewModel::setKeyBarRows
-                        )
-                    }
-                }
-                item {
-                    SettingsCard(
-                        title = "SSH KEEPALIVE",
-                        description = "Sends SSH keepalive traffic to reduce silent disconnects while Android keeps the app process alive. tmux preserves remote work if Android stops the process."
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                if (settings.sshKeepaliveEnabled) "Enabled" else "Disabled",
-                                color = MegaDriveOnSurface,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 12.sp
-                            )
-                            Switch(
-                                checked = settings.sshKeepaliveEnabled,
-                                onCheckedChange = viewModel::setSshKeepaliveEnabled
-                            )
-                        }
-                    }
-                }
-                item {
-                    SettingsCard(
-                        title = "BACKGROUND KEEPALIVE PROFILE",
-                        description = "Controls opportunistic keepalive timing while the app remains in memory. Android may still stop background networking; TerminalHub then reconnects to the tmux session when reopened."
-                    ) {
-                        SettingsValue(
-                            "Current profile",
-                            when (settings.backgroundKeepaliveProfile) {
-                                BackgroundKeepaliveProfile.AGGRESSIVE -> "Aggressive (30s)"
-                                BackgroundKeepaliveProfile.BALANCED -> "Balanced (2 min)"
-                                BackgroundKeepaliveProfile.BATTERY_SAVER -> "Battery saver (5 min)"
-                                BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER -> "Ultra battery saver (10 min)"
-                            }
-                        )
-                        Spacer(Modifier.height(12.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            RetroButton(
-                                text = "AGGRESSIVE (30s)",
-                                onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.AGGRESSIVE) },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.AGGRESSIVE
-                            )
-                            RetroButton(
-                                text = "BALANCED (2 MIN)",
-                                onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.BALANCED) },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.BALANCED
-                            )
-                            RetroButton(
-                                text = "BATTERY SAVER (5 MIN)",
-                                onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.BATTERY_SAVER) },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.BATTERY_SAVER
-                            )
-                            RetroButton(
-                                text = "ULTRA BATTERY SAVER (10 MIN)",
-                                onClick = { viewModel.setBackgroundKeepaliveProfile(BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER) },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = settings.backgroundKeepaliveProfile != BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER
-                            )
-                        }
-                    }
-                }
-                item {
-                    SettingsCard(
-                        title = "BACKGROUND KEEPALIVE SCOPE",
-                        description = "Controls which SSH tabs receive opportunistic keepalives while the app remains in memory. Active tab only uses the least background network traffic."
-                    ) {
-                        SettingsValue(
-                            "Current scope",
-                            when (settings.backgroundKeepaliveScope) {
-                                BackgroundKeepaliveScope.ALL_SESSIONS -> "All SSH sessions"
-                                BackgroundKeepaliveScope.ACTIVE_TAB_ONLY -> "Active tab only"
-                            }
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            RetroButton(
-                                text = "ACTIVE TAB ONLY",
-                                onClick = { viewModel.setBackgroundKeepaliveScope(BackgroundKeepaliveScope.ACTIVE_TAB_ONLY) },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = settings.backgroundKeepaliveScope != BackgroundKeepaliveScope.ACTIVE_TAB_ONLY
-                            )
-                            RetroButton(
-                                text = "ALL SESSIONS",
-                                onClick = { viewModel.setBackgroundKeepaliveScope(BackgroundKeepaliveScope.ALL_SESSIONS) },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled = settings.backgroundKeepaliveScope != BackgroundKeepaliveScope.ALL_SESSIONS
-                            )
+                            SettingsValue("App state", if (runtimeState.appInForeground) "Foreground" else "Background/unknown")
+                            SettingsValue("Background SSH", backgroundSshMode.name.lowercase().replaceFirstChar { it.uppercase() })
+                            SettingsValue("Foreground service", if (runtimeState.foregroundServiceRunning) "Running" else "Stopped")
+                            SettingsValue("Tracked remote projects", runtimeState.remoteProjectIds.sorted().joinToString().ifBlank { "None" })
+                            SettingsValue("Recovery pending", if (runtimeState.recoveryPending) "Yes" else "No")
+                            SettingsValue("Last restart reason", runtimeState.lastProcessRestartReason ?: "None recorded")
+                            SettingsValue("Last SSH drop", runtimeState.lastSshDisconnectSummary ?: "None recorded")
                         }
                     }
                 }
@@ -371,10 +322,9 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun SettingsCard(
-    title: String,
-    description: String,
-    content: @Composable () -> Unit
+private fun QuickAccessCard(
+    onOpenSessions: () -> Unit,
+    onOpenServers: () -> Unit
 ) {
     RetroCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -384,22 +334,177 @@ private fun SettingsCard(
                 .padding(12.dp)
         ) {
             Text(
-                title,
+                "QUICK ACCESS",
                 color = MegaDrivePrimary,
                 fontFamily = MonoFontFamily,
-                fontSize = 14.sp
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                RetroButton(
+                    text = "SESSIONS",
+                    onClick = onOpenSessions,
+                    modifier = Modifier.weight(1f)
+                )
+                RetroButton(
+                    text = "SERVERS",
+                    onClick = onOpenServers,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpandableSettingsSection(
+    title: String,
+    summary: String,
+    importance: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    RetroCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MegaDriveSurface)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onExpandedChange(!expanded) }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        importance,
+                        color = MegaDriveDim,
+                        fontFamily = MonoFontFamily,
+                        fontSize = 10.sp
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        title,
+                        color = MegaDrivePrimary,
+                        fontFamily = MonoFontFamily,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        summary,
+                        color = MegaDriveOnSurface,
+                        fontFamily = MonoFontFamily,
+                        fontSize = 11.sp
+                    )
+                }
+                Text(
+                    if (expanded) "[-]" else "[+]",
+                    color = MegaDrivePrimary,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            if (expanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    content = content
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsToggleRow(
+    title: String,
+    description: String,
+    status: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                title,
+                color = MegaDriveOnSurface,
+                fontFamily = MonoFontFamily,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(4.dp))
             Text(
                 description,
                 color = MegaDriveDim,
                 fontFamily = MonoFontFamily,
-                fontSize = 12.sp
+                fontSize = 11.sp
             )
-            Spacer(Modifier.height(12.dp))
-            content()
+            Spacer(Modifier.height(4.dp))
+            Text(
+                status,
+                color = MegaDrivePrimary,
+                fontFamily = MonoFontFamily,
+                fontSize = 11.sp
+            )
         }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
+}
+
+@Composable
+private fun SettingsSubheading(title: String, description: String) {
+    Column {
+        Text(
+            title,
+            color = MegaDriveOnSurface,
+            fontFamily = MonoFontFamily,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            description,
+            color = MegaDriveDim,
+            fontFamily = MonoFontFamily,
+            fontSize = 11.sp
+        )
+    }
+}
+
+@Composable
+private fun SettingsSeparator() {
+    Spacer(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MegaDriveDim.copy(alpha = 0.3f))
+    )
+}
+
+internal fun backgroundProfileLabel(profile: BackgroundKeepaliveProfile): String = when (profile) {
+    BackgroundKeepaliveProfile.AGGRESSIVE -> "Aggressive (30 sec)"
+    BackgroundKeepaliveProfile.BALANCED -> "Balanced (2 min)"
+    BackgroundKeepaliveProfile.BATTERY_SAVER -> "Battery saver (5 min)"
+    BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER -> "Ultra battery saver (10 min)"
+}
+
+internal fun backgroundScopeLabel(scope: BackgroundKeepaliveScope): String = when (scope) {
+    BackgroundKeepaliveScope.ACTIVE_TAB_ONLY -> "Active tab only"
+    BackgroundKeepaliveScope.ALL_SESSIONS -> "All SSH sessions"
 }
 
 @Composable
