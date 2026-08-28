@@ -245,7 +245,11 @@ class TerminalSessionManager @Inject constructor(
         publishSessions()
     }
 
-    fun close(id: TerminalSessionId, killTmuxSession: Boolean = false) {
+    fun close(
+        id: TerminalSessionId,
+        killTmuxSession: Boolean = false,
+        selectReplacementIfActive: Boolean = true
+    ) {
         val entry = entries.remove(id.value) ?: return
         val closedProjectName = entry.meta.projectName
         val closedMeta = entry.meta.copy(isConnected = false)
@@ -273,7 +277,7 @@ class TerminalSessionManager @Inject constructor(
         }
         publishSessions()
 
-        if (_activeId.value == id) {
+        if (_activeId.value == id && selectReplacementIfActive) {
             val next = entries.keys.firstOrNull()
             _activeId.value = next?.let { TerminalSessionId(it) }
             _activeSession.value = next?.let { entries[it]?.terminalSession }

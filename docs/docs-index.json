@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "product": "TerminalHub: SSH Project Tabs",
-  "snapshot_date": "2026-08-27",
+  "snapshot_date": "2026-08-28",
   "canonical_url": "https://joynes.github.io/terminalhub/",
   "repository": "https://github.com/joynes/terminalhub",
   "package": "se.joynes.terminalhub",
@@ -10,6 +10,7 @@
     "primary_target": "user-controlled SSH server",
     "remote_persistence": "tmux",
     "background_ssh_guaranteed": false,
+    "optional_user_started_background_ssh": true,
     "server_hosting_included": false,
     "ai_included": false,
     "file_upload_supported": true,

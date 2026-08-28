@@ -125,6 +125,12 @@ Open sequence:
 - TerminalHub stores which tabs are open, their order, and the active tab.
 - When SSH fails, the tab can show connection failure and offer Reconnect.
 - When several tabs are disconnected, Reconnect all is available.
+- Reconnect all starts connections in parallel and preserves the tab that was
+  active when the action began.
+- Identical first-contact host-key prompts from tabs using the same host and port
+  are grouped into one trust decision and then reconnect together.
+- After the first successful SSH connection, a one-time opt-in prompt recommends
+  background SSH for users who frequently switch apps. It never enables itself.
 - tmux is the source of server-side persistence; saved Android tabs are the source of workspace reconstruction.
 
 ## Terminal functions
@@ -206,7 +212,9 @@ TerminalHub does not control model billing, authentication, permissions, sandbox
 
 - Not a full Termux/Linux distribution running solely on Android.
 - Does not supply cloud servers or SSH accounts.
-- Does not guarantee background SSH continuity.
+- Optional user-started background SSH can reduce reconnects while switching
+  apps, but Android or the network can still interrupt it; tmux remains the
+  reliable persistence fallback.
 - Does not bundle an AI model or terminal agent.
 - Not affiliated with or endorsed by Termux.
 - Remote download lists top-level regular files only; it is not a recursive remote file manager.

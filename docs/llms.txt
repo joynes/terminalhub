@@ -30,7 +30,9 @@ License: GPL-3.0-only
 - Servers are supplied and controlled by the user; TerminalHub does not provide hosting.
 - TerminalHub stores project/server profiles and open tab order on Android.
 - tmux on the server keeps remote shells and processes alive across disconnects.
-- TerminalHub reconnects saved tabs; it does not promise a permanently live background SSH socket.
+- TerminalHub offers an optional, explicitly user-started foreground-service mode
+  to reduce reconnects while switching apps. It does not promise uninterrupted
+  background SSH; tmux remains the persistence fallback.
 - Multi-file upload from Android into the active remote project is supported, including Android Share-to-TerminalHub.
 - Remote download is supported for top-level regular files in an SSH project's folder. Android chooses the destination, and a completed download can be opened in a compatible app.
 - HTTP(S) and www links in terminal output can be tapped to open in Android's browser or a compatible app. Selected URL text also provides an Open action.

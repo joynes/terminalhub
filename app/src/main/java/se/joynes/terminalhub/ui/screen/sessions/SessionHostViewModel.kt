@@ -25,7 +25,11 @@ import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
+import se.joynes.terminalhub.data.runtime.BackgroundSshCommand
+import se.joynes.terminalhub.data.runtime.BackgroundSshEvent
+import se.joynes.terminalhub.data.runtime.BackgroundSshModeController
 import se.joynes.terminalhub.data.security.HostKeyChallenge
+import se.joynes.terminalhub.data.security.HostKeyCheckResult
 import se.joynes.terminalhub.data.security.HostKeyChallengeKind
 import se.joynes.terminalhub.data.security.KnownHostRepository
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
@@ -35,6 +39,7 @@ import se.joynes.terminalhub.domain.TerminalSessionId
 import se.joynes.terminalhub.domain.TerminalSessionManager
 import se.joynes.terminalhub.domain.TerminalSessionMeta
 import se.joynes.terminalhub.domain.usecase.ConnectToServer
+import se.joynes.terminalhub.service.BackgroundSshService
 import javax.inject.Inject
 
 /**
@@ -82,6 +87,28 @@ internal fun recoveryProjectsInPriorityOrder(
     return if (primary == null) emptyList() else listOf(primary) + projects.filterNot { it.id == primary.id }
 }
 
+data class HostKeyPrompt(
+    val challenge: HostKeyChallenge,
+    val projectIds: Set<Long>
+)
+
+internal fun groupHostKeyChallenges(challenges: Map<Long, HostKeyChallenge>): List<HostKeyPrompt> =
+    challenges.entries
+        .groupBy({ it.value }, { it.key })
+        .map { (challenge, projectIds) -> HostKeyPrompt(challenge, projectIds.toSet()) }
+
+internal fun shouldShowBackgroundSshRecommendation(
+    recommendationHandled: Boolean,
+    keepSshActiveInBackground: Boolean,
+    connectedRemoteSessionCount: Int
+): Boolean = !recommendationHandled && !keepSshActiveInBackground && connectedRemoteSessionCount > 0
+
+internal fun shouldSwitchToReplacementSession(
+    autoSwitch: Boolean,
+    replacementSessionId: TerminalSessionId?,
+    activeSessionId: TerminalSessionId?
+): Boolean = autoSwitch || (replacementSessionId != null && replacementSessionId == activeSessionId)
+
 data class SessionHomeState(
     val serverCount: Int = 0,
     val projectCount: Int = 0,
@@ -92,7 +119,7 @@ data class SessionHomeState(
 
 @HiltViewModel
 class SessionHostViewModel @Inject constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     private val logger: AppLogger,
     private val serverRepo: ServerRepository,
     private val projectRepo: ProjectRepository,
@@ -103,7 +130,8 @@ class SessionHostViewModel @Inject constructor(
     private val textInputHistoryDao: TextInputHistoryDao,
     private val settingsRepository: AppSettingsRepository,
     private val runtimeRepository: AppRuntimeRepository,
-    private val knownHosts: KnownHostRepository
+    private val knownHosts: KnownHostRepository,
+    private val backgroundSshModeController: BackgroundSshModeController
 ) : ViewModel() {
     private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
     private val tabOrderKey = "project_tab_order"
@@ -117,7 +145,13 @@ class SessionHostViewModel @Inject constructor(
     private val connectingProjectIds = MutableStateFlow<Set<Long>>(emptySet())
     private val connectionErrors = MutableStateFlow<Map<Long, String>>(emptyMap())
     private val _hostKeyChallenges = MutableStateFlow<Map<Long, HostKeyChallenge>>(emptyMap())
-    val hostKeyChallenges: StateFlow<Map<Long, HostKeyChallenge>> = _hostKeyChallenges.asStateFlow()
+    val hostKeyPrompts: StateFlow<List<HostKeyPrompt>> = _hostKeyChallenges
+        .map(::groupHostKeyChallenges)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val _trustingHostKeys = MutableStateFlow<Set<HostKeyChallenge>>(emptySet())
+    val trustingHostKeys: StateFlow<Set<HostKeyChallenge>> = _trustingHostKeys.asStateFlow()
+    private val _uiMessages = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    val uiMessages: SharedFlow<String> = _uiMessages.asSharedFlow()
 
     /** Combined tab list: open project tabs merged with live session state. */
     val projectTabs: StateFlow<List<ProjectTabState>> = combine(
@@ -162,6 +196,20 @@ class SessionHostViewModel @Inject constructor(
             .map { it.keyBarRows }
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.keyBarRows)
     val runtimeState = runtimeRepository.state
+    val showBackgroundSshRecommendation: StateFlow<Boolean> = combine(
+        settingsRepository.settings,
+        sessionManager.sessions,
+        runtimeRepository.state
+    ) { settings, sessions, runtime ->
+        val connectedRemoteCount = sessions.count {
+            it.isConnected && it.projectId in runtime.remoteProjectIds
+        }
+        shouldShowBackgroundSshRecommendation(
+            recommendationHandled = settings.backgroundSshRecommendationHandled,
+            keepSshActiveInBackground = settings.keepSshActiveInBackground,
+            connectedRemoteSessionCount = connectedRemoteCount
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val connectingJobs = mutableMapOf<Long, Job>()
     private val _serverId = MutableStateFlow<Long?>(null)
     val serverId: StateFlow<Long?> = _serverId.asStateFlow()
@@ -275,10 +323,14 @@ class SessionHostViewModel @Inject constructor(
         logger.log(LogLevel.INFO, "SessionHostViewModel", "Created default diagnostic local project")
     }
 
-    private fun activateProject(project: Project, autoSwitch: Boolean = false) {
+    private fun activateProject(
+        project: Project,
+        autoSwitch: Boolean = false,
+        replacementSessionId: TerminalSessionId? = null
+    ) {
         if (project.id in connectingProjectIds.value) return
         // Already registered as a session
-        if (sessionManager.sessions.value.any { it.projectId == project.id }) return
+        if (replacementSessionId == null && sessionManager.sessions.value.any { it.projectId == project.id }) return
         connectionErrors.value = connectionErrors.value - project.id
         connectingProjectIds.value = connectingProjectIds.value + project.id
 
@@ -286,7 +338,7 @@ class SessionHostViewModel @Inject constructor(
             try {
                 when (project.targetType) {
                     ProjectTargetType.LOCAL -> activateLocalProject(project, autoSwitch)
-                    ProjectTargetType.SSH -> activateSshProject(project, autoSwitch)
+                    ProjectTargetType.SSH -> activateSshProject(project, autoSwitch, replacementSessionId)
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
@@ -311,7 +363,11 @@ class SessionHostViewModel @Inject constructor(
         logger.log(LogLevel.WARN, "SessionRecovery", "Connection failed project=${project.name}: $message")
     }
 
-    private suspend fun activateSshProject(project: Project, autoSwitch: Boolean) {
+    private suspend fun activateSshProject(
+        project: Project,
+        autoSwitch: Boolean,
+        replacementSessionId: TerminalSessionId?
+    ) {
         val reason = when {
             runtimeRepository.state.value.recoveryPending &&
                 project.id in runtimeRepository.state.value.recoveryRemoteProjectIds -> "process-restart-recovery"
@@ -361,6 +417,11 @@ class SessionHostViewModel @Inject constructor(
             conn.awaitTransportQuiescence()
         }
         if (!sessionManager.isProjectClosed(project.id)) {
+            val switchToReplacement = shouldSwitchToReplacementSession(
+                autoSwitch = autoSwitch,
+                replacementSessionId = replacementSessionId,
+                activeSessionId = activeId.value
+            )
             sessionManager.register(
                 conn.sessionId,
                 conn,
@@ -370,7 +431,12 @@ class SessionHostViewModel @Inject constructor(
                 tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null,
                 lastOpenedAt = project.lastOpenedAt
             )
-            if (autoSwitch) sessionManager.switchTo(TerminalSessionId(conn.sessionId))
+            replacementSessionId?.let {
+                sessionManager.close(it, killTmuxSession = false, selectReplacementIfActive = false)
+            }
+            if (switchToReplacement) {
+                sessionManager.switchTo(TerminalSessionId(conn.sessionId))
+            }
         } else {
             sshManager.destroySession(conn.sessionId)
             return
@@ -397,22 +463,88 @@ class SessionHostViewModel @Inject constructor(
         }
     }
 
-    fun trustHostKeyAndReconnect(projectId: Long) {
-        val challenge = _hostKeyChallenges.value[projectId] ?: return
+    fun trustHostKeyAndReconnect(prompt: HostKeyPrompt) {
+        val challenge = prompt.challenge
         if (challenge.kind != HostKeyChallengeKind.UNKNOWN) return
-        runCatching { knownHosts.trust(challenge) }
-            .onSuccess {
-                _hostKeyChallenges.value = _hostKeyChallenges.value - projectId
-                reconnectProject(projectId)
+        if (challenge in _trustingHostKeys.value) return
+        viewModelScope.launch {
+            _trustingHostKeys.value = _trustingHostKeys.value + challenge
+            val affectedProjectIds = _hostKeyChallenges.value
+                .filterValues { it == challenge }
+                .keys
+                .ifEmpty { prompt.projectIds }
+            val trustResult = runCatching {
+                when (knownHosts.check(
+                    challenge.endpoint.normalizedHost,
+                    challenge.endpoint.port,
+                    challenge.presentedAlgorithm,
+                    challenge.presentedKeyBytes
+                )) {
+                    HostKeyCheckResult.Accepted -> Unit
+                    is HostKeyCheckResult.Rejected -> knownHosts.trust(challenge)
+                    HostKeyCheckResult.CorruptStore -> error("Trusted-host storage is corrupt.")
+                    HostKeyCheckResult.InvalidCandidate -> error("The server presented an invalid SSH host key.")
+                }
             }
-            .onFailure { error ->
-                connectionErrors.value = connectionErrors.value +
-                    (projectId to (error.message ?: "Could not save the trusted host key."))
+            trustResult.onSuccess {
+                _hostKeyChallenges.value = _hostKeyChallenges.value.filterValues { it != challenge }
+                val activeProjectId = sessionManager.sessions.value
+                    .firstOrNull { it.id == activeId.value }
+                    ?.projectId
+                affectedProjectIds.forEach { projectId ->
+                    reconnectProject(projectId, autoSwitch = projectId == activeProjectId)
+                }
+                _uiMessages.tryEmit(
+                    if (affectedProjectIds.size == 1) "Host trusted — reconnecting tab"
+                    else "Host trusted — reconnecting ${affectedProjectIds.size} tabs"
+                )
+            }.onFailure { error ->
+                affectedProjectIds.forEach { projectId ->
+                    connectionErrors.value = connectionErrors.value +
+                        (projectId to (error.message ?: "Could not save the trusted host key."))
+                }
+                _uiMessages.tryEmit(error.message ?: "Could not save the trusted host key")
             }
+            _trustingHostKeys.value = _trustingHostKeys.value - challenge
+        }
     }
 
-    fun dismissHostKeyChallenge(projectId: Long) {
-        _hostKeyChallenges.value = _hostKeyChallenges.value - projectId
+    fun dismissHostKeyChallenge(prompt: HostKeyPrompt) {
+        _hostKeyChallenges.value = _hostKeyChallenges.value.filterValues { it != prompt.challenge }
+    }
+
+    fun dismissBackgroundSshRecommendation() {
+        settingsRepository.setBackgroundSshRecommendationHandled()
+    }
+
+    fun startRecommendedBackgroundSsh(notificationPermissionGranted: Boolean) {
+        settingsRepository.setBackgroundSshRecommendationHandled()
+        val transition = backgroundSshModeController.dispatch(
+            BackgroundSshEvent.UserStart(
+                notificationPermissionGranted = notificationPermissionGranted,
+                activeSshSessionCount = runtimeRepository.state.value.remoteProjectIds.size
+            )
+        )
+        when {
+            !notificationPermissionGranted -> {
+                settingsRepository.setKeepSshActiveInBackground(false)
+                _uiMessages.tryEmit("Notification permission is required for background SSH")
+            }
+            transition.command != BackgroundSshCommand.START_SERVICE -> {
+                settingsRepository.setKeepSshActiveInBackground(false)
+                _uiMessages.tryEmit("Open an SSH terminal before starting background SSH")
+            }
+            else -> runCatching {
+                settingsRepository.setKeepSshActiveInBackground(true)
+                BackgroundSshService.requestStart(context)
+            }.onSuccess {
+                _uiMessages.tryEmit("Background SSH started")
+            }.onFailure {
+                settingsRepository.setKeepSshActiveInBackground(false)
+                backgroundSshModeController.dispatch(BackgroundSshEvent.ServiceStopped)
+                _uiMessages.tryEmit("Could not start background SSH")
+            }
+        }
     }
 
     private fun activateLocalProject(project: Project, autoSwitch: Boolean) {
@@ -551,13 +683,16 @@ class SessionHostViewModel @Inject constructor(
     private fun reconnectProject(projectId: Long, autoSwitch: Boolean) {
         val project = _allDbProjects.value.find { it.id == projectId } ?: return
         val existingSessionId = sessionManager.sessions.value.firstOrNull { it.projectId == projectId }?.id
-        existingSessionId?.let { sessionManager.close(it, killTmuxSession = false) }
         connectingJobs.remove(projectId)?.cancel()
         connectingProjectIds.value = connectingProjectIds.value - projectId
         sessionManager.markProjectOpen(projectId)
         logger.log(LogLevel.INFO, "SessionRecovery", "Manual reconnect requested for projectId=$projectId")
         viewModelScope.launch { projectRepo.updateLastOpenedAt(projectId, System.currentTimeMillis()) }
-        activateProject(project, autoSwitch = autoSwitch)
+        activateProject(
+            project,
+            autoSwitch = autoSwitch,
+            replacementSessionId = existingSessionId
+        )
     }
 
     fun reconnectAllDisconnected() {

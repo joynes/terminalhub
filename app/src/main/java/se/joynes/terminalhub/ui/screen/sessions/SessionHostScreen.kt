@@ -1,5 +1,7 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.view.WindowInsets as AndroidWindowInsets
@@ -41,6 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.content.ContextCompat
 import se.joynes.terminalhub.R
 import se.joynes.terminalhub.BuildConfig
 import se.joynes.terminalhub.ui.screen.export.ExportImportState
@@ -87,7 +90,9 @@ fun SessionHostScreen(
     val serverId by viewModel.serverId.collectAsState()
     val homeState by viewModel.homeState.collectAsState()
     val runtimeState by viewModel.runtimeState.collectAsState()
-    val hostKeyChallenges by viewModel.hostKeyChallenges.collectAsState()
+    val hostKeyPrompts by viewModel.hostKeyPrompts.collectAsState()
+    val trustingHostKeys by viewModel.trustingHostKeys.collectAsState()
+    val showBackgroundSshRecommendation by viewModel.showBackgroundSshRecommendation.collectAsState()
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
     val executeTextInputOnSend by viewModel.executeTextInputOnSend.collectAsState()
@@ -121,10 +126,37 @@ fun SessionHostScreen(
     val exportImportState by exportImportViewModel.state.collectAsState()
     val textInputSendScope = rememberCoroutineScope()
 
-    hostKeyChallenges.entries.firstOrNull()?.let { (projectId, challenge) ->
+    LaunchedEffect(Unit) {
+        viewModel.uiMessages.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    val backgroundNotificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        viewModel.startRecommendedBackgroundSsh(notificationPermissionGranted = granted)
+    }
+
+    fun acceptBackgroundSshRecommendation() {
+        val notificationGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+        if (notificationGranted) {
+            viewModel.startRecommendedBackgroundSsh(notificationPermissionGranted = true)
+        } else {
+            backgroundNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    hostKeyPrompts.firstOrNull()?.let { prompt ->
+        val challenge = prompt.challenge
         val changed = challenge.kind == se.joynes.terminalhub.data.security.HostKeyChallengeKind.CHANGED
+        val trusting = challenge in trustingHostKeys
         AlertDialog(
-            onDismissRequest = { viewModel.dismissHostKeyChallenge(projectId) },
+            onDismissRequest = { if (!trusting) viewModel.dismissHostKeyChallenge(prompt) },
             title = { Text(if (changed) "SSH HOST KEY CHANGED" else "TRUST SSH HOST?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -135,6 +167,13 @@ fun SessionHostScreen(
                             "First contact. Compare this fingerprint with the SSH server before trusting it."
                         }
                     )
+                    if (prompt.projectIds.size > 1) {
+                        Text(
+                            "${prompt.projectIds.size} tabs are waiting for this server. One approval reconnects them all.",
+                            fontFamily = MonoFontFamily,
+                            fontSize = 11.sp
+                        )
+                    }
                     challenge.trustedFingerprint?.let {
                         Text("Trusted: $it", fontFamily = MonoFontFamily, fontSize = 11.sp)
                     }
@@ -144,14 +183,41 @@ fun SessionHostScreen(
             },
             confirmButton = {
                 TextButton(
+                    enabled = !trusting,
                     onClick = {
-                        if (changed) viewModel.dismissHostKeyChallenge(projectId)
-                        else viewModel.trustHostKeyAndReconnect(projectId)
+                        if (changed) viewModel.dismissHostKeyChallenge(prompt)
+                        else viewModel.trustHostKeyAndReconnect(prompt)
                     }
-                ) { Text(if (changed) "OK" else "TRUST AND RECONNECT") }
+                ) { Text(if (trusting) "TRUSTING..." else if (changed) "OK" else "TRUST AND RECONNECT") }
             },
             dismissButton = if (changed) null else {
-                { TextButton(onClick = { viewModel.dismissHostKeyChallenge(projectId) }) { Text("CANCEL") } }
+                {
+                    TextButton(
+                        enabled = !trusting,
+                        onClick = { viewModel.dismissHostKeyChallenge(prompt) }
+                    ) { Text("CANCEL") }
+                }
+            }
+        )
+    }
+
+    if (showBackgroundSshRecommendation && hostKeyPrompts.isEmpty()) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissBackgroundSshRecommendation,
+            title = { Text("KEEP SSH CONNECTED WHEN SWITCHING APPS?") },
+            text = {
+                Text(
+                    "Recommended if you regularly switch to other apps. TerminalHub can keep active SSH " +
+                        "connections alive with an ongoing notification, reducing reconnects when you return. " +
+                        "It may use battery and mobile data, and Android or the network can still interrupt it. " +
+                        "tmux remains the reliable fallback. You can turn this off at any time in Settings."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = ::acceptBackgroundSshRecommendation) { Text("KEEP ALIVE") }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissBackgroundSshRecommendation) { Text("NOT NOW") }
             }
         )
     }

@@ -28,6 +28,7 @@ class SettingsViewModel @Inject constructor(
     val backgroundSshMode = backgroundSshModeController.mode
 
     fun startBackgroundSsh(notificationPermissionGranted: Boolean): BackgroundSshStartResult {
+        settingsRepository.setBackgroundSshRecommendationHandled()
         val transition = backgroundSshModeController.dispatch(
             BackgroundSshEvent.UserStart(
                 notificationPermissionGranted = notificationPermissionGranted,

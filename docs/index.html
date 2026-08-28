@@ -292,7 +292,7 @@ tmux -V</code></pre></details>
         <h3>Verify the server host key</h3>
         <ol>
           <li>On first Test SSH or project connection, TerminalHub blocks the attempt and shows the host-key algorithm and <code>SHA256:</code> fingerprint.</li>
-          <li>Compare it with a fingerprint obtained independently from the intended server, then choose <em>Trust and retry</em>.</li>
+          <li>Compare it with a fingerprint obtained independently from the intended server, then choose <em>Trust and reconnect</em>. If several tabs use the same endpoint, one approval reconnects all of them.</li>
           <li>The same host and port must present that exact key for terminal, upload, download, and public-key installation connections.</li>
         </ol>
         <div class="callout warning"><strong>A changed host key is blocked.</strong><p>TerminalHub shows the trusted and newly presented fingerprints and never replaces the trusted key automatically. Verify a legitimate server replacement outside the app, open the server editor, confirm <em>Forget trusted key</em>, and run Test SSH again. The trust record is shared by profiles using the same host and port and is not included in configuration exports.</p></div>
@@ -451,7 +451,7 @@ Custom command: codex</code></pre>
         <div class="troubleshooting-list">
           <details open><summary>SSH test fails</summary><div><ol><li>Confirm host, port and username.</li><li>Verify Android can reach the address on its current network.</li><li>Test the same account with another SSH client.</li><li>Check the private-key format and the matching public key in <code>~/.ssh/authorized_keys</code>.</li><li>Inspect TerminalHub's app log for the exact authentication or transport error.</li></ol></div></details>
           <details><summary>A saved tab does not reconnect</summary><div><ol><li>Confirm the server is reachable.</li><li>Tap <em>Reconnect</em>; use <em>Reconnect all</em> if several tabs are disconnected.</li><li>SSH into the server and run <code>tmux ls</code>.</li><li>Verify that the project still has tmux enabled and that its name still maps to the expected session.</li><li>Review app and session logs.</li></ol></div></details>
-          <details><summary>The process stopped while the app was closed</summary><div><p>The Android app does not keep a foreground service running. The remote process must run inside tmux. Confirm with <code>tmux ls</code> on the server and start the project again if the tmux session itself exited.</p></div></details>
+          <details><summary>The process stopped while the app was closed</summary><div><p>Keep SSH active in background is optional and off by default. Enable it from the one-time recommendation after your first SSH connection or from Settings to reduce reconnects while switching apps. It always shows an ongoing notification and may use battery and mobile data. Android or the network can still interrupt it, so remote work should run inside tmux. Confirm with <code>tmux ls</code> if a process appears missing.</p></div></details>
           <details><summary>Git clone fails</summary><div><ol><li>Confirm Git is installed on the server.</li><li>For a private repository, confirm the server—not Android—has credentials or an SSH deploy key for that Git host.</li><li>Test <code>git clone</code> manually on the server.</li><li>Inspect whether TerminalHub created the target folder after reporting clone failure.</li></ol></div></details>
           <details><summary>Upload fails</summary><div><ol><li>Confirm the active project is connected.</li><li>Verify write permission in the project directory and free disk space.</li><li>Try a small file with a simple filename.</li><li>Keep the app active until the progress dialog completes.</li><li>Inspect the app log for SFTP/SCP errors.</li></ol></div></details>
           <details><summary>Terminal sizing, keyboard or rendering is wrong</summary><div><ol><li>Hide and reopen the Android keyboard.</li><li>Switch tabs and return to force a terminal size synchronization.</li><li>Rotate the device once if allowed.</li><li>Capture Android version, device model, screenshot and relevant logs when opening an issue.</li></ol></div></details>
@@ -464,7 +464,7 @@ Custom command: codex</code></pre>
         <h2>Limitations and non-goals</h2>
         <ul class="boundary-list">
           <li><strong>A server is required for the main product workflow.</strong> TerminalHub is not a full Linux distribution running entirely on Android.</li>
-          <li><strong>It does not guarantee a live background SSH connection.</strong> Tabs are restored and reconnected; tmux provides remote persistence.</li>
+          <li><strong>Background SSH is best effort.</strong> The optional user-started foreground service can reduce reconnects while switching apps, but Android or the network may still interrupt it. Tabs are restored and reconnected; tmux provides remote persistence.</li>
           <li><strong>It does not supply servers.</strong> You configure machines and credentials you control.</li>
           <li><strong>It does not include AI.</strong> AI terminal tools are optional server-side programs.</li>
           <li><strong>It is not affiliated with Termux.</strong> It adapts open-source Termux terminal components under their licenses.</li>

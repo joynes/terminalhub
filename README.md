@@ -41,6 +41,10 @@ least one machine that the phone can reach over SSH.
   order. Closing and reopening the app does not mean rebuilding the workspace.
 - **tmux keeps work alive.** Reattach to the remote session after Android process
   restarts, SSH interruptions, or a change between Wi-Fi and mobile data.
+- **Optional background SSH.** After the first successful SSH connection,
+  TerminalHub recommends a user-controlled foreground-service mode that can
+  reduce reconnects while switching apps. It is off by default, always shows an
+  ongoing notification, and can be stopped from the notification or Settings.
 - **Start new work from the phone.** Create a remote project folder or clone a Git
   repository without first opening a laptop.
 - **Upload files in context.** Send Android files directly into the active remote
