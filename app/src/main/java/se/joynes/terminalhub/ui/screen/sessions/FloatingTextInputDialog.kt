@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -27,6 +28,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
@@ -213,15 +215,28 @@ fun FloatingTextInputDialog(
                             .fillMaxWidth(0.92f)
                             .background(MegaDriveSurface)
                     ) {
-                        history.forEach { entry ->
+                        history.forEachIndexed { index, entry ->
+                            if (index > 0) {
+                                HorizontalDivider(color = MegaDriveDim.copy(alpha = 0.45f))
+                            }
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        text = entry,
+                                        text = textInputHistoryPreview(entry),
                                         color = MegaDrivePrimary,
                                         fontSize = 12.sp,
                                         fontFamily = MonoFontFamily,
-                                        maxLines = 2
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                },
+                                leadingIcon = {
+                                    Text(
+                                        text = "${index + 1}.",
+                                        color = MegaDriveDim,
+                                        fontSize = 10.sp,
+                                        fontFamily = MonoFontFamily
                                     )
                                 },
                                 onClick = {
@@ -276,6 +291,9 @@ internal const val MAX_TEXT_INPUT_PANEL_OPACITY = 1f
 
 internal fun normalizeTextInputPanelOpacity(value: Float): Float =
     value.coerceIn(MIN_TEXT_INPUT_PANEL_OPACITY, MAX_TEXT_INPUT_PANEL_OPACITY)
+
+internal fun textInputHistoryPreview(entry: String): String =
+    entry.replace(Regex("\\s+"), " ").trim()
 
 internal data class FloatingPanelVerticalLayout(
     val availableBottomPx: Float,

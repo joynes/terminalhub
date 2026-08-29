@@ -8,9 +8,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
+internal const val DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND = true
+
 data class AppSettings(
     val preferFastResume: Boolean = true,
-    val executeTextInputOnSend: Boolean = false,
+    val executeTextInputOnSend: Boolean = DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND,
     val sshKeepaliveEnabled: Boolean = true,
     val keepSshActiveInBackground: Boolean = false,
     val backgroundSshRecommendationHandled: Boolean = false,
@@ -40,7 +42,10 @@ class AppSettingsRepository @Inject constructor(
     private val _settings = MutableStateFlow(
         AppSettings(
             preferFastResume = prefs.getBoolean(KEY_FAST_RESUME, true),
-            executeTextInputOnSend = prefs.getBoolean(KEY_EXECUTE_TEXT_INPUT_ON_SEND, false),
+            executeTextInputOnSend = prefs.getBoolean(
+                KEY_EXECUTE_TEXT_INPUT_ON_SEND,
+                DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND
+            ),
             sshKeepaliveEnabled = prefs.getBoolean(KEY_SSH_KEEPALIVE, true),
             keepSshActiveInBackground = prefs.getBoolean(KEY_KEEP_SSH_ACTIVE_IN_BACKGROUND, false),
             backgroundSshRecommendationHandled = prefs.getBoolean(KEY_BACKGROUND_SSH_RECOMMENDATION_HANDLED, false),
