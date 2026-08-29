@@ -8,7 +8,7 @@ from the phone, and open each project in its own tab. TerminalHub remembers the
 tabs and their order, while tmux keeps remote work available after disconnects,
 app restarts, and network changes.
 
-[Get TerminalHub on Google Play](https://play.google.com/store/apps/details?id=se.joynes.terminalhub)
+[Get TerminalHub on Google Play](https://play.google.com/store/apps/details?id=se.joynes.terminalhub&utm_source=github_readme&utm_medium=referral&utm_campaign=project_tabs_launch_2026)
 · [Download the latest signed release](https://github.com/joynes/terminalhub/releases/latest)
 · [Read the complete documentation](https://joynes.github.io/terminalhub/)
 · [View the open-source code](https://github.com/joynes/terminalhub)
