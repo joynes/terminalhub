@@ -87,6 +87,8 @@ provides machine-readable entry points for AI assistants:
 
 ## Community and Security
 
+- Share privacy-safe [early-user workflow feedback](https://github.com/joynes/terminalhub/issues/new?template=activation_feedback.yml)
+  about first-server setup, project tabs, restart, and reconnect.
 - Use [GitHub Discussions](https://github.com/joynes/terminalhub/discussions)
   for setup questions, workflow ideas, and general feedback.
 - Use [GitHub Issues](https://github.com/joynes/terminalhub/issues) for

@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Early-user workflow feedback
+    url: https://github.com/joynes/terminalhub/issues/new?template=activation_feedback.yml
+    about: Tell us where first-server, first-project, multi-tab, restart, or reconnect setup was difficult.
   - name: Setup and workflow questions
     url: https://github.com/joynes/terminalhub/discussions
     about: Ask for help or discuss an idea before turning it into an issue.

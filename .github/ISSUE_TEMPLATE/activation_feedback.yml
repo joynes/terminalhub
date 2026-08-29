@@ -1,0 +1,82 @@
+name: Early-user workflow feedback
+description: Share where TerminalHub's first-project and multi-tab workflow was easy or difficult
+title: "[Feedback]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying TerminalHub. This form measures the phone-first SSH project workflow without collecting identity or private infrastructure data.
+
+        Do not include passwords, private keys, tokens, usernames, hostnames, IP addresses, repository URLs, private file paths, screenshots containing private data, or raw logs. Report security vulnerabilities privately from the Security tab.
+  - type: input
+    id: version
+    attributes:
+      label: TerminalHub version
+      placeholder: "For example: 1.263"
+    validations:
+      required: true
+  - type: dropdown
+    id: experience
+    attributes:
+      label: Your SSH and tmux experience
+      options:
+        - New to both SSH and tmux
+        - Comfortable with SSH, new to tmux
+        - Comfortable with SSH and tmux
+    validations:
+      required: true
+  - type: dropdown
+    id: server_type
+    attributes:
+      label: General server type
+      description: Keep this generic; do not provide a host or provider account name.
+      options:
+        - Home server or workstation
+        - VPS or cloud server
+        - Work or lab server
+        - More than one server type
+        - I did not connect a server
+    validations:
+      required: true
+  - type: checkboxes
+    id: milestones
+    attributes:
+      label: Milestones completed
+      description: Check every step you completed successfully.
+      options:
+        - label: Added and tested an SSH server
+        - label: Verified and trusted the first-contact host-key fingerprint
+        - label: Created or cloned a first project from the phone
+        - label: Opened a second project tab
+        - label: Used tabs across more than one server
+        - label: Reopened the app and saw the saved tab workspace
+        - label: Reconnected and resumed an existing tmux session
+        - label: Uploaded a file or opened a terminal link on Android
+  - type: textarea
+    id: blocker
+    attributes:
+      label: Biggest point of friction
+      description: Describe the UI step or concept, using sanitized example data.
+      placeholder: "I expected ... but the app ..."
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: What would make TerminalHub useful enough to keep using?
+      description: Describe the workflow or outcome rather than private project details.
+    validations:
+      required: true
+  - type: textarea
+    id: optional_context
+    attributes:
+      label: Optional non-sensitive context
+      description: Android version, general device class, and whether the connection used LAN, VPN, or public SSH are useful. Do not include addresses or names.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I have removed credentials, private server details, private repository details, personal data, and raw logs.
+          required: true
+
