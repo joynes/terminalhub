@@ -114,4 +114,28 @@ class SessionTabSwipeTest {
 
         composeRule.runOnIdle { assertEquals(7L, restartedProjectId) }
     }
+
+    @Test
+    fun longPressCanEnterDedicatedReorderMode() {
+        val tabs = listOf(makeTab(1L, "first"), makeTab(2L, "second"))
+        composeRule.setContent {
+            TerminalHubTheme {
+                SessionTabBar(
+                    tabs = tabs,
+                    activeId = tabs.first().sessionId,
+                    onSelect = {},
+                    onClose = { _, _ -> },
+                    onRestartTmux = {},
+                    onMove = { _, _ -> },
+                    onAddProject = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("FIRST").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Reorder tabs").performClick()
+
+        composeRule.onNodeWithText("DRAG A TAB TO ITS NEW POSITION").assertIsDisplayed()
+        composeRule.onNodeWithText("DONE").assertIsDisplayed()
+    }
 }

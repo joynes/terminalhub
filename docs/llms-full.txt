@@ -16,7 +16,7 @@ TerminalHub is not an AI application. Terminal AI agents are one optional use ca
 
 Workspace and tabs:
 - Multi-server project tab bar with persisted open tabs, order, active tab, and per-project colors.
-- Wrapped tab rows, tap-to-switch, key-bar swipe navigation, and long-press drag-and-drop reordering with Move Left/Move Right fallbacks.
+- Wrapped tab rows, tap-to-switch, key-bar swipe navigation, and a dedicated Reorder tabs mode opened from a tab's long-press menu. In reorder mode tabs follow the finger and can be dropped directly onto a destination, including another wrapped row.
 - A tmux-backed tab's long-press menu can restart only that project's tmux session while keeping the Android tab and project profile in place. Restarting ends programs in the old tmux session and requires confirmation.
 - Disconnected tabs stay visible; manual Reconnect and Reconnect All are available.
 - Recent Projects shows active and closed sessions with relative times and multi-select reopen.

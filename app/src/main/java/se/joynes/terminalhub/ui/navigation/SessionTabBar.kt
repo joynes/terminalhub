@@ -3,7 +3,8 @@ package se.joynes.terminalhub.ui.navigation
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.*
@@ -12,11 +13,13 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -55,9 +58,11 @@ fun SessionTabBar(
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var menuTabId by remember { mutableStateOf<Long?>(null) }
+    var reorderMode by rememberSaveable { mutableStateOf(false) }
     var draggedTabId by remember { mutableStateOf<Long?>(null) }
+    var dropTargetTabId by remember { mutableStateOf<Long?>(null) }
     var dragPointer by remember { mutableStateOf(Offset.Zero) }
-    var dragDistance by remember { mutableFloatStateOf(0f) }
+    var dragTranslation by remember { mutableStateOf(Offset.Zero) }
     val tabBounds = remember { mutableStateMapOf<Long, Rect>() }
     val latestTabs by rememberUpdatedState(tabs)
     val latestOnMove by rememberUpdatedState(onMove)
@@ -67,163 +72,218 @@ fun SessionTabBar(
         tabBounds.keys.filterNot { it in currentIds }.forEach(tabBounds::remove)
     }
 
-    FlowRow(
+    Column(
         modifier = modifier
             .background(MegaDriveSurface)
-            .heightIn(min = 28.dp),
-        verticalArrangement = Arrangement.Top,
-        horizontalArrangement = Arrangement.Start
+            .heightIn(min = 28.dp)
     ) {
-        tabs.forEachIndexed { index, tab ->
-            val isSelected = tab.sessionId != null && tab.sessionId == activeId
-            val bg = tabColor(tab.colorSeed, isSelected)
-            val textColor = when {
-                isSelected      -> Color.White
-                tab.isConnecting -> MegaDrivePrimary
-                tab.isConnected -> Color.White.copy(alpha = 0.65f)
-                else            -> Color.White.copy(alpha = 0.28f)
-            }
-            key(tab.projectId) {
-            Box(
+        if (reorderMode) {
+            Row(
                 modifier = Modifier
-                    .onGloballyPositioned { coordinates ->
-                        tabBounds[tab.projectId] = coordinates.boundsInParent()
-                    }
-                    .zIndex(if (draggedTabId == tab.projectId) 2f else 0f)
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .background(MegaDriveAccent)
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
+                Text(
+                    "DRAG A TAB TO ITS NEW POSITION",
+                    color = MegaDriveBg,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 9.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "DONE",
+                    color = MegaDriveBg,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 11.sp,
                     modifier = Modifier
-                        .width(TAB_WIDTH_DP.dp)
-                        .height(28.dp)
-                        .background(bg)
-                        .then(
-                            if (draggedTabId == tab.projectId) {
-                                Modifier.border(2.dp, MegaDriveAccent)
-                            } else {
-                                Modifier
+                        .clickable {
+                            reorderMode = false
+                            draggedTabId = null
+                            dropTargetTabId = null
+                            dragTranslation = Offset.Zero
+                        }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                )
+            }
+        }
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 28.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            tabs.forEach { tab ->
+                val isSelected = tab.sessionId != null && tab.sessionId == activeId
+                val bg = tabColor(tab.colorSeed, isSelected)
+                val textColor = when {
+                    isSelected -> Color.White
+                    tab.isConnecting -> MegaDrivePrimary
+                    tab.isConnected -> Color.White.copy(alpha = 0.65f)
+                    else -> Color.White.copy(alpha = 0.28f)
+                }
+                key(tab.projectId) {
+                    Box(
+                        modifier = Modifier
+                            .onGloballyPositioned { coordinates ->
+                                tabBounds[tab.projectId] = coordinates.boundsInParent()
                             }
-                        )
-                        .clickable { onSelect(tab.projectId) }
-                        .pointerInput(tab.projectId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { localStart ->
-                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    menuTabId = null
-                                    draggedTabId = tab.projectId
-                                    dragDistance = 0f
-                                    dragPointer = (tabBounds[tab.projectId]?.topLeft ?: Offset.Zero) + localStart
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragPointer += dragAmount
-                                    dragDistance += dragAmount.getDistance()
-                                    if (dragDistance >= viewConfiguration.touchSlop) {
-                                        val currentTabs = latestTabs
-                                        val fromIndex = currentTabs.indexOfFirst { it.projectId == tab.projectId }
-                                        val toIndex = tabDropTargetIndex(
-                                            tabIds = currentTabs.map { it.projectId },
-                                            bounds = tabBounds,
-                                            pointer = dragPointer
-                                        )
-                                        if (fromIndex >= 0 && toIndex != null && toIndex != fromIndex) {
-                                            latestOnMove(fromIndex, toIndex)
+                            .zIndex(if (draggedTabId == tab.projectId) 2f else 0f)
+                            .graphicsLayer {
+                                if (draggedTabId == tab.projectId) {
+                                    translationX = dragTranslation.x
+                                    translationY = dragTranslation.y
+                                }
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .width(TAB_WIDTH_DP.dp)
+                                .height(28.dp)
+                                .background(bg)
+                                .then(
+                                    when (tab.projectId) {
+                                        draggedTabId -> Modifier.border(2.dp, MegaDriveAccent)
+                                        dropTargetTabId -> Modifier.border(2.dp, MegaDrivePrimary)
+                                        else -> Modifier
+                                    }
+                                )
+                                .then(
+                                    if (reorderMode) {
+                                        Modifier.pointerInput(tab.projectId) {
+                                            detectDragGestures(
+                                                onDragStart = { localStart ->
+                                                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    menuTabId = null
+                                                    draggedTabId = tab.projectId
+                                                    dropTargetTabId = tab.projectId
+                                                    dragTranslation = Offset.Zero
+                                                    dragPointer =
+                                                        (tabBounds[tab.projectId]?.topLeft ?: Offset.Zero) + localStart
+                                                },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    dragPointer += dragAmount
+                                                    dragTranslation += dragAmount
+                                                    val currentTabs = latestTabs
+                                                    val targetIndex = tabDropTargetIndex(
+                                                        tabIds = currentTabs.map { it.projectId },
+                                                        bounds = tabBounds,
+                                                        pointer = dragPointer
+                                                    )
+                                                    dropTargetTabId = targetIndex
+                                                        ?.let { currentTabs.getOrNull(it)?.projectId }
+                                                },
+                                                onDragEnd = {
+                                                    val currentTabs = latestTabs
+                                                    val fromIndex = currentTabs.indexOfFirst {
+                                                        it.projectId == tab.projectId
+                                                    }
+                                                    val toIndex = currentTabs.indexOfFirst {
+                                                        it.projectId == dropTargetTabId
+                                                    }
+                                                    if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
+                                                        latestOnMove(fromIndex, toIndex)
+                                                    }
+                                                    draggedTabId = null
+                                                    dropTargetTabId = null
+                                                    dragTranslation = Offset.Zero
+                                                },
+                                                onDragCancel = {
+                                                    draggedTabId = null
+                                                    dropTargetTabId = null
+                                                    dragTranslation = Offset.Zero
+                                                }
+                                            )
                                         }
+                                    } else {
+                                        Modifier.combinedClickable(
+                                            onClick = { onSelect(tab.projectId) },
+                                            onLongClick = { menuTabId = tab.projectId }
+                                        )
                                     }
+                                )
+                                .padding(start = 7.dp, end = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = tab.projectName.uppercase(),
+                                color = textColor,
+                                fontSize = 9.sp,
+                                fontFamily = MonoFontFamily,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuTabId == tab.projectId,
+                            onDismissRequest = { menuTabId = null }
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Reorder tabs",
+                                        color = if (tabs.size > 1) Color.White else MegaDriveDim,
+                                        fontFamily = MonoFontFamily,
+                                        fontSize = 12.sp
+                                    )
                                 },
-                                onDragEnd = {
-                                    if (dragDistance < viewConfiguration.touchSlop) {
-                                        menuTabId = tab.projectId
-                                    }
-                                    draggedTabId = null
-                                    dragDistance = 0f
+                                enabled = tabs.size > 1,
+                                onClick = {
+                                    menuTabId = null
+                                    reorderMode = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Restart tmux…",
+                                        color = if (tab.usesTmux && !tab.isConnecting) {
+                                            Color.White
+                                        } else {
+                                            MegaDriveDim
+                                        },
+                                        fontFamily = MonoFontFamily,
+                                        fontSize = 12.sp
+                                    )
                                 },
-                                onDragCancel = {
-                                    draggedTabId = null
-                                    dragDistance = 0f
+                                enabled = tab.usesTmux && !tab.isConnecting,
+                                onClick = {
+                                    menuTabId = null
+                                    onRestartTmux(tab.projectId)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        "Close",
+                                        color = Color.White,
+                                        fontFamily = MonoFontFamily,
+                                        fontSize = 12.sp
+                                    )
+                                },
+                                onClick = {
+                                    menuTabId = null
+                                    onClose(tab.projectId, tab.sessionId)
                                 }
                             )
                         }
-                        .padding(start = 7.dp, end = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = tab.projectName.uppercase(),
-                        color = textColor,
-                        fontSize = 9.sp,
-                        fontFamily = MonoFontFamily,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                DropdownMenu(
-                    expanded = menuTabId == tab.projectId,
-                    onDismissRequest = { menuTabId = null }
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "Restart tmux…",
-                                color = if (tab.usesTmux && !tab.isConnecting) Color.White else MegaDriveDim,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 12.sp
-                            )
-                        },
-                        enabled = tab.usesTmux && !tab.isConnecting,
-                        onClick = {
-                            menuTabId = null
-                            onRestartTmux(tab.projectId)
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text("Close", color = Color.White, fontFamily = MonoFontFamily, fontSize = 12.sp)
-                        },
-                        onClick = {
-                            menuTabId = null
-                            onClose(tab.projectId, tab.sessionId)
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "Move Left",
-                                color = if (index > 0) Color.White else MegaDriveDim,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 12.sp
-                            )
-                        },
-                        onClick = {
-                            menuTabId = null
-                            if (index > 0) onMove(index, index - 1)
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "Move Right",
-                                color = if (index < tabs.lastIndex) Color.White else MegaDriveDim,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 12.sp
-                            )
-                        },
-                        onClick = {
-                            menuTabId = null
-                            if (index < tabs.lastIndex) onMove(index, index + 1)
-                        }
-                    )
+                    }
                 }
             }
+            Box(
+                modifier = Modifier
+                    .height(28.dp)
+                    .clickable(enabled = !reorderMode) { onAddProject() }
+                    .padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("+", color = if (reorderMode) MegaDriveDim else MegaDriveAccent, fontSize = 14.sp)
             }
-        }
-        Box(
-            modifier = Modifier
-                .height(28.dp)
-                .clickable { onAddProject() }
-                .padding(horizontal = 10.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text("+", color = MegaDriveAccent, fontSize = 14.sp)
         }
     }
 }
