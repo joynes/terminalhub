@@ -70,6 +70,11 @@ private data class PendingTabClose(
     val sessionId: se.joynes.terminalhub.domain.TerminalSessionId?
 )
 
+private data class PendingTmuxRestart(
+    val projectId: Long,
+    val projectName: String
+)
+
 @Composable
 fun SessionHostScreen(
     requestedServerId: Long? = null,
@@ -109,6 +114,7 @@ fun SessionHostScreen(
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTabClose by remember { mutableStateOf<PendingTabClose?>(null) }
+    var pendingTmuxRestart by remember { mutableStateOf<PendingTmuxRestart?>(null) }
     var deleteProjectOnClose by remember(pendingTabClose?.projectId) { mutableStateOf(false) }
     val textInputVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     val textInputDraftByProject = remember { mutableStateMapOf<Long, TextFieldValue>() }
@@ -545,6 +551,43 @@ fun SessionHostScreen(
             }
         )
     }
+    pendingTmuxRestart?.let { pending ->
+        AlertDialog(
+            onDismissRequest = { pendingTmuxRestart = null },
+            containerColor = MegaDriveSurface,
+            title = {
+                Text(
+                    "RESTART TMUX?",
+                    color = MegaDrivePrimary,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 14.sp
+                )
+            },
+            text = {
+                Text(
+                    "This stops the tmux session for ${pending.projectName}, including programs running inside it, then creates a fresh session in the same project tab.",
+                    color = Color.White,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 12.sp
+                )
+            },
+            dismissButton = {
+                RetroButton(
+                    text = "CANCEL",
+                    onClick = { pendingTmuxRestart = null }
+                )
+            },
+            confirmButton = {
+                RetroButton(
+                    text = "RESTART",
+                    onClick = {
+                        viewModel.restartTmuxProject(pending.projectId)
+                        pendingTmuxRestart = null
+                    }
+                )
+            }
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -577,6 +620,14 @@ fun SessionHostScreen(
                                 )
                             } else {
                                 viewModel.closeSession(projectId, sessionId)
+                            }
+                        },
+                        onRestartTmux = { projectId ->
+                            projectTabs.firstOrNull { it.projectId == projectId }?.let { tab ->
+                                pendingTmuxRestart = PendingTmuxRestart(
+                                    projectId = tab.projectId,
+                                    projectName = tab.projectName
+                                )
                             }
                         },
                         onMove = { fromIndex, toIndex -> viewModel.moveSession(fromIndex, toIndex) },

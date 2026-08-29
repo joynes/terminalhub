@@ -19,6 +19,8 @@ import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
+import se.joynes.terminalhub.data.runtime.BackgroundSshModeController
+import se.joynes.terminalhub.data.security.KnownHostRepository
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.ssh.SshManager
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
@@ -42,6 +44,8 @@ class SessionTabOrderTest {
     @Inject lateinit var textInputHistoryDao: TextInputHistoryDao
     @Inject lateinit var settingsRepository: AppSettingsRepository
     @Inject lateinit var runtimeRepository: AppRuntimeRepository
+    @Inject lateinit var knownHosts: KnownHostRepository
+    @Inject lateinit var backgroundSshModeController: BackgroundSshModeController
 
     private lateinit var viewModel: SessionHostViewModel
 
@@ -62,7 +66,9 @@ class SessionTabOrderTest {
             sessionManager = sessionManager,
             textInputHistoryDao = textInputHistoryDao,
             settingsRepository = settingsRepository,
-            runtimeRepository = runtimeRepository
+            runtimeRepository = runtimeRepository,
+            knownHosts = knownHosts,
+            backgroundSshModeController = backgroundSshModeController
         )
     }
 

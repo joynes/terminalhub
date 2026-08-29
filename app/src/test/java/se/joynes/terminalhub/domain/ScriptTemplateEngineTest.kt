@@ -47,4 +47,13 @@ class ScriptTemplateEngineTest {
         assertTrue(command.contains("mkdir -p \"\$HOME/projects with spaces/.trash\""))
         assertTrue(command.contains("mv \"\$HOME/projects with spaces/sample-project\" \"\$HOME/projects with spaces/.trash/sample-project-12345\""))
     }
+
+    @Test
+    fun renderKillTmuxTargetsOnlyTheProjectsSanitizedSessionName() {
+        val project = Project(serverId = 1L, name = "My Busy Project")
+
+        val command = engine.renderKillTmux(project)
+
+        assertTrue(command == "tmux kill-session -t \"my-busy-project\" 2>/dev/null || true")
+    }
 }

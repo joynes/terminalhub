@@ -35,6 +35,7 @@ class SessionTabSwipeTest {
                     activeId = tabs.first().sessionId,
                     onSelect = {},
                     onClose = { _, _ -> },
+                    onRestartTmux = {},
                     onMove = { _, _ -> },
                     onAddProject = {}
                 )
@@ -54,6 +55,7 @@ class SessionTabSwipeTest {
                     activeId = tabs.first().sessionId,
                     onSelect = {},
                     onClose = { _, _ -> },
+                    onRestartTmux = {},
                     onMove = { _, _ -> },
                     onAddProject = {}
                 )
@@ -78,6 +80,7 @@ class SessionTabSwipeTest {
                     activeId = null,
                     onSelect = { selectedProjectId = it },
                     onClose = { _, _ -> },
+                    onRestartTmux = {},
                     onMove = { _, _ -> },
                     onAddProject = {}
                 )
@@ -86,5 +89,29 @@ class SessionTabSwipeTest {
 
         composeRule.onNodeWithText("DISCONNECTED").performClick()
         composeRule.runOnIdle { assertEquals(42L, selectedProjectId) }
+    }
+
+    @Test
+    fun longPressShowsRestartTmuxForTmuxTab() {
+        var restartedProjectId: Long? = null
+        val tab = makeTab(7L, "tmux-project").copy(usesTmux = true)
+        composeRule.setContent {
+            TerminalHubTheme {
+                SessionTabBar(
+                    tabs = listOf(tab),
+                    activeId = tab.sessionId,
+                    onSelect = {},
+                    onClose = { _, _ -> },
+                    onRestartTmux = { restartedProjectId = it },
+                    onMove = { _, _ -> },
+                    onAddProject = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("TMUX-PROJECT").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Restart tmux…").performClick()
+
+        composeRule.runOnIdle { assertEquals(7L, restartedProjectId) }
     }
 }

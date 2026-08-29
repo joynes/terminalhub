@@ -680,6 +680,96 @@ class SessionHostViewModel @Inject constructor(
         reconnectProject(projectId, autoSwitch = true)
     }
 
+    fun restartTmuxProject(projectId: Long) {
+        val project = _allDbProjects.value.find { it.id == projectId }
+        if (project == null || project.targetType != ProjectTargetType.SSH || !project.useTmux) {
+            _uiMessages.tryEmit("This project does not use remote tmux")
+            return
+        }
+        if (projectId in connectingProjectIds.value) {
+            _uiMessages.tryEmit("${project.name} is already connecting")
+            return
+        }
+
+        val existingSessionId = sessionManager.sessions.value
+            .firstOrNull { it.projectId == projectId }
+            ?.id
+        val wasActive = existingSessionId != null && existingSessionId == activeId.value
+        connectionErrors.value = connectionErrors.value - projectId
+        connectingProjectIds.value = connectingProjectIds.value + projectId
+        logger.log(LogLevel.INFO, "TmuxRestart", "Restart requested project=${project.name}")
+        _uiMessages.tryEmit("Restarting tmux for ${project.name}…")
+
+        connectingJobs[projectId] = viewModelScope.launch {
+            try {
+                val killCommand = engine.renderKillTmux(project)
+                val existingConnection = sessionManager.getConnectionForProject(projectId)
+                val killedOnExistingConnection = existingConnection != null && runCatching {
+                    withTimeoutOrNull(TMUX_KILL_TIMEOUT_MS) {
+                        existingConnection.runSilent(killCommand)
+                        true
+                    } == true
+                }.getOrDefault(false)
+
+                if (!killedOnExistingConnection) {
+                    val server = serverRepo.getById(project.serverId)
+                        ?: error("Server configuration was not found.")
+                    val maintenanceConnection = connectToServer(server)
+                    try {
+                        maintenanceConnection.bindProject(project.id, project.name)
+                        when (val attempt = awaitSshConnectionAttempt(
+                            maintenanceConnection.connected,
+                            maintenanceConnection.lastErrorMessage,
+                            SSH_CONNECT_TIMEOUT_MS
+                        )) {
+                            SshConnectionAttemptResult.Connected -> Unit
+                            is SshConnectionAttemptResult.Failed -> error(attempt.message)
+                        }
+                        val killed = withTimeoutOrNull(TMUX_KILL_TIMEOUT_MS) {
+                            maintenanceConnection.runSilent(killCommand)
+                            true
+                        } == true
+                        if (!killed) error("Timed out while stopping the tmux session.")
+                    } finally {
+                        sshManager.destroySession(maintenanceConnection.sessionId)
+                    }
+                }
+
+                if (sessionManager.isProjectClosed(projectId)) return@launch
+                activateSshProject(
+                    project = project,
+                    autoSwitch = wasActive,
+                    replacementSessionId = existingSessionId
+                )
+                val replacement = sessionManager.sessions.value.firstOrNull {
+                    it.projectId == projectId && it.id != existingSessionId && it.isConnected
+                }
+                if (replacement == null) {
+                    error(
+                        connectionErrors.value[projectId]
+                            ?: "Tmux stopped, but TerminalHub could not reconnect. Tap Reconnect to try again."
+                    )
+                }
+                _uiMessages.tryEmit("Tmux restarted for ${project.name}")
+                logger.log(LogLevel.INFO, "TmuxRestart", "Restart completed project=${project.name}")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                val message = error.message ?: "Could not restart tmux."
+                connectionErrors.value = connectionErrors.value + (projectId to message)
+                _uiMessages.tryEmit(message)
+                logger.log(
+                    LogLevel.ERROR,
+                    "TmuxRestart",
+                    "Restart failed project=${project.name}: ${error.javaClass.simpleName}: $message"
+                )
+            } finally {
+                connectingJobs.remove(projectId)
+                connectingProjectIds.value = connectingProjectIds.value - projectId
+            }
+        }
+    }
+
     private fun reconnectProject(projectId: Long, autoSwitch: Boolean) {
         val project = _allDbProjects.value.find { it.id == projectId } ?: return
         val existingSessionId = sessionManager.sessions.value.firstOrNull { it.projectId == projectId }?.id
@@ -783,5 +873,6 @@ class SessionHostViewModel @Inject constructor(
 
     private companion object {
         const val SSH_CONNECT_TIMEOUT_MS = 15_000L
+        const val TMUX_KILL_TIMEOUT_MS = 10_000L
     }
 }

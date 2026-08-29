@@ -84,6 +84,12 @@ class ScriptTemplateEngine @Inject constructor() {
             "if [ -e $projectPath ]; then mv $projectPath $trashPath; fi"
     }
 
+    /** Stops only this project's tmux session so a fresh session can be created in the same tab. */
+    fun renderKillTmux(project: Project): String {
+        val session = shellQuote(sessionName(project))
+        return "tmux kill-session -t $session 2>/dev/null || true"
+    }
+
     /** AI tool command run last. Empty = none. */
     fun renderAiCommand(project: Project): String = project.aiCommand.trim()
 
