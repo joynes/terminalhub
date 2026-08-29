@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Create or clone remote Git projects from an Android phone and keep them in persistent SSH tabs with TerminalHub.">
+  <meta name="theme-color" content="#080912">
+  <link rel="canonical" href="https://joynes.github.io/terminalhub/guides/starting-git-projects.html">
+  <link rel="icon" href="../assets/icon.png">
+  <link rel="stylesheet" href="../styles.css">
+  <title>Start remote Git projects from Android | TerminalHub</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Start remote Git projects from Android",
+    "description": "Use TerminalHub to create a remote project directory or shallow-clone a Git repository and open it in a persistent tmux tab.",
+    "tool": ["TerminalHub for Android", "SSH server", "Git", "tmux"],
+    "step": [
+      {"@type":"HowToStep","name":"Prepare Git on the server","text":"Install Git and configure server-side access to the repository host."},
+      {"@type":"HowToStep","name":"Add an SSH server","text":"Create and verify a TerminalHub server profile."},
+      {"@type":"HowToStep","name":"Create a project","text":"Choose the server, project name, optional Git URL, and startup command."},
+      {"@type":"HowToStep","name":"Open the project","text":"Let TerminalHub create or shallow-clone the folder and open its tmux-backed tab."}
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to guide</a>
+  <header class="site-header">
+    <a class="brand" href="../" aria-label="TerminalHub documentation home">
+      <img src="../assets/icon.png" width="38" height="38" alt="">
+      <span>TerminalHub <em>/ guide</em></span>
+    </a>
+    <nav class="header-links" aria-label="External links">
+      <a href="../">Documentation</a>
+      <a href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Google Play</a>
+      <a href="https://github.com/joynes/terminalhub">Source</a>
+    </nav>
+  </header>
+
+  <main id="content">
+    <article class="doc-section">
+      <p class="eyebrow">PHONE-FIRST PROJECT SETUP</p>
+      <h1>Start remote Git projects from Android</h1>
+      <p class="lead">Create a project profile on the phone, let your server clone the repository, and keep the resulting shell in a persistent TerminalHub tab. The server does the build and execution work; Android remains the control surface.</p>
+
+      <h2>Before you start</h2>
+      <ul class="check-list">
+        <li>TerminalHub installed on Android.</li>
+        <li>A Linux or macOS server reachable from the phone over SSH.</li>
+        <li><code>git</code> and preferably <code>tmux</code> installed on that server.</li>
+        <li>The server account can authenticate to the Git host when the repository is private.</li>
+      </ul>
+      <div class="callout warning"><strong>Two SSH relationships may be involved.</strong><p>TerminalHub authenticates from Android to your server. The server separately authenticates to GitHub, GitLab, or another Git host. A successful TerminalHub connection does not automatically give the server access to a private repository.</p></div>
+
+      <h2>1. Prepare Git access on the server</h2>
+      <p>Log in to the server account and verify the tools:</p>
+      <pre><code>git --version
+tmux -V
+mkdir -p "$HOME/terminalhub"</code></pre>
+      <p>For a private GitHub repository, configure an SSH key or another credential on the server and test it there:</p>
+      <pre><code>ssh -T git@github.com
+git ls-remote git@github.com:OWNER/REPOSITORY.git HEAD</code></pre>
+      <p>Follow your Git provider's current authentication guidance. Do not put a personal access token directly in a TerminalHub project URL or public configuration export.</p>
+
+      <h2>2. Add the server to TerminalHub</h2>
+      <ol>
+        <li>Create a server profile with host, port, username, authentication, and projects folder.</li>
+        <li>Run <em>Test SSH</em>.</li>
+        <li>On first contact, compare the displayed SHA-256 host-key fingerprint through an independent channel before trusting it.</li>
+      </ol>
+
+      <h2>3. Create the project profile</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>TerminalHub field</th><th>Example</th><th>What it controls</th></tr></thead>
+        <tbody>
+          <tr><td>Target</td><td><code>Home workstation</code></td><td>The saved SSH server that runs the project.</td></tr>
+          <tr><td>Name</td><td><code>website</code></td><td>Tab label, remote folder name, and source for the tmux session name.</td></tr>
+          <tr><td>Git repository URL</td><td><code>git@github.com:owner/website.git</code></td><td>Optional repository shallow-cloned when no checkout exists.</td></tr>
+          <tr><td>Use tmux</td><td>Enabled</td><td>Keeps the remote shell and commands alive across disconnects.</td></tr>
+          <tr><td>Custom script</td><td><code>cd {{PROJECT_PATH}}</code></td><td>Prepares the newly created session.</td></tr>
+          <tr><td>Custom command</td><td><code>npm run dev</code></td><td>Optional final command for a new tmux session.</td></tr>
+        </tbody>
+      </table></div>
+      <p>TerminalHub normalizes GitHub HTTPS repository URLs to SSH form when they are saved. That avoids embedding web credentials, but it also means the server must have working SSH access to GitHub.</p>
+
+      <h2>4. Open the project from the phone</h2>
+      <p>On first open, TerminalHub follows this sequence:</p>
+      <pre><code>resolve the server's projects folder
+└─ create the project folder, or shallow-clone the Git repository
+   └─ create the named tmux session
+      └─ attach the Android terminal
+         └─ run the custom script
+            └─ run the optional custom command</code></pre>
+      <p>When you later reconnect to the same running tmux session, TerminalHub skips the script and custom command so it does not intentionally start a second development server or agent.</p>
+
+      <h2>5. Work entirely from Android</h2>
+      <ul>
+        <li>Use the terminal tab for Git, builds, editors, logs, server tools, or optional AI terminal agents.</li>
+        <li>Use multiline input for longer commands or pasted instructions.</li>
+        <li>Upload one or more Android files into the active project or share a file to TerminalHub from another app.</li>
+        <li>Download a top-level project file through Android's destination picker and open the completed file with a compatible app.</li>
+        <li>Tap HTTP(S) links printed by a development server to open them in the phone's browser.</li>
+        <li>Create more project profiles and switch among them in the persistent tab bar.</li>
+      </ul>
+
+      <h2>Useful project patterns</h2>
+      <div class="card-grid">
+        <article class="card"><h4>Existing repository</h4><p>Set a Git URL and let TerminalHub shallow-clone it on the first open.</p></article>
+        <article class="card"><h4>New empty project</h4><p>Leave Git URL empty. TerminalHub creates the project directory; initialize it with <code>git init</code> from the tab.</p></article>
+        <article class="card"><h4>Long-running development server</h4><p>Use tmux and set the custom command to the development server command.</p></article>
+        <article class="card"><h4>Interactive coding agent</h4><p>Install the agent on the server and use its CLI command as the optional custom command. The AI service is not bundled with TerminalHub.</p></article>
+      </div>
+
+      <h2>Troubleshooting clone failures</h2>
+      <div class="troubleshooting-list">
+        <details><summary>Permission denied (publickey) from the Git host</summary><div><p>The server, not Android, lacks Git-host authentication. Run <code>ssh -T</code> and <code>git ls-remote</code> as the same server user configured in TerminalHub.</p></div></details>
+        <details><summary>The repository URL works on a laptop but not the server</summary><div><p>Credentials and SSH agents are machine-specific. Configure access for the remote server account and confirm DNS/network access from that server.</p></div></details>
+        <details><summary>The project directory exists but is not a Git checkout</summary><div><p>TerminalHub only clones when the expected checkout is absent. Inspect the remote directory, move conflicting files safely, or clone manually. Avoid deleting data until it is backed up.</p></div></details>
+        <details><summary>The startup command does not run after reconnecting</summary><div><p>This is expected when reattaching an existing tmux session. TerminalHub avoids rerunning startup commands that could create duplicate processes.</p></div></details>
+      </div>
+
+      <h2>Security boundaries</h2>
+      <ul class="check-list">
+        <li>TerminalHub does not host the repository or server.</li>
+        <li>Git credentials remain the responsibility of the configured server account.</li>
+        <li>Configuration export excludes TerminalHub credentials, but review any exported file before sharing it.</li>
+        <li>Never include secrets in project names, Git URLs, custom scripts, screenshots, issues, or support logs.</li>
+      </ul>
+
+      <div class="link-row">
+        <a class="button primary" href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Install TerminalHub</a>
+        <a class="button" href="multiple-tmux-projects.html">Manage multiple tmux projects</a>
+        <a class="button" href="../#projects">Project reference</a>
+      </div>
+      <p class="updated">Verified against TerminalHub 1.263 · Updated 2026-08-29</p>
+    </article>
+  </main>
+
+  <footer><p>TerminalHub is open source under GPL-3.0. Built on adapted terminal components from Termux; not affiliated with or endorsed by Termux.</p></footer>
+</body>
+</html>

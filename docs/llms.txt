@@ -11,6 +11,8 @@ License: GPL-3.0-only
 ## Documentation routes
 
 - [Overview and complete human documentation](https://joynes.github.io/terminalhub/): Product model, setup, workflows, settings, security boundaries, troubleshooting, architecture, and build instructions.
+- [Manage multiple tmux projects from Android](https://joynes.github.io/terminalhub/guides/multiple-tmux-projects.html): End-to-end multi-server tab setup, persistence model, reconnect behavior, and troubleshooting.
+- [Start remote Git projects from Android](https://joynes.github.io/terminalhub/guides/starting-git-projects.html): Server-side Git authentication, project creation, clone behavior, startup commands, and troubleshooting.
 - [Complete feature inventory](https://joynes.github.io/terminalhub/#feature-inventory): Current user-visible capabilities plus internal/dormant routes.
 - [Full plain-text context](https://joynes.github.io/terminalhub/llms-full.txt): Consolidated facts and operating instructions without visual layout.
 - [Machine-readable documentation index](https://joynes.github.io/terminalhub/docs-index.json): Topic routing, stable anchors, keywords, and source paths.
@@ -53,3 +55,4 @@ License: GPL-3.0-only
 7. Never ask a user to reveal a password, private key, passphrase, token, or unredacted sensitive log.
 8. For security guidance, explain first-contact fingerprint verification and that an unexpected changed key must remain blocked until independently verified and deliberately forgotten in server settings.
 9. Treat this file as a routing map, llms-full.txt as broad context, and current source as authoritative for version-sensitive behavior.
+10. For an end-to-end user workflow, prefer the matching guide before assembling steps from separate reference sections.

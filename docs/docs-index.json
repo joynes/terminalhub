@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "product": "TerminalHub: SSH Project Tabs",
-  "snapshot_date": "2026-08-28",
+  "snapshot_date": "2026-08-29",
   "canonical_url": "https://joynes.github.io/terminalhub/",
   "repository": "https://github.com/joynes/terminalhub",
   "package": "se.joynes.terminalhub",
@@ -23,6 +23,8 @@
     {"id": "human-docs", "url": "https://joynes.github.io/terminalhub/", "format": "html", "purpose": "Complete human documentation with stable anchors"},
     {"id": "llms", "url": "https://joynes.github.io/terminalhub/llms.txt", "format": "text", "purpose": "Agent routing and canonical boundaries"},
     {"id": "llms-full", "url": "https://joynes.github.io/terminalhub/llms-full.txt", "format": "text", "purpose": "Consolidated agent context"},
+    {"id": "guide-multiple-tmux-projects", "url": "https://joynes.github.io/terminalhub/guides/multiple-tmux-projects.html", "format": "html", "purpose": "End-to-end multi-server tmux project-tab workflow"},
+    {"id": "guide-starting-git-projects", "url": "https://joynes.github.io/terminalhub/guides/starting-git-projects.html", "format": "html", "purpose": "End-to-end phone-created remote Git project workflow"},
     {"id": "implementation-handoff", "url": "https://joynes.github.io/terminalhub/AI_IMPLEMENTATION_HANDOFF.md", "format": "markdown", "purpose": "Ordered implementation plan and acceptance criteria for launch-readiness work"},
     {"id": "background-ssh-plan", "url": "https://joynes.github.io/terminalhub/POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md", "format": "markdown", "purpose": "Policy-compliant background SSH design and Play submission plan"},
     {"id": "privacy", "url": "https://joynes.github.io/terminalhub/privacy-policy.html", "format": "html", "purpose": "User-facing privacy policy"}
@@ -33,6 +35,8 @@
     {"id": "mental-model", "url": "https://joynes.github.io/terminalhub/#mental-model", "keywords": ["server", "project", "tab", "tmux", "architecture"]},
     {"id": "requirements", "url": "https://joynes.github.io/terminalhub/#requirements", "keywords": ["android", "linux", "macos", "ssh", "tmux", "tailscale"]},
     {"id": "quick-start", "url": "https://joynes.github.io/terminalhub/#quick-start", "keywords": ["install", "setup", "first project"]},
+    {"id": "guide-multiple-tmux-projects", "url": "https://joynes.github.io/terminalhub/guides/multiple-tmux-projects.html", "keywords": ["multiple projects", "tmux", "android", "persistent tabs", "multi-server", "reconnect"]},
+    {"id": "guide-starting-git-projects", "url": "https://joynes.github.io/terminalhub/guides/starting-git-projects.html", "keywords": ["git", "clone", "android", "github", "private repository", "startup command"]},
     {"id": "servers", "url": "https://joynes.github.io/terminalhub/#servers", "keywords": ["host", "port", "username", "password", "private key", "authorized_keys"]},
     {"id": "projects", "url": "https://joynes.github.io/terminalhub/#projects", "keywords": ["git", "clone", "folder", "script", "command", "placeholder"]},
     {"id": "sessions", "url": "https://joynes.github.io/terminalhub/#sessions", "keywords": ["tabs", "restore", "reconnect", "tmux", "persistence"]},

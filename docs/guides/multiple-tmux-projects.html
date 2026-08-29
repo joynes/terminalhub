@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Set up and manage several persistent tmux projects across SSH servers from an Android phone with TerminalHub.">
+  <meta name="theme-color" content="#080912">
+  <link rel="canonical" href="https://joynes.github.io/terminalhub/guides/multiple-tmux-projects.html">
+  <link rel="icon" href="../assets/icon.png">
+  <link rel="stylesheet" href="../styles.css">
+  <title>Manage multiple tmux projects from Android | TerminalHub</title>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "Manage multiple tmux projects from Android",
+    "description": "Create persistent SSH project tabs on one or more servers and restore them through tmux with TerminalHub.",
+    "tool": ["TerminalHub for Android", "SSH server", "tmux"],
+    "step": [
+      {"@type":"HowToStep","name":"Prepare the server","text":"Install SSH, tmux, and the tools required by each project."},
+      {"@type":"HowToStep","name":"Add the server","text":"Create and test an SSH server profile in TerminalHub."},
+      {"@type":"HowToStep","name":"Add projects","text":"Create one TerminalHub project profile per remote project and keep tmux enabled."},
+      {"@type":"HowToStep","name":"Open project tabs","text":"Open each project and switch between its persistent tabs from Android."},
+      {"@type":"HowToStep","name":"Restore work","text":"Reconnect saved tabs and reattach to the existing tmux sessions."}
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to guide</a>
+  <header class="site-header">
+    <a class="brand" href="../" aria-label="TerminalHub documentation home">
+      <img src="../assets/icon.png" width="38" height="38" alt="">
+      <span>TerminalHub <em>/ guide</em></span>
+    </a>
+    <nav class="header-links" aria-label="External links">
+      <a href="../">Documentation</a>
+      <a href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Google Play</a>
+      <a href="https://github.com/joynes/terminalhub">Source</a>
+    </nav>
+  </header>
+
+  <main id="content">
+    <article class="doc-section">
+      <p class="eyebrow">PERSISTENT MOBILE WORKSPACE</p>
+      <h1>Manage multiple tmux projects from Android</h1>
+      <p class="lead">Use TerminalHub as the mobile control surface for several projects running on your own SSH servers. Each project gets a saved Android tab; tmux keeps its remote shell and processes alive when the connection disappears.</p>
+      <div class="callout important"><strong>No companion computer is required.</strong><p>You configure, start, inspect, and switch projects from the phone. At least one reachable server is still required because that is where the remote shells and processes run.</p></div>
+
+      <h2>What persists where</h2>
+      <div class="card-grid">
+        <article class="card"><h4>TerminalHub on Android</h4><p>Stores server and project profiles, open tabs, tab order, the active tab, and reconnect state.</p></article>
+        <article class="card"><h4>tmux on the server</h4><p>Keeps the remote shell, command output, and long-running processes alive across SSH disconnects and app restarts.</p></article>
+      </div>
+      <p>A live SSH socket is useful but not the durable state. Optional background SSH can reduce reconnects while switching apps, but tmux remains the recovery mechanism.</p>
+
+      <h2>1. Prepare each server</h2>
+      <p>Install an SSH server, tmux, Git, and the tools used by your projects. This Debian/Ubuntu example creates a common parent directory:</p>
+      <pre><code>sudo apt update
+sudo apt install openssh-server tmux git
+mkdir -p "$HOME/terminalhub"
+tmux -V</code></pre>
+      <p>For macOS, enable Remote Login and install tmux with <code>brew install tmux</code>. Prefer a private network or VPN such as Tailscale instead of exposing password-based SSH directly to the internet.</p>
+
+      <h2>2. Add and verify the server in TerminalHub</h2>
+      <ol class="steps">
+        <li><div><strong>Create a server profile.</strong><p>Enter a display name, hostname or IP address, SSH port, username, and projects folder such as <code>~/terminalhub</code>.</p></div></li>
+        <li><div><strong>Configure authentication.</strong><p>Generate an SSH key in TerminalHub, install its public key with a one-time password, or paste an existing private key. Never copy the private key to the server.</p></div></li>
+        <li><div><strong>Run Test SSH.</strong><p>On first contact, independently compare the displayed SHA-256 host-key fingerprint with the intended server before choosing <em>Trust and reconnect</em>.</p></div></li>
+      </ol>
+
+      <h2>3. Create one profile per project</h2>
+      <p>Each TerminalHub project combines a server, remote folder, tmux session, startup script, optional Git repository, and terminal tab. Keep <em>Use tmux</em> enabled for persistent remote projects.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Example tab</th><th>Server</th><th>Custom command</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>api</code></td><td>Home workstation</td><td><code>npm run dev</code></td><td>Backend development server</td></tr>
+          <tr><td><code>logs</code></td><td>VPS</td><td><code>journalctl -f -u myapp</code></td><td>Production monitoring</td></tr>
+          <tr><td><code>infra</code></td><td>Home server</td><td><code>htop</code></td><td>Operations shell</td></tr>
+          <tr><td><code>agent-docs</code></td><td>VPS</td><td><code>codex</code></td><td>Optional terminal AI session</td></tr>
+        </tbody>
+      </table></div>
+      <p>The default custom script changes to <code>{{PROJECT_PATH}}</code>. TerminalHub derives a shell-safe tmux name from the project name. A custom command starts only when a new tmux session is created, so reconnecting does not deliberately launch duplicates.</p>
+
+      <h2>4. Build the tab workspace</h2>
+      <ol>
+        <li>Open the first project. TerminalHub prepares its directory, creates the named tmux session, and adds a tab.</li>
+        <li>Open additional projects on the same server or on other servers.</li>
+        <li>Tap a tab to switch projects, reorder tabs to match your workflow, or swipe the special-key bar to move between connected tabs.</li>
+        <li>Use the multiline input panel for longer commands, pasted instructions, or text prepared with Android voice input.</li>
+        <li>Upload Android files into the active project, or open HTTP(S) links from terminal output in the phone's browser.</li>
+      </ol>
+
+      <h2>5. Disconnect and restore safely</h2>
+      <p>Leaving the app or changing networks may disconnect SSH. The project tab should remain visible. Reconnect the individual tab or use <em>Reconnect all</em>; TerminalHub opens replacement connections in parallel and keeps the tab that was active when reconnect began.</p>
+      <pre><code># Server-side check if a tab does not restore as expected
+tmux ls
+
+# Attach manually for diagnosis
+tmux attach -t project-session-name</code></pre>
+      <p>If Android killed the app, reopening it reconstructs the saved tab workspace and reconnects to the server. Existing tmux sessions are reused, so their commands and processes remain available.</p>
+
+      <h2>Troubleshooting</h2>
+      <div class="troubleshooting-list">
+        <details><summary>The tab reconnects but the process is gone</summary><div><p>Confirm that the project uses tmux and that the process was started inside its tmux session. Check <code>tmux ls</code> on the server.</p></div></details>
+        <details><summary>Several tabs ask about the same new host key</summary><div><p>TerminalHub groups matching first-contact prompts for the same host and port. Verify the fingerprint once through an independent channel, then approve the grouped reconnect.</p></div></details>
+        <details><summary>The server key changed unexpectedly</summary><div><p>Stop. Do not replace trust automatically. Verify the server was legitimately rebuilt, then use <em>Forget trusted key</em> in the server editor and run Test SSH again.</p></div></details>
+        <details><summary>Android reconnects too often while switching apps</summary><div><p>Enable the optional user-controlled background SSH setting. It displays an ongoing notification and Stop action. Android can still terminate the process; tmux remains the fallback.</p></div></details>
+      </div>
+
+      <h2>Security checklist</h2>
+      <ul class="check-list">
+        <li>Use SSH keys and protect the server account.</li>
+        <li>Verify every first-contact host-key fingerprint independently.</li>
+        <li>Use a VPN or restricted firewall rules where practical.</li>
+        <li>Do not paste passwords, private keys, tokens, or unredacted logs into public issues or AI conversations.</li>
+        <li>Remember that server-side programs can read data available to that server account.</li>
+      </ul>
+
+      <div class="link-row">
+        <a class="button primary" href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Install TerminalHub</a>
+        <a class="button" href="starting-git-projects.html">Start Git projects from Android</a>
+        <a class="button" href="../#sessions">Session reference</a>
+      </div>
+      <p class="updated">Verified against TerminalHub 1.263 · Updated 2026-08-29</p>
+    </article>
+  </main>
+
+  <footer><p>TerminalHub is open source under GPL-3.0. Built on adapted terminal components from Termux; not affiliated with or endorsed by Termux.</p></footer>
+</body>
+</html>

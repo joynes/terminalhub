@@ -1,6 +1,6 @@
 # TerminalHub full product and support context
 
-Documentation snapshot: 2026-08-25
+Documentation snapshot: 2026-08-29
 Canonical page: https://joynes.github.io/terminalhub/
 Repository: https://github.com/joynes/terminalhub
 
@@ -63,7 +63,10 @@ tmux session = remote shell/process container that survives transport and Androi
 
 Android persists server/project profiles, open tabs, tab order, active tab, settings, local logs, and text-input history. tmux persists the actual remote work. On app return, TerminalHub reconstructs saved tabs, reconnects SSH, and reattaches tmux.
 
-TerminalHub does not run an Android foreground service in the current production architecture. It does not guarantee a continuously live SSH socket while backgrounded. Remote persistence depends on tmux.
+TerminalHub offers an optional, explicitly user-started Android foreground
+service for active SSH project tabs. It displays an ongoing notification with a
+Stop action and is off by default. Android still does not guarantee a
+continuously live SSH socket; remote persistence depends on tmux.
 
 ## Requirements
 
@@ -73,6 +76,19 @@ TerminalHub does not run an Android foreground service in the current production
 - tmux installed on the remote machine for persistent sessions.
 - Optional Git and project-specific tools on the remote machine.
 - Private networking or a VPN such as Tailscale is recommended over public password SSH.
+
+## End-to-end workflow guides
+
+- https://joynes.github.io/terminalhub/guides/multiple-tmux-projects.html
+  explains how to prepare servers, create several tmux-backed project tabs,
+  separate Android tab persistence from remote tmux persistence, reconnect the
+  workspace, and diagnose common failures.
+- https://joynes.github.io/terminalhub/guides/starting-git-projects.html explains
+  the separate Android-to-server and server-to-Git-host authentication paths,
+  first-open shallow clone behavior, startup commands, file transfer, browser
+  links, and clone troubleshooting.
+- Use these guides for complete user workflows. Use the remaining sections as
+  canonical field and behavior references.
 
 ## Server configuration
 

@@ -20,6 +20,7 @@
     </a>
     <nav class="header-links" aria-label="External links">
       <a href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Google Play</a>
+      <a href="https://github.com/joynes/terminalhub/releases/latest">Download</a>
       <a href="https://github.com/joynes/terminalhub">Source</a>
       <a href="https://github.com/joynes/terminalhub/issues">Issues</a>
     </nav>
@@ -38,6 +39,7 @@
         <a href="#mental-model">Mental model</a>
         <a href="#requirements">Requirements</a>
         <a href="#quick-start">Quick start</a>
+        <a href="#guides">Workflow guides</a>
         <a href="#servers">Servers &amp; SSH</a>
         <a href="#projects">Projects</a>
         <a href="#sessions">Tabs &amp; persistence</a>
@@ -69,6 +71,7 @@
           <div class="actions">
             <a class="button primary" href="#quick-start">Set up your first project</a>
             <a class="button" href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub">Install from Google Play</a>
+            <a class="button" href="https://github.com/joynes/terminalhub/releases/latest">Download open-source release</a>
           </div>
           <dl class="fact-strip">
             <div><dt>Primary device</dt><dd>Android phone or tablet</dd></div>
@@ -263,6 +266,22 @@ mkdir -p "$HOME/terminalhub"
 # Verify from another machine before configuring the app
 ssh your-user@your-server
 tmux -V</code></pre></details>
+      </section>
+
+      <section class="doc-section" id="guides" data-search-title="Workflow guides">
+        <p class="eyebrow">PRACTICAL WORKFLOWS</p>
+        <h2>Build a phone-first server workspace</h2>
+        <p>These task-focused guides turn the reference documentation into complete workflows. They are written for both people and AI assistants, with explicit requirements, security boundaries, commands, failure modes, and stable URLs.</p>
+        <div class="card-grid">
+          <article class="card">
+            <h4><a href="guides/multiple-tmux-projects.html">Manage multiple tmux projects from Android</a></h4>
+            <p>Prepare one or more servers, create project tabs, understand what TerminalHub and tmux each persist, and recover the workspace after disconnects.</p>
+          </article>
+          <article class="card">
+            <h4><a href="guides/starting-git-projects.html">Start remote Git projects from Android</a></h4>
+            <p>Configure server-side Git access, shallow-clone a repository from a phone-created project, run startup commands, and diagnose authentication failures.</p>
+          </article>
+        </div>
       </section>
 
       <section class="doc-section" id="servers" data-search-title="Servers and SSH">
@@ -575,7 +594,7 @@ cd terminalhub
             <tr><th>AI dependency</th><td>None; terminal AI tools are optional server-side use cases</td></tr>
           </tbody>
         </table></div>
-        <p class="updated">Documentation snapshot: 2026-08-25 · <a href="https://github.com/joynes/terminalhub/edit/main/docs/index.html">Edit this page on GitHub</a></p>
+        <p class="updated">Documentation snapshot: 2026-08-29 · <a href="https://github.com/joynes/terminalhub/edit/main/docs/index.html">Edit this page on GitHub</a></p>
       </section>
     </main>
   </div>

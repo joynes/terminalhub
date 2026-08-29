@@ -18,6 +18,8 @@ The files in this directory are published at
   and changed-key recovery.
 - `privacy-policy.html` is the web version of `privacy-policy.md`; keep their
   claims synchronized.
+- `guides/` contains task-focused, search-friendly workflows with HowTo metadata
+  and stable routes for people and AI agents.
 - `assets/screenshots/` contains real Android emulator captures used in Google
   Play. Do not replace them with mockups without labeling them.
 
