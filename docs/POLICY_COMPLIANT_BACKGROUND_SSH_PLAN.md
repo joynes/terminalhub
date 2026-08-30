@@ -8,7 +8,7 @@ Implementation notes (2026-08-27):
 
 - Added an off-by-default, user-started setting with an explanatory confirmation.
 - Added a `specialUse` `START_NOT_STICKY` foreground service and ongoing Stop notification.
-- Added notification permission handling, live SSH tab counts, and automatic stop after the final SSH tab.
+- Added notification permission handling and live SSH tab counts. Once explicitly enabled, the mode remains active with a zero-session notification until the user stops it or Android ends the service.
 - Stop closes SSH transports without issuing `tmux kill-session`.
 - Process startup resets the mode to off, so it cannot silently restart.
 - Added reducer and notification-count tests for the required state transitions.
@@ -78,8 +78,9 @@ user separately chooses to kill them.
 - When the mode is on, the service keeps the app process at foreground-service
   priority and owns the lifetime signal for existing SSH transports.
 - New tabs opened while the service is running join the visible session count.
-- Closing the final SSH tab stops the service unless the UX explicitly offers a
-  useful idle state and Play accepts it. The preferred first version stops.
+- Closing the final SSH tab leaves the explicitly enabled service in a visible
+  idle state showing zero active connections. This avoids silently changing the
+  user's setting; the notification and Settings screen continue to provide Stop actions.
 - If the service or process is killed, do not silently restart it from the
   background. Recover through normal tmux reconnection when the user returns.
 - Never create a second source of SSH-session truth. The service should observe
@@ -192,7 +193,7 @@ roll back.
 - explicit start action enables service state;
 - tab connection alone never starts the service;
 - stop action closes transports but does not kill tmux;
-- final remote tab closes the service;
+- final remote tab leaves the explicitly enabled service visible in its zero-session idle state;
 - notification session count follows connected SSH sessions;
 - denied notification permission leaves the mode off;
 - process recovery does not start the service without a new user action.

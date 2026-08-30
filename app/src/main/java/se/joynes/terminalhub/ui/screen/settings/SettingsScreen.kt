@@ -100,7 +100,6 @@ fun SettingsScreen(
     fun showStartResult(result: BackgroundSshStartResult) {
         val message = when (result) {
             BackgroundSshStartResult.STARTED -> "Background SSH started"
-            BackgroundSshStartResult.NO_ACTIVE_SSH_SESSIONS -> "Open an SSH terminal first"
             BackgroundSshStartResult.NOTIFICATION_PERMISSION_REQUIRED -> "Notification permission is required"
             BackgroundSshStartResult.START_FAILED -> "Could not start background SSH"
         }
@@ -134,7 +133,8 @@ fun SettingsScreen(
             title = { Text("KEEP SSH ACTIVE IN BACKGROUND?") },
             text = {
                 Text(
-                    "TerminalHub will show an ongoing notification and may use battery and mobile data. " +
+                    "TerminalHub will show an ongoing notification, even when no SSH sessions are open, " +
+                        "and may use battery and mobile data. " +
                         "You can stop it from Settings or the notification; stopping closes SSH transports " +
                         "but leaves tmux sessions running. Android or the network can still interrupt it, " +
                         "so tmux remains the reliable fallback."
@@ -182,7 +182,7 @@ fun SettingsScreen(
                     ) {
                         SettingsToggleRow(
                             title = "Keep SSH active in background",
-                            description = "Recommended when switching apps. Uses an ongoing notification and may use battery and mobile data.",
+                            description = "Recommended when switching apps. Stays enabled with an ongoing notification until you stop it, including when no SSH sessions are open.",
                             status = if (settings.keepSshActiveInBackground) "Active" else "Off",
                             checked = settings.keepSshActiveInBackground,
                             onCheckedChange = { enabled ->

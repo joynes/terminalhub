@@ -16,8 +16,7 @@ enum class BackgroundSshMode {
 enum class BackgroundSshCommand {
     NONE,
     START_SERVICE,
-    STOP_AND_CLOSE_TRANSPORTS,
-    STOP_SERVICE_ONLY
+    STOP_AND_CLOSE_TRANSPORTS
 }
 
 sealed interface BackgroundSshEvent {
@@ -47,7 +46,6 @@ fun reduceBackgroundSshMode(
 ): BackgroundSshTransition = when (event) {
     is BackgroundSshEvent.UserStart -> when {
         !event.notificationPermissionGranted -> BackgroundSshTransition(BackgroundSshMode.OFF)
-        event.activeSshSessionCount <= 0 -> BackgroundSshTransition(BackgroundSshMode.OFF)
         current == BackgroundSshMode.OFF -> BackgroundSshTransition(
             BackgroundSshMode.STARTING,
             BackgroundSshCommand.START_SERVICE
@@ -61,11 +59,7 @@ fun reduceBackgroundSshMode(
     } else {
         BackgroundSshTransition(BackgroundSshMode.STOPPING, BackgroundSshCommand.STOP_AND_CLOSE_TRANSPORTS)
     }
-    BackgroundSshEvent.LastSshTabClosed -> if (current == BackgroundSshMode.ACTIVE || current == BackgroundSshMode.STARTING) {
-        BackgroundSshTransition(BackgroundSshMode.STOPPING, BackgroundSshCommand.STOP_SERVICE_ONLY)
-    } else {
-        BackgroundSshTransition(current)
-    }
+    BackgroundSshEvent.LastSshTabClosed -> BackgroundSshTransition(current)
     BackgroundSshEvent.PermissionDenied,
     BackgroundSshEvent.ServiceStopped,
     BackgroundSshEvent.ProcessStarted -> BackgroundSshTransition(BackgroundSshMode.OFF)

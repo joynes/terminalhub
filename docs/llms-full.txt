@@ -65,8 +65,9 @@ tmux session = remote shell/process container that survives transport and Androi
 Android persists server/project profiles, open tabs, tab order, active tab, settings, local logs, and text-input history. tmux persists the actual remote work. On app return, TerminalHub reconstructs saved tabs, reconnects SSH, and reattaches tmux.
 
 TerminalHub offers an optional, explicitly user-started Android foreground
-service for active SSH project tabs. It displays an ongoing notification with a
-Stop action and is off by default. Android still does not guarantee a
+service for SSH project tabs. It displays an ongoing notification with a Stop
+action and is off by default. Once enabled, its visible idle state remains active
+with zero sessions until the user stops it or Android ends the service. Android still does not guarantee a
 continuously live SSH socket; remote persistence depends on tmux.
 
 ## Requirements

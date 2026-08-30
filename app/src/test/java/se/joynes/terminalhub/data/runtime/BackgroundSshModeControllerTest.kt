@@ -38,14 +38,14 @@ class BackgroundSshModeControllerTest {
     }
 
     @Test
-    fun `last SSH tab stops service without another transport close`() {
+    fun `last SSH tab leaves explicitly enabled service active`() {
         val transition = reduceBackgroundSshMode(
             BackgroundSshMode.ACTIVE,
             BackgroundSshEvent.LastSshTabClosed
         )
 
-        assertEquals(BackgroundSshMode.STOPPING, transition.mode)
-        assertEquals(BackgroundSshCommand.STOP_SERVICE_ONLY, transition.command)
+        assertEquals(BackgroundSshMode.ACTIVE, transition.mode)
+        assertEquals(BackgroundSshCommand.NONE, transition.command)
     }
 
     @Test
@@ -71,14 +71,14 @@ class BackgroundSshModeControllerTest {
     }
 
     @Test
-    fun `start without an active SSH tab remains off`() {
+    fun `explicit start without an SSH tab enables idle notification mode`() {
         val transition = reduceBackgroundSshMode(
             BackgroundSshMode.OFF,
             BackgroundSshEvent.UserStart(notificationPermissionGranted = true, activeSshSessionCount = 0)
         )
 
-        assertEquals(BackgroundSshMode.OFF, transition.mode)
-        assertEquals(BackgroundSshCommand.NONE, transition.command)
+        assertEquals(BackgroundSshMode.STARTING, transition.mode)
+        assertEquals(BackgroundSshCommand.START_SERVICE, transition.command)
     }
 
     @Test

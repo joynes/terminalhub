@@ -60,7 +60,7 @@ class SettingsViewModel @Inject constructor(
         }
         if (transition.command != BackgroundSshCommand.START_SERVICE) {
             settingsRepository.setKeepSshActiveInBackground(false)
-            return BackgroundSshStartResult.NO_ACTIVE_SSH_SESSIONS
+            return BackgroundSshStartResult.START_FAILED
         }
         return BackgroundSshStartResult.START_FAILED
     }
@@ -112,7 +112,6 @@ class SettingsViewModel @Inject constructor(
 
 enum class BackgroundSshStartResult {
     STARTED,
-    NO_ACTIVE_SSH_SESSIONS,
     NOTIFICATION_PERMISSION_REQUIRED,
     START_FAILED
 }

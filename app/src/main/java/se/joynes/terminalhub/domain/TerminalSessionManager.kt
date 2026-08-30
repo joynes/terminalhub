@@ -19,13 +19,11 @@ import kotlinx.coroutines.launch
 import se.joynes.terminalhub.data.logging.AppLogger
 import se.joynes.terminalhub.data.logging.LogLevel
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
-import se.joynes.terminalhub.data.runtime.BackgroundSshCommand
 import se.joynes.terminalhub.data.runtime.BackgroundSshEvent
 import se.joynes.terminalhub.data.runtime.BackgroundSshModeController
 import se.joynes.terminalhub.data.ssh.SshConnection
 import se.joynes.terminalhub.data.ssh.SshManager
 import se.joynes.terminalhub.data.ssh.TerminalSessionClientImpl
-import se.joynes.terminalhub.service.BackgroundSshService
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.UUID
@@ -284,16 +282,7 @@ class TerminalSessionManager @Inject constructor(
         }
         logger.log(LogLevel.INFO, TAG, "Session closed: $closedProjectName")
         if (entries.values.none { it.conn != null }) {
-            val transition = backgroundSshModeController.dispatch(BackgroundSshEvent.LastSshTabClosed)
-            if (transition.command == BackgroundSshCommand.STOP_SERVICE_ONLY &&
-                runtimeRepository.state.value.foregroundServiceRunning
-            ) {
-                BackgroundSshService.requestStop(
-                    context,
-                    BackgroundSshService.STOP_REASON_LAST_SESSION_CLOSED,
-                    closeTransports = false
-                )
-            }
+            backgroundSshModeController.dispatch(BackgroundSshEvent.LastSshTabClosed)
         }
     }
 

@@ -308,7 +308,7 @@ Use the full matrix in `POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md`. At minimum:
 - explicit enable does;
 - notification appears immediately and reports a sanitized session count;
 - Stop works from notification and app;
-- final SSH tab stops the first-version service;
+- final SSH tab leaves the explicitly enabled service visible in its zero-session idle state;
 - denial of notification permission leaves the feature off with a clear message;
 - process recovery does not silently restart it;
 - tmux fallback reconnects without duplicate startup commands;

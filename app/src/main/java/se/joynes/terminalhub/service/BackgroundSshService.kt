@@ -20,7 +20,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -45,7 +44,6 @@ class BackgroundSshService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var countJob: Job? = null
-    private var idleStopJob: Job? = null
     private var foregroundStarted = false
     private var stopRecorded = false
 
@@ -74,7 +72,6 @@ class BackgroundSshService : Service() {
 
     override fun onDestroy() {
         countJob?.cancel()
-        idleStopJob?.cancel()
         serviceScope.cancel()
         settingsRepository.setKeepSshActiveInBackground(false)
         modeController.dispatch(BackgroundSshEvent.ServiceStopped)
@@ -93,11 +90,6 @@ class BackgroundSshService : Service() {
             return
         }
         val count = activeSshCount()
-        if (count == 0) {
-            stopWithoutRestart(STOP_REASON_NO_ACTIVE_SESSIONS, closeTransports = false)
-            return
-        }
-
         val notification = buildNotification(count)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
@@ -116,24 +108,8 @@ class BackgroundSshService : Service() {
                 .map { it.remoteProjectIds.size }
                 .distinctUntilChanged()
                 .collect { sessionCount ->
-                    if (sessionCount == 0) {
-                        scheduleIdleStop()
-                    } else {
-                        idleStopJob?.cancel()
-                        idleStopJob = null
-                        updateNotification(sessionCount)
-                    }
+                    updateNotification(sessionCount)
                 }
-        }
-    }
-
-    private fun scheduleIdleStop() {
-        if (idleStopJob?.isActive == true) return
-        idleStopJob = serviceScope.launch {
-            delay(TRANSIENT_SESSION_GRACE_MS)
-            if (activeSshCount() == 0) {
-                stopAndClose(STOP_REASON_LAST_SESSION_CLOSED, closeTransports = false)
-            }
         }
     }
 
@@ -208,17 +184,14 @@ class BackgroundSshService : Service() {
         const val ACTION_OPEN = "se.joynes.terminalhub.backgroundssh.OPEN"
         const val STOP_REASON_USER_SETTINGS = "user_stopped_from_settings"
         const val STOP_REASON_NOTIFICATION = "user_stopped_from_notification"
-        const val STOP_REASON_LAST_SESSION_CLOSED = "last_ssh_session_closed"
         const val STOP_REASON_SERVICE_DESTROYED = "service_destroyed"
         const val STOP_REASON_NOTIFICATION_PERMISSION = "notification_permission_denied"
-        const val STOP_REASON_NO_ACTIVE_SESSIONS = "no_active_ssh_sessions"
         const val STOP_REASON_MISSING_ACTION = "missing_or_unknown_action"
 
         private const val EXTRA_REASON = "stop_reason"
         private const val EXTRA_CLOSE_TRANSPORTS = "close_transports"
         private const val CHANNEL_ID = "background_ssh"
         private const val NOTIFICATION_ID = 4101
-        internal const val TRANSIENT_SESSION_GRACE_MS = 10_000L
         private const val TAG = "BackgroundSshService"
 
         fun requestStart(context: Context) {
