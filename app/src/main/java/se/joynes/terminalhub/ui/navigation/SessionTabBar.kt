@@ -13,7 +13,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -52,24 +51,36 @@ fun SessionTabBar(
     onSelect: (Long) -> Unit,
     onClose: (Long, TerminalSessionId?) -> Unit,
     onRestartTmux: (Long) -> Unit = {},
-    onMove: (Int, Int) -> Unit,
+    onReorder: (List<Long>) -> Unit,
     onAddProject: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var menuTabId by remember { mutableStateOf<Long?>(null) }
-    var reorderMode by rememberSaveable { mutableStateOf(false) }
+    var reorderMode by remember { mutableStateOf(false) }
+    var draftOrder by remember { mutableStateOf<List<Long>>(emptyList()) }
     var draggedTabId by remember { mutableStateOf<Long?>(null) }
     var dropTargetTabId by remember { mutableStateOf<Long?>(null) }
     var dragPointer by remember { mutableStateOf(Offset.Zero) }
     var dragTranslation by remember { mutableStateOf(Offset.Zero) }
     val tabBounds = remember { mutableStateMapOf<Long, Rect>() }
-    val latestTabs by rememberUpdatedState(tabs)
-    val latestOnMove by rememberUpdatedState(onMove)
+    val displayedTabs = if (reorderMode) {
+        val tabById = tabs.associateBy { it.projectId }
+        val ordered = draftOrder.mapNotNull(tabById::get)
+        ordered + tabs.filterNot { it.projectId in draftOrder }
+    } else {
+        tabs
+    }
+    val latestDisplayedTabs by rememberUpdatedState(displayedTabs)
+    val latestOnReorder by rememberUpdatedState(onReorder)
 
     LaunchedEffect(tabs.map { it.projectId }) {
         val currentIds = tabs.mapTo(mutableSetOf()) { it.projectId }
         tabBounds.keys.filterNot { it in currentIds }.forEach(tabBounds::remove)
+        if (reorderMode) {
+            draftOrder = draftOrder.filter { it in currentIds } +
+                tabs.map { it.projectId }.filterNot { it in draftOrder }
+        }
     }
 
     Column(
@@ -87,11 +98,26 @@ fun SessionTabBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "DRAG A TAB TO ITS NEW POSITION",
+                    "PREVIEW — DRAG TABS FREELY",
                     color = MegaDriveBg,
                     fontFamily = MonoFontFamily,
                     fontSize = 9.sp,
                     modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "CANCEL",
+                    color = MegaDriveBg,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 10.sp,
+                    modifier = Modifier
+                        .clickable {
+                            reorderMode = false
+                            draftOrder = emptyList()
+                            draggedTabId = null
+                            dropTargetTabId = null
+                            dragTranslation = Offset.Zero
+                        }
+                        .padding(horizontal = 6.dp, vertical = 6.dp)
                 )
                 Text(
                     "DONE",
@@ -100,12 +126,14 @@ fun SessionTabBar(
                     fontSize = 11.sp,
                     modifier = Modifier
                         .clickable {
+                            latestOnReorder(draftOrder)
                             reorderMode = false
+                            draftOrder = emptyList()
                             draggedTabId = null
                             dropTargetTabId = null
                             dragTranslation = Offset.Zero
                         }
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
                 )
             }
         }
@@ -116,7 +144,7 @@ fun SessionTabBar(
             verticalArrangement = Arrangement.Top,
             horizontalArrangement = Arrangement.Start
         ) {
-            tabs.forEach { tab ->
+            displayedTabs.forEach { tab ->
                 val isSelected = tab.sessionId != null && tab.sessionId == activeId
                 val bg = tabColor(tab.colorSeed, isSelected)
                 val textColor = when {
@@ -168,7 +196,7 @@ fun SessionTabBar(
                                                     change.consume()
                                                     dragPointer += dragAmount
                                                     dragTranslation += dragAmount
-                                                    val currentTabs = latestTabs
+                                                    val currentTabs = latestDisplayedTabs
                                                     val targetIndex = tabDropTargetIndex(
                                                         tabIds = currentTabs.map { it.projectId },
                                                         bounds = tabBounds,
@@ -178,7 +206,7 @@ fun SessionTabBar(
                                                         ?.let { currentTabs.getOrNull(it)?.projectId }
                                                 },
                                                 onDragEnd = {
-                                                    val currentTabs = latestTabs
+                                                    val currentTabs = latestDisplayedTabs
                                                     val fromIndex = currentTabs.indexOfFirst {
                                                         it.projectId == tab.projectId
                                                     }
@@ -186,7 +214,11 @@ fun SessionTabBar(
                                                         it.projectId == dropTargetTabId
                                                     }
                                                     if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
-                                                        latestOnMove(fromIndex, toIndex)
+                                                        draftOrder = moveTabId(
+                                                            currentTabs.map { it.projectId },
+                                                            fromIndex,
+                                                            toIndex
+                                                        )
                                                     }
                                                     draggedTabId = null
                                                     dropTargetTabId = null
@@ -235,6 +267,7 @@ fun SessionTabBar(
                                 enabled = tabs.size > 1,
                                 onClick = {
                                     menuTabId = null
+                                    draftOrder = tabs.map { it.projectId }
                                     reorderMode = true
                                 }
                             )
@@ -302,3 +335,12 @@ internal fun tabDropTargetIndex(
     }
     .minByOrNull { it.second }
     ?.first
+
+internal fun moveTabId(tabIds: List<Long>, fromIndex: Int, toIndex: Int): List<Long> {
+    if (fromIndex !in tabIds.indices || toIndex !in tabIds.indices || fromIndex == toIndex) {
+        return tabIds
+    }
+    return tabIds.toMutableList().apply {
+        add(toIndex, removeAt(fromIndex))
+    }
+}

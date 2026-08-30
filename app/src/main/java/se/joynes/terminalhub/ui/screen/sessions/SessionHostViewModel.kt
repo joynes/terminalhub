@@ -803,9 +803,19 @@ class SessionHostViewModel @Inject constructor(
         val visibleTabs = projectTabs.value
         if (fromIndex !in visibleTabs.indices || toIndex !in visibleTabs.indices) return
         val visibleIds = visibleTabs.map { it.projectId }.toMutableList()
-        val visibleIdSet = visibleIds.toSet()
         val movedId = visibleIds.removeAt(fromIndex)
         visibleIds.add(toIndex, movedId)
+        reorderSessions(visibleIds)
+    }
+
+    fun reorderSessions(visibleIds: List<Long>) {
+        val currentVisibleIds = projectTabs.value.map { it.projectId }
+        if (visibleIds.size != currentVisibleIds.size ||
+            visibleIds.toSet() != currentVisibleIds.toSet()
+        ) {
+            return
+        }
+        val visibleIdSet = visibleIds.toSet()
         val allIds = _allDbProjects.value.sortedByProjectOrder(_projectOrder.value).map { it.id }
         val reorderedVisible = ArrayDeque(visibleIds)
         val mergedOrder = allIds.map { projectId ->

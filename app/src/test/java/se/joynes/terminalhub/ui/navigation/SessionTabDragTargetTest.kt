@@ -26,4 +26,14 @@ class SessionTabDragTargetTest {
     fun `drag target follows current persisted order`() {
         assertEquals(0, tabDropTargetIndex(listOf(3L, 1L, 2L), bounds, Offset(30f, 48f)))
     }
+
+    @Test
+    fun `preview move changes the draft order`() {
+        assertEquals(listOf(2L, 3L, 1L), moveTabId(listOf(1L, 2L, 3L), 0, 2))
+    }
+
+    @Test
+    fun `invalid preview move preserves the draft order`() {
+        assertEquals(listOf(1L, 2L, 3L), moveTabId(listOf(1L, 2L, 3L), 0, 4))
+    }
 }

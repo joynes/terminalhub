@@ -630,7 +630,7 @@ fun SessionHostScreen(
                                 )
                             }
                         },
-                        onMove = { fromIndex, toIndex -> viewModel.moveSession(fromIndex, toIndex) },
+                        onReorder = viewModel::reorderSessions,
                         onAddProject = { onAddProject(serverId) },
                         modifier = Modifier
                             .fillMaxWidth()

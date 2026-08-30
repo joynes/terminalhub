@@ -36,7 +36,7 @@ class SessionTabSwipeTest {
                     onSelect = {},
                     onClose = { _, _ -> },
                     onRestartTmux = {},
-                    onMove = { _, _ -> },
+                    onReorder = {},
                     onAddProject = {}
                 )
             }
@@ -56,7 +56,7 @@ class SessionTabSwipeTest {
                     onSelect = {},
                     onClose = { _, _ -> },
                     onRestartTmux = {},
-                    onMove = { _, _ -> },
+                    onReorder = {},
                     onAddProject = {}
                 )
             }
@@ -81,7 +81,7 @@ class SessionTabSwipeTest {
                     onSelect = { selectedProjectId = it },
                     onClose = { _, _ -> },
                     onRestartTmux = {},
-                    onMove = { _, _ -> },
+                    onReorder = {},
                     onAddProject = {}
                 )
             }
@@ -103,7 +103,7 @@ class SessionTabSwipeTest {
                     onSelect = {},
                     onClose = { _, _ -> },
                     onRestartTmux = { restartedProjectId = it },
-                    onMove = { _, _ -> },
+                    onReorder = {},
                     onAddProject = {}
                 )
             }
@@ -117,6 +117,7 @@ class SessionTabSwipeTest {
 
     @Test
     fun longPressCanEnterDedicatedReorderMode() {
+        var committedOrder: List<Long>? = null
         val tabs = listOf(makeTab(1L, "first"), makeTab(2L, "second"))
         composeRule.setContent {
             TerminalHubTheme {
@@ -126,7 +127,7 @@ class SessionTabSwipeTest {
                     onSelect = {},
                     onClose = { _, _ -> },
                     onRestartTmux = {},
-                    onMove = { _, _ -> },
+                    onReorder = { committedOrder = it },
                     onAddProject = {}
                 )
             }
@@ -135,7 +136,38 @@ class SessionTabSwipeTest {
         composeRule.onNodeWithText("FIRST").performTouchInput { longClick() }
         composeRule.onNodeWithText("Reorder tabs").performClick()
 
-        composeRule.onNodeWithText("DRAG A TAB TO ITS NEW POSITION").assertIsDisplayed()
+        composeRule.onNodeWithText("PREVIEW — DRAG TABS FREELY").assertIsDisplayed()
+        composeRule.onNodeWithText("CANCEL").assertIsDisplayed()
         composeRule.onNodeWithText("DONE").assertIsDisplayed()
+        composeRule.runOnIdle { assertEquals(null, committedOrder) }
+
+        composeRule.onNodeWithText("DONE").performClick()
+        composeRule.runOnIdle { assertEquals(listOf(1L, 2L), committedOrder) }
+    }
+
+    @Test
+    fun cancelLeavesPersistedTabOrderUntouched() {
+        var committedOrder: List<Long>? = null
+        val tabs = listOf(makeTab(1L, "first"), makeTab(2L, "second"))
+        composeRule.setContent {
+            TerminalHubTheme {
+                SessionTabBar(
+                    tabs = tabs,
+                    activeId = tabs.first().sessionId,
+                    onSelect = {},
+                    onClose = { _, _ -> },
+                    onRestartTmux = {},
+                    onReorder = { committedOrder = it },
+                    onAddProject = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("FIRST").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Reorder tabs").performClick()
+        composeRule.onNodeWithText("CANCEL").performClick()
+
+        composeRule.runOnIdle { assertEquals(null, committedOrder) }
+        composeRule.onNodeWithText("FIRST").assertIsDisplayed()
     }
 }

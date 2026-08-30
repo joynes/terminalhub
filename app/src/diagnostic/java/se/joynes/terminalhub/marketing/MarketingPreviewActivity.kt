@@ -111,6 +111,7 @@ private fun MarketingScene(scene: String) {
 
 @Composable
 private fun DemoTerminalWorkspace(scene: String) {
+    var orderedTabs by remember(scene) { mutableStateOf(demoTabs) }
     val activeId = if (scene == "resume") TerminalSessionId("api") else TerminalSessionId("mobile")
     val esc = "\u001B"
     val output = when (scene) {
@@ -173,11 +174,14 @@ private fun DemoTerminalWorkspace(scene: String) {
     ) {
         Column(Modifier.fillMaxSize()) {
             SessionTabBar(
-                tabs = demoTabs,
+                tabs = orderedTabs,
                 activeId = activeId,
                 onSelect = {},
                 onClose = { _, _ -> },
-                onMove = { _, _ -> },
+                onReorder = { ids ->
+                    val tabsById = orderedTabs.associateBy { it.projectId }
+                    orderedTabs = ids.mapNotNull(tabsById::get)
+                },
                 onAddProject = {}
             )
             Row(
