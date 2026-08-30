@@ -4,6 +4,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -169,5 +170,48 @@ class SessionTabSwipeTest {
 
         composeRule.runOnIdle { assertEquals(null, committedOrder) }
         composeRule.onNodeWithText("FIRST").assertIsDisplayed()
+    }
+
+    @Test
+    fun droppedTabStaysAtPreviewPositionUntilDone() {
+        var committedOrder: List<Long>? = null
+        val tabs = listOf(makeTab(1L, "first"), makeTab(2L, "second"))
+        composeRule.setContent {
+            TerminalHubTheme {
+                SessionTabBar(
+                    tabs = tabs,
+                    activeId = tabs.first().sessionId,
+                    onSelect = {},
+                    onClose = { _, _ -> },
+                    onRestartTmux = {},
+                    onReorder = { committedOrder = it },
+                    onAddProject = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("FIRST").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Reorder tabs").performClick()
+
+        val firstCenter = composeRule.onNodeWithText("FIRST").fetchSemanticsNode().boundsInRoot.center
+        val secondCenter = composeRule.onNodeWithText("SECOND").fetchSemanticsNode().boundsInRoot.center
+        composeRule.onNodeWithText("FIRST").performTouchInput {
+            swipe(
+                start = center,
+                end = center + (secondCenter - firstCenter),
+                durationMillis = 400
+            )
+        }
+        composeRule.waitForIdle()
+
+        val previewFirstLeft = composeRule.onNodeWithText("FIRST")
+            .fetchSemanticsNode().boundsInRoot.left
+        val previewSecondLeft = composeRule.onNodeWithText("SECOND")
+            .fetchSemanticsNode().boundsInRoot.left
+        assertTrue("Dropped tab must remain in its preview slot", previewSecondLeft < previewFirstLeft)
+        composeRule.runOnIdle { assertEquals(null, committedOrder) }
+
+        composeRule.onNodeWithText("DONE").performClick()
+        composeRule.runOnIdle { assertEquals(listOf(2L, 1L), committedOrder) }
     }
 }

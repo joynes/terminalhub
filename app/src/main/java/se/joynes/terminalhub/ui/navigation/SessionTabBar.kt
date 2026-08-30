@@ -182,12 +182,14 @@ fun SessionTabBar(
                                 .then(
                                     if (reorderMode) {
                                         Modifier.pointerInput(tab.projectId) {
+                                            var gestureTargetId: Long? = tab.projectId
                                             detectDragGestures(
                                                 onDragStart = { localStart ->
                                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     menuTabId = null
                                                     draggedTabId = tab.projectId
                                                     dropTargetTabId = tab.projectId
+                                                    gestureTargetId = tab.projectId
                                                     dragTranslation = Offset.Zero
                                                     dragPointer =
                                                         (tabBounds[tab.projectId]?.topLeft ?: Offset.Zero) + localStart
@@ -202,8 +204,9 @@ fun SessionTabBar(
                                                         bounds = tabBounds,
                                                         pointer = dragPointer
                                                     )
-                                                    dropTargetTabId = targetIndex
+                                                    gestureTargetId = targetIndex
                                                         ?.let { currentTabs.getOrNull(it)?.projectId }
+                                                    dropTargetTabId = gestureTargetId
                                                 },
                                                 onDragEnd = {
                                                     val currentTabs = latestDisplayedTabs
@@ -211,7 +214,7 @@ fun SessionTabBar(
                                                         it.projectId == tab.projectId
                                                     }
                                                     val toIndex = currentTabs.indexOfFirst {
-                                                        it.projectId == dropTargetTabId
+                                                        it.projectId == gestureTargetId
                                                     }
                                                     if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
                                                         draftOrder = moveTabId(
