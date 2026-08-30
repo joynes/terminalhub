@@ -27,6 +27,7 @@ import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.terminalhub.data.runtime.BackgroundSshCommand
 import se.joynes.terminalhub.data.runtime.BackgroundSshEvent
+import se.joynes.terminalhub.data.runtime.BackgroundSshMode
 import se.joynes.terminalhub.data.runtime.BackgroundSshModeController
 import se.joynes.terminalhub.data.security.HostKeyChallenge
 import se.joynes.terminalhub.data.security.HostKeyCheckResult
@@ -530,20 +531,28 @@ class SessionHostViewModel @Inject constructor(
                 settingsRepository.setKeepSshActiveInBackground(false)
                 _uiMessages.tryEmit("Notification permission is required for background SSH")
             }
+            transition.mode == BackgroundSshMode.ACTIVE ||
+                transition.mode == BackgroundSshMode.STARTING -> {
+                settingsRepository.setKeepSshActiveInBackground(true)
+                if (transition.command == BackgroundSshCommand.START_SERVICE) {
+                    runCatching {
+                        BackgroundSshService.requestStart(context)
+                    }.onSuccess {
+                        _uiMessages.tryEmit("Background SSH started")
+                    }.onFailure {
+                        settingsRepository.setKeepSshActiveInBackground(false)
+                        backgroundSshModeController.dispatch(BackgroundSshEvent.ServiceStopped)
+                        _uiMessages.tryEmit("Could not start background SSH")
+                    }
+                } else {
+                    _uiMessages.tryEmit("Background SSH is already active")
+                }
+            }
             transition.command != BackgroundSshCommand.START_SERVICE -> {
                 settingsRepository.setKeepSshActiveInBackground(false)
                 _uiMessages.tryEmit("Open an SSH terminal before starting background SSH")
             }
-            else -> runCatching {
-                settingsRepository.setKeepSshActiveInBackground(true)
-                BackgroundSshService.requestStart(context)
-            }.onSuccess {
-                _uiMessages.tryEmit("Background SSH started")
-            }.onFailure {
-                settingsRepository.setKeepSshActiveInBackground(false)
-                backgroundSshModeController.dispatch(BackgroundSshEvent.ServiceStopped)
-                _uiMessages.tryEmit("Could not start background SSH")
-            }
+            else -> _uiMessages.tryEmit("Could not start background SSH")
         }
     }
 

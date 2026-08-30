@@ -80,4 +80,26 @@ class BackgroundSshModeControllerTest {
         assertEquals(BackgroundSshMode.OFF, transition.mode)
         assertEquals(BackgroundSshCommand.NONE, transition.command)
     }
+
+    @Test
+    fun `repeated user start keeps an active service active`() {
+        val transition = reduceBackgroundSshMode(
+            BackgroundSshMode.ACTIVE,
+            BackgroundSshEvent.UserStart(notificationPermissionGranted = true, activeSshSessionCount = 1)
+        )
+
+        assertEquals(BackgroundSshMode.ACTIVE, transition.mode)
+        assertEquals(BackgroundSshCommand.NONE, transition.command)
+    }
+
+    @Test
+    fun `repeated user start does not cancel a service that is starting`() {
+        val transition = reduceBackgroundSshMode(
+            BackgroundSshMode.STARTING,
+            BackgroundSshEvent.UserStart(notificationPermissionGranted = true, activeSshSessionCount = 1)
+        )
+
+        assertEquals(BackgroundSshMode.STARTING, transition.mode)
+        assertEquals(BackgroundSshCommand.NONE, transition.command)
+    }
 }

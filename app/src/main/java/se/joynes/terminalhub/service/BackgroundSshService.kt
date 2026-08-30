@@ -20,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -44,6 +45,7 @@ class BackgroundSshService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var countJob: Job? = null
+    private var idleStopJob: Job? = null
     private var foregroundStarted = false
     private var stopRecorded = false
 
@@ -72,6 +74,7 @@ class BackgroundSshService : Service() {
 
     override fun onDestroy() {
         countJob?.cancel()
+        idleStopJob?.cancel()
         serviceScope.cancel()
         settingsRepository.setKeepSshActiveInBackground(false)
         modeController.dispatch(BackgroundSshEvent.ServiceStopped)
@@ -114,11 +117,23 @@ class BackgroundSshService : Service() {
                 .distinctUntilChanged()
                 .collect { sessionCount ->
                     if (sessionCount == 0) {
-                        stopAndClose(STOP_REASON_LAST_SESSION_CLOSED, closeTransports = false)
+                        scheduleIdleStop()
                     } else {
+                        idleStopJob?.cancel()
+                        idleStopJob = null
                         updateNotification(sessionCount)
                     }
                 }
+        }
+    }
+
+    private fun scheduleIdleStop() {
+        if (idleStopJob?.isActive == true) return
+        idleStopJob = serviceScope.launch {
+            delay(TRANSIENT_SESSION_GRACE_MS)
+            if (activeSshCount() == 0) {
+                stopAndClose(STOP_REASON_LAST_SESSION_CLOSED, closeTransports = false)
+            }
         }
     }
 
@@ -203,6 +218,7 @@ class BackgroundSshService : Service() {
         private const val EXTRA_CLOSE_TRANSPORTS = "close_transports"
         private const val CHANNEL_ID = "background_ssh"
         private const val NOTIFICATION_ID = 4101
+        internal const val TRANSIENT_SESSION_GRACE_MS = 10_000L
         private const val TAG = "BackgroundSshService"
 
         fun requestStart(context: Context) {

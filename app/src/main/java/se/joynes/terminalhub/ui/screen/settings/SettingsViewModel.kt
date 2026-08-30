@@ -7,6 +7,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.terminalhub.data.runtime.BackgroundSshCommand
 import se.joynes.terminalhub.data.runtime.BackgroundSshEvent
+import se.joynes.terminalhub.data.runtime.BackgroundSshMode
 import se.joynes.terminalhub.data.runtime.BackgroundSshModeController
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveProfile
@@ -39,21 +40,29 @@ class SettingsViewModel @Inject constructor(
             settingsRepository.setKeepSshActiveInBackground(false)
             return BackgroundSshStartResult.NOTIFICATION_PERMISSION_REQUIRED
         }
+        if (transition.mode == BackgroundSshMode.ACTIVE ||
+            transition.mode == BackgroundSshMode.STARTING
+        ) {
+            settingsRepository.setKeepSshActiveInBackground(true)
+            if (transition.command == BackgroundSshCommand.START_SERVICE) {
+                return runCatching {
+                    BackgroundSshService.requestStart(context)
+                }.fold(
+                    onSuccess = { BackgroundSshStartResult.STARTED },
+                    onFailure = {
+                        settingsRepository.setKeepSshActiveInBackground(false)
+                        backgroundSshModeController.dispatch(BackgroundSshEvent.ServiceStopped)
+                        BackgroundSshStartResult.START_FAILED
+                    }
+                )
+            }
+            return BackgroundSshStartResult.STARTED
+        }
         if (transition.command != BackgroundSshCommand.START_SERVICE) {
             settingsRepository.setKeepSshActiveInBackground(false)
             return BackgroundSshStartResult.NO_ACTIVE_SSH_SESSIONS
         }
-        return runCatching {
-            settingsRepository.setKeepSshActiveInBackground(true)
-            BackgroundSshService.requestStart(context)
-        }.fold(
-            onSuccess = { BackgroundSshStartResult.STARTED },
-            onFailure = {
-                settingsRepository.setKeepSshActiveInBackground(false)
-                backgroundSshModeController.dispatch(BackgroundSshEvent.ServiceStopped)
-                BackgroundSshStartResult.START_FAILED
-            }
-        )
+        return BackgroundSshStartResult.START_FAILED
     }
 
     fun notificationPermissionDenied() {
