@@ -79,6 +79,7 @@ private data class PendingTmuxRestart(
 fun SessionHostScreen(
     requestedServerId: Long? = null,
     requestedProjectId: Long? = null,
+    reconnectAllRequested: Boolean = false,
     onOpenServers: () -> Unit,
     onAddServer: () -> Unit,
     onAddProject: (Long?) -> Unit,
@@ -89,6 +90,7 @@ fun SessionHostScreen(
     viewModel: SessionHostViewModel = hiltViewModel()
 ) {
     val projectTabs by viewModel.projectTabs.collectAsState()
+    var pendingReconnectAll by remember(reconnectAllRequested) { mutableStateOf(reconnectAllRequested) }
     val sessions by viewModel.sessionManager.sessions.collectAsState()
     val activeId by viewModel.activeId.collectAsState()
     val session by viewModel.activeSession.collectAsState()
@@ -432,6 +434,13 @@ fun SessionHostScreen(
     LaunchedEffect(requestedServerId) {
         viewModel.selectServer(requestedServerId)
         viewModel.init()
+    }
+
+    LaunchedEffect(pendingReconnectAll, projectTabs) {
+        if (pendingReconnectAll && projectTabs.isNotEmpty()) {
+            pendingReconnectAll = false
+            viewModel.reconnectAllDisconnected()
+        }
     }
 
     LaunchedEffect(requestedProjectId) {

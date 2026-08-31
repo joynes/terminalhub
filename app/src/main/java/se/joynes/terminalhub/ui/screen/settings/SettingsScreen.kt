@@ -77,6 +77,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSessions: () -> Unit,
     onOpenServers: () -> Unit,
+    onReconnectAll: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -205,6 +206,18 @@ fun SettingsScreen(
                             status = if (settings.preferFastResume) "Enabled" else "Disabled",
                             checked = settings.preferFastResume,
                             onCheckedChange = viewModel::setPreferFastResume
+                        )
+                        SettingsSeparator()
+                        RetroButton(
+                            text = "RECONNECT ALL",
+                            onClick = onReconnectAll,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            "Reconnects every disconnected SSH project tab in parallel.",
+                            color = MegaDriveDim,
+                            fontFamily = MonoFontFamily,
+                            fontSize = 11.sp
                         )
                     }
                 }

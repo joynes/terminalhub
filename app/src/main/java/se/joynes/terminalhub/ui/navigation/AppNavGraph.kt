@@ -97,16 +97,19 @@ fun AppNavGraph(
             Screen.SessionHost.route,
             arguments = listOf(
                 navArgument("serverId") { type = NavType.LongType; defaultValue = -1L },
-                navArgument("projectId") { type = NavType.LongType; defaultValue = -1L }
+                navArgument("projectId") { type = NavType.LongType; defaultValue = -1L },
+                navArgument("reconnectAll") { type = NavType.BoolType; defaultValue = false }
             )
         ) { backStackEntry ->
             val requestedServerId = backStackEntry.arguments?.getLong("serverId")?.takeIf { it >= 0 }
             val requestedProjectId = backStackEntry.arguments?.getLong("projectId")?.takeIf { it >= 0 }
+            val reconnectAll = backStackEntry.arguments?.getBoolean("reconnectAll") == true
             val viewModel = androidx.hilt.navigation.compose.hiltViewModel<se.joynes.terminalhub.ui.screen.sessions.SessionHostViewModel>()
             val serverId by viewModel.serverId.collectAsState()
             SessionHostScreen(
                 requestedServerId = requestedServerId,
                 requestedProjectId = requestedProjectId,
+                reconnectAllRequested = reconnectAll,
                 viewModel = viewModel,
                 sharedUri = sharedUri,
                 onConsumeSharedUri = onConsumeSharedUri,
@@ -133,7 +136,13 @@ fun AppNavGraph(
                         launchSingleTop = true
                     }
                 },
-                onOpenServers = { navController.navigate(Screen.ServerList.route) }
+                onOpenServers = { navController.navigate(Screen.ServerList.route) },
+                onReconnectAll = {
+                    navController.navigate(Screen.SessionHost.createRoute(reconnectAll = true)) {
+                        launchSingleTop = true
+                        popUpTo(Screen.SessionHost.route) { inclusive = false }
+                    }
+                }
             )
         }
         composable(
