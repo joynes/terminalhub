@@ -12,7 +12,6 @@ import se.joynes.terminalhub.data.runtime.BackgroundSshModeController
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveProfile
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveScope
-import se.joynes.terminalhub.domain.TerminalSessionManager
 import se.joynes.terminalhub.service.BackgroundSshService
 import javax.inject.Inject
 
@@ -21,7 +20,6 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: AppSettingsRepository,
     private val runtimeRepository: AppRuntimeRepository,
-    private val sessionManager: TerminalSessionManager,
     private val backgroundSshModeController: BackgroundSshModeController
 ) : ViewModel() {
     val settings = settingsRepository.settings
@@ -79,8 +77,9 @@ class SettingsViewModel @Inject constructor(
                 BackgroundSshService.STOP_REASON_USER_SETTINGS,
                 closeTransports = transition.command == BackgroundSshCommand.STOP_AND_CLOSE_TRANSPORTS
             )
-        } else if (transition.command == BackgroundSshCommand.STOP_AND_CLOSE_TRANSPORTS) {
-            sessionManager.closeAllRemoteTransports()
+        } else {
+            // The process/service was already gone. Clearing the remembered preference must not
+            // unexpectedly close SSH sessions that have since been restored in this new process.
             backgroundSshModeController.dispatch(BackgroundSshEvent.ServiceStopped)
         }
     }

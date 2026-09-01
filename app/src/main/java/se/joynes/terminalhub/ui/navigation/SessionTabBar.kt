@@ -182,14 +182,12 @@ fun SessionTabBar(
                                 .then(
                                     if (reorderMode) {
                                         Modifier.pointerInput(tab.projectId) {
-                                            var gestureTargetId: Long? = tab.projectId
                                             detectDragGestures(
                                                 onDragStart = { localStart ->
                                                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                                     menuTabId = null
                                                     draggedTabId = tab.projectId
                                                     dropTargetTabId = tab.projectId
-                                                    gestureTargetId = tab.projectId
                                                     dragTranslation = Offset.Zero
                                                     dragPointer =
                                                         (tabBounds[tab.projectId]?.topLeft ?: Offset.Zero) + localStart
@@ -204,25 +202,29 @@ fun SessionTabBar(
                                                         bounds = tabBounds,
                                                         pointer = dragPointer
                                                     )
-                                                    gestureTargetId = targetIndex
+                                                    val targetTabId = targetIndex
                                                         ?.let { currentTabs.getOrNull(it)?.projectId }
-                                                    dropTargetTabId = gestureTargetId
-                                                },
-                                                onDragEnd = {
-                                                    val currentTabs = latestDisplayedTabs
+                                                    dropTargetTabId = targetTabId
                                                     val fromIndex = currentTabs.indexOfFirst {
                                                         it.projectId == tab.projectId
                                                     }
-                                                    val toIndex = currentTabs.indexOfFirst {
-                                                        it.projectId == gestureTargetId
-                                                    }
-                                                    if (fromIndex >= 0 && toIndex >= 0 && fromIndex != toIndex) {
+                                                    if (fromIndex >= 0 && targetIndex != null &&
+                                                        fromIndex != targetIndex
+                                                    ) {
+                                                        // Reorder the draft as soon as the pointer crosses another
+                                                        // tab. This makes preview mode show the result before Done.
                                                         draftOrder = moveTabId(
                                                             currentTabs.map { it.projectId },
                                                             fromIndex,
-                                                            toIndex
+                                                            targetIndex
                                                         )
+                                                        hapticFeedback.performHapticFeedback(
+                                                            HapticFeedbackType.TextHandleMove
+                                                        )
+                                                        dragTranslation = Offset.Zero
                                                     }
+                                                },
+                                                onDragEnd = {
                                                     draggedTabId = null
                                                     dropTargetTabId = null
                                                     dragTranslation = Offset.Zero

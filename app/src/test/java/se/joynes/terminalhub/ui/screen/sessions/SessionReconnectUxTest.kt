@@ -76,6 +76,16 @@ class SessionReconnectUxTest {
         assertTrue(shouldSwitchToReplacementSession(true, inactive, active))
     }
 
+    @Test
+    fun `reconnect feedback says whether there is work to do`() {
+        assertEquals("All SSH tabs are already connected", reconnectFeedbackMessage(emptyList()))
+        assertEquals("Reconnecting api…", reconnectFeedbackMessage(listOf("api")))
+        assertEquals(
+            "Reconnecting 3 tabs in parallel…",
+            reconnectFeedbackMessage(listOf("api", "web", "worker"))
+        )
+    }
+
     private fun challenge(host: String, port: Int, key: ByteArray) = HostKeyChallenge(
         endpoint = SshEndpoint(host, port),
         kind = HostKeyChallengeKind.UNKNOWN,

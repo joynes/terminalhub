@@ -83,6 +83,12 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val runtimeState by viewModel.runtimeState.collectAsState()
     val backgroundSshMode by viewModel.backgroundSshMode.collectAsState()
+    val backgroundSshIsRunning = runtimeState.foregroundServiceRunning
+    val backgroundSshStatus = when {
+        !settings.keepSshActiveInBackground -> "Off"
+        backgroundSshIsRunning -> "Active"
+        else -> "Ready — tap Start"
+    }
     val context = LocalContext.current
     var showBackgroundSshConfirmation by remember { mutableStateOf(false) }
     var connectionsExpanded by rememberSaveable {
@@ -176,21 +182,42 @@ fun SettingsScreen(
                 item {
                     ExpandableSettingsSection(
                         title = "CONNECTION & BACKGROUND",
-                        summary = "Background ${if (settings.keepSshActiveInBackground) "active" else "off"} · SSH keepalive ${if (settings.sshKeepaliveEnabled) "on" else "off"}",
+                        summary = "Background ${backgroundSshStatus.lowercase()} · SSH keepalive ${if (settings.sshKeepaliveEnabled) "on" else "off"}",
                         importance = "MOST IMPORTANT",
                         expanded = connectionsExpanded,
                         onExpandedChange = { connectionsExpanded = it }
                     ) {
                         SettingsToggleRow(
                             title = "Keep SSH active in background",
-                            description = "Recommended when switching apps. Stays enabled with an ongoing notification until you stop it, including when no SSH sessions are open.",
-                            status = if (settings.keepSshActiveInBackground) "Active" else "Off",
+                            description = "Recommended when switching apps: without it, Android may disconnect SSH and you will need to reconnect. Your choice is remembered after updates and process restarts; tap Start to resume it.",
+                            status = backgroundSshStatus,
                             checked = settings.keepSshActiveInBackground,
                             onCheckedChange = { enabled ->
                                 if (enabled) showBackgroundSshConfirmation = true
                                 else viewModel.stopBackgroundSsh()
                             }
                         )
+                        if (!settings.keepSshActiveInBackground) {
+                            Text(
+                                "RECOMMENDED: enable this for a smoother experience when switching apps.",
+                                color = MegaDrivePrimary,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 11.sp
+                            )
+                        }
+                        if (settings.keepSshActiveInBackground && !backgroundSshIsRunning) {
+                            RetroButton(
+                                text = "START ACTIVE NOTIFICATION",
+                                onClick = ::requestBackgroundSshStart,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                "Android stopped the previous service. Your preference is saved, but this explicit tap is required to start it again.",
+                                color = MegaDriveDim,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 11.sp
+                            )
+                        }
                         SettingsSeparator()
                         SettingsToggleRow(
                             title = "SSH keepalive",

@@ -73,7 +73,6 @@ class BackgroundSshService : Service() {
     override fun onDestroy() {
         countJob?.cancel()
         serviceScope.cancel()
-        settingsRepository.setKeepSshActiveInBackground(false)
         modeController.dispatch(BackgroundSshEvent.ServiceStopped)
         if (!stopRecorded && foregroundStarted) {
             runtimeRepository.noteForegroundServiceStopped(STOP_REASON_SERVICE_DESTROYED, sessionManager.debugSnapshot())
@@ -121,7 +120,9 @@ class BackgroundSshService : Service() {
     private fun stopWithoutRestart(reason: String, closeTransports: Boolean) {
         if (stopRecorded) return
         stopRecorded = true
-        settingsRepository.setKeepSshActiveInBackground(false)
+        if (shouldClearBackgroundSshPreference(reason)) {
+            settingsRepository.setKeepSshActiveInBackground(false)
+        }
         modeController.dispatch(BackgroundSshEvent.ServiceStopped)
         runtimeRepository.noteForegroundServiceStopped(reason, sessionManager.debugSnapshot())
         logger.log(
@@ -214,3 +215,14 @@ class BackgroundSshService : Service() {
 
 internal fun backgroundSshNotificationText(activeSshCount: Int): String =
     if (activeSshCount == 1) "1 active SSH connection" else "$activeSshCount active SSH connections"
+
+/**
+ * The saved preference is distinct from a running foreground service. Android may stop a service
+ * or process at any time; retain the user's choice, but never use it to restart the service
+ * automatically. Only an explicit opt-out (or a missing required notification permission)
+ * clears it.
+ */
+internal fun shouldClearBackgroundSshPreference(stopReason: String): Boolean =
+    stopReason == BackgroundSshService.STOP_REASON_USER_SETTINGS ||
+        stopReason == BackgroundSshService.STOP_REASON_NOTIFICATION ||
+        stopReason == BackgroundSshService.STOP_REASON_NOTIFICATION_PERMISSION

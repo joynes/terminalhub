@@ -217,6 +217,7 @@ fun SessionHostScreen(
                 Text(
                     "Recommended if you regularly switch to other apps. TerminalHub can keep active SSH " +
                         "connections alive with an ongoing notification, reducing reconnects when you return. " +
+                        "Without it, switching away may mean reconnecting before you can continue. " +
                         "It may use battery and mobile data, and Android or the network can still interrupt it. " +
                         "tmux remains the reliable fallback. You can turn this off at any time in Settings."
                 )

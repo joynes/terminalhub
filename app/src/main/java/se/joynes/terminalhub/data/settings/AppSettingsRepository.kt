@@ -80,13 +80,6 @@ class AppSettingsRepository @Inject constructor(
         update(_settings.value.copy(backgroundSshRecommendationHandled = handled))
     }
 
-    /** Active background mode never survives a process restart or starts itself again. */
-    fun resetBackgroundSshModeForProcessStart() {
-        if (_settings.value.keepSshActiveInBackground) {
-            setKeepSshActiveInBackground(false)
-        }
-    }
-
     fun setBackgroundKeepaliveProfile(profile: BackgroundKeepaliveProfile) {
         update(_settings.value.copy(backgroundKeepaliveProfile = profile))
     }

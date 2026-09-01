@@ -110,6 +110,12 @@ internal fun shouldSwitchToReplacementSession(
     activeSessionId: TerminalSessionId?
 ): Boolean = autoSwitch || (replacementSessionId != null && replacementSessionId == activeSessionId)
 
+internal fun reconnectFeedbackMessage(projectNames: List<String>): String = when (projectNames.size) {
+    0 -> "All SSH tabs are already connected"
+    1 -> "Reconnecting ${projectNames.single()}…"
+    else -> "Reconnecting ${projectNames.size} tabs in parallel…"
+}
+
 data class SessionHomeState(
     val serverCount: Int = 0,
     val projectCount: Int = 0,
@@ -686,7 +692,7 @@ class SessionHostViewModel @Inject constructor(
     }
 
     fun reconnectProject(projectId: Long) {
-        reconnectProject(projectId, autoSwitch = true)
+        reconnectProject(projectId, autoSwitch = true, showFeedback = true)
     }
 
     fun restartTmuxProject(projectId: Long) {
@@ -779,11 +785,14 @@ class SessionHostViewModel @Inject constructor(
         }
     }
 
-    private fun reconnectProject(projectId: Long, autoSwitch: Boolean) {
+    private fun reconnectProject(projectId: Long, autoSwitch: Boolean, showFeedback: Boolean = false) {
         val project = _allDbProjects.value.find { it.id == projectId } ?: return
+        if (projectId in connectingProjectIds.value) {
+            if (showFeedback) _uiMessages.tryEmit("${project.name} is already reconnecting")
+            return
+        }
         val existingSessionId = sessionManager.sessions.value.firstOrNull { it.projectId == projectId }?.id
-        connectingJobs.remove(projectId)?.cancel()
-        connectingProjectIds.value = connectingProjectIds.value - projectId
+        if (showFeedback) _uiMessages.tryEmit(reconnectFeedbackMessage(listOf(project.name)))
         sessionManager.markProjectOpen(projectId)
         logger.log(LogLevel.INFO, "SessionRecovery", "Manual reconnect requested for projectId=$projectId")
         viewModelScope.launch { projectRepo.updateLastOpenedAt(projectId, System.currentTimeMillis()) }
@@ -801,10 +810,15 @@ class SessionHostViewModel @Inject constructor(
         val disconnected = projectTabs.value.filter { tab ->
             tab.targetType == ProjectTargetType.SSH && !tab.isConnected && !tab.isConnecting
         }
+        _uiMessages.tryEmit(reconnectFeedbackMessage(disconnected.map { it.projectName }))
         // Each call launches its own connection job immediately. Keep focus on the tab that was
         // active when reconnect-all started instead of switching tabs as each connection finishes.
         disconnected.forEach { tab ->
-            reconnectProject(tab.projectId, autoSwitch = tab.projectId == activeProjectId)
+            reconnectProject(
+                projectId = tab.projectId,
+                autoSwitch = tab.projectId == activeProjectId,
+                showFeedback = false
+            )
         }
     }
 

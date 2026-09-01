@@ -10,7 +10,8 @@ Implementation notes (2026-08-27):
 - Added a `specialUse` `START_NOT_STICKY` foreground service and ongoing Stop notification.
 - Added notification permission handling and live SSH tab counts. Once explicitly enabled, the mode remains active with a zero-session notification until the user stops it or Android ends the service.
 - Stop closes SSH transports without issuing `tmux kill-session`.
-- Process startup resets the mode to off, so it cannot silently restart.
+- Process startup ends the running mode but preserves the user's preference. It
+  cannot silently restart; the user must tap Start in the visible app to resume it.
 - Added reducer and notification-count tests for the required state transitions.
 
 ## Objective
@@ -82,7 +83,8 @@ user separately chooses to kill them.
   idle state showing zero active connections. This avoids silently changing the
   user's setting; the notification and Settings screen continue to provide Stop actions.
 - If the service or process is killed, do not silently restart it from the
-  background. Recover through normal tmux reconnection when the user returns.
+  background. Keep the saved preference and offer an explicit visible Start
+  action when the user returns; recover remote work through normal tmux reconnection.
 - Never create a second source of SSH-session truth. The service should observe
   the existing `SshManager` and `TerminalSessionManager` state.
 
