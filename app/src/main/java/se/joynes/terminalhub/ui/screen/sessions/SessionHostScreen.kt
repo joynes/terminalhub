@@ -854,15 +854,22 @@ fun SessionHostScreen(
                             else -> {
                                 Text(
                                     "NO SERVER",
-                                    color = MegaDriveDim,
+                                    color = MegaDriveOnSurface,
                                     fontSize = 12.sp,
                                     fontFamily = MonoFontFamily
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 Text(
-                                    "Add a server first. Then create a project to start a terminal session.",
-                                    color = MegaDriveDim,
+                                    "Start with a server, test SSH using a key, then create a project. The server screen includes a guide for starting SSH and finding its IP address.",
+                                    color = MegaDriveOnSurface,
                                     fontSize = 11.sp,
+                                    fontFamily = MonoFontFamily
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    "1  ADD SERVER   →   2  TEST SSH   →   3  ADD PROJECT   →   4  ENABLE ACTIVE NOTIFICATION",
+                                    color = MegaDrivePrimary,
+                                    fontSize = 10.sp,
                                     fontFamily = MonoFontFamily
                                 )
                                 Spacer(Modifier.height(16.dp))

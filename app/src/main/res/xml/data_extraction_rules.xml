@@ -5,15 +5,10 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <!-- SSH passwords and private keys remain device-local. -->
+        <exclude domain="sharedpref" path="ssh_secure_prefs.xml" />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="sharedpref" path="ssh_secure_prefs.xml" />
     </device-transfer>
-    -->
 </data-extraction-rules>

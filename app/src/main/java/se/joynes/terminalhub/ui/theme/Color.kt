@@ -11,5 +11,6 @@ val MegaDriveSurface = Color(0xFF1A1A2E)
 val MegaDriveOnSurface = Color(0xFFE0E0E0)
 val MegaDriveGreen = Color(0xFF39FF14)
 val MegaDriveBlue = Color(0xFF0055FF)
-val MegaDriveDim = Color(0xFF333350)
+// Secondary copy must remain comfortably readable on the dark terminal surface.
+val MegaDriveDim = Color(0xFFA8A8BE)
 val MegaDriveError = Color(0xFFFF3333)

@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -26,6 +27,9 @@ fun AddEditServerScreen(
     val state by viewModel.state.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     var showForgetConfirmation by remember { mutableStateOf(false) }
+    var showServerSetupHelp by rememberSaveable { mutableStateOf(false) }
+    var showPasswordOption by rememberSaveable { mutableStateOf(false) }
+    var showPrivateKeyEntry by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(serverId) { viewModel.loadServer(serverId) }
     LaunchedEffect(state.saved) { if (state.saved) onBack() }
@@ -77,6 +81,28 @@ fun AddEditServerScreen(
         )
     }
 
+    if (showServerSetupHelp) {
+        AlertDialog(
+            onDismissRequest = { showServerSetupHelp = false },
+            title = { Text("START OR FIND A SERVER") },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text("1. Start SSH on the computer you want to reach.")
+                    Text("macOS: System Settings → General → Sharing → Remote Login.\nUbuntu/Debian: sudo apt install openssh-server && sudo systemctl enable --now ssh\nWindows: Settings → System → Optional features → OpenSSH Server, then start the OpenSSH SSH Server service.")
+                    Text("2. Find its local IP address. macOS/Linux: hostname -I or ip addr. Windows: ipconfig. Use an address such as 192.168.1.42 while your phone is on the same Wi-Fi.")
+                    Text("3. Enter that IP, port 22, and the username from the computer. Generate an SSH key, install or copy only its public part, then Test SSH and verify the displayed fingerprint.")
+                    Text("For access away from home, use a secure private network such as Tailscale or configure your network carefully. Do not expose SSH to the internet without understanding the security implications.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showServerSetupHelp = false }) { Text("GOT IT") }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             RetroTopBar(
@@ -98,7 +124,12 @@ fun AddEditServerScreen(
         ) {
             SecurityNote(
                 title = "RECOMMENDED SETUP",
-                body = "Use SSH keys. TerminalHub keeps the private key on this Android device. The server only needs the public key. Password login is optional and best used once to install the public key."
+                body = "Use SSH keys. The private key is encrypted and kept only on this Android device; the server only needs the public key. Password login is an optional one-time setup method."
+            )
+            RetroButton(
+                text = "[ HOW TO START A SERVER / FIND ITS IP ]",
+                onClick = { showServerSetupHelp = true },
+                modifier = Modifier.fillMaxWidth()
             )
             SectionTitle("1. SERVER")
             RetroTextField(state.name, { viewModel.update { copy(name = it) } }, "Display name *", Modifier.fillMaxWidth())
@@ -141,41 +172,43 @@ fun AddEditServerScreen(
             }
 
             SectionTitle("2. AUTHENTICATION")
-            RetroTextField(state.password, { viewModel.update { copy(password = it) } }, "One-time password (optional)", Modifier.fillMaxWidth(), isPassword = true)
-            HelpText("Not recommended for normal use. Add it only if you want TerminalHub to install the public key for you once.")
-            Text("PRIVATE KEY - LOCAL ONLY", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
-            OutlinedTextField(
-                value = state.privateKey,
-                onValueChange = { viewModel.update { copy(privateKey = it) } },
-                placeholder = {
-                    Text(
-                        if (state.hasSavedPrivateKey) "Private key saved locally. Paste a new PEM key only to replace it." else "Optional: paste an existing private key into the app. Do not copy this to the server.",
-                        color = MegaDriveDim,
-                        fontSize = 11.sp,
-                        fontFamily = MonoFontFamily
+            Text("SSH KEY — RECOMMENDED", color = MegaDrivePrimary, fontSize = 12.sp, fontFamily = MonoFontFamily)
+            HelpText("Generate a key here. TerminalHub stores its private half encrypted on this device; install or copy only the public half to the server.")
+            if (showPrivateKeyEntry) {
+                OutlinedTextField(
+                    value = state.privateKey,
+                    onValueChange = { viewModel.update { copy(privateKey = it) } },
+                    placeholder = {
+                        Text("Paste an existing PEM private key to replace the local key.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
+                    },
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontFamily = MonoFontFamily, fontSize = 11.sp, color = MegaDriveOnSurface),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MegaDrivePrimary,
+                        unfocusedBorderColor = MegaDriveDim,
+                        focusedTextColor = MegaDriveOnSurface,
+                        unfocusedTextColor = MegaDriveOnSurface,
+                        cursorColor = MegaDrivePrimary
                     )
-                },
-                modifier = Modifier.fillMaxWidth().height(120.dp),
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = MonoFontFamily,
-                    fontSize = 11.sp,
-                    color = MegaDriveOnSurface
-                ),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MegaDrivePrimary,
-                    unfocusedBorderColor = MegaDriveDim,
-                    focusedTextColor = MegaDriveOnSurface,
-                    unfocusedTextColor = MegaDriveOnSurface,
-                    cursorColor = MegaDrivePrimary
                 )
-            )
+                RetroButton(
+                    text = "[ HIDE PRIVATE KEY FIELD ]",
+                    onClick = { showPrivateKeyEntry = false },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                RetroButton(
+                    text = if (state.hasSavedPrivateKey || state.privateKey.isNotBlank()) "[ REPLACE PRIVATE KEY ]" else "[ I HAVE A PRIVATE KEY ]",
+                    onClick = { showPrivateKeyEntry = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             if (state.privateKey.isNotBlank() || state.hasSavedPrivateKey) {
                 NeonStatusBadge(
                     text = if (state.privateKey.isNotBlank()) "KEY READY" else "KEY SAVED",
                     color = MegaDriveGreen
                 )
             }
-            HelpText("Generate a new key here unless you already know which private key you want to use.")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -197,11 +230,33 @@ fun AddEditServerScreen(
                 )
             }
             Text(
-                "Automatic install needs host, username, one-time password, and a generated public key.",
+                "Automatic install uses a one-time password only to add the public key. It is not needed for normal SSH key login.",
                 color = MegaDriveDim,
                 fontSize = 10.sp,
                 fontFamily = MonoFontFamily
             )
+            if (showPasswordOption) {
+                Text("ONE-TIME PASSWORD — OPTIONAL", color = MegaDriveWarning, fontSize = 12.sp, fontFamily = MonoFontFamily)
+                RetroTextField(
+                    state.password,
+                    { viewModel.update { copy(password = it) } },
+                    "Password for public-key install",
+                    Modifier.fillMaxWidth(),
+                    isPassword = true
+                )
+                HelpText("Used only to install the generated public key. Prefer removing or leaving this empty after setup.")
+                RetroButton(
+                    text = "[ HIDE PASSWORD OPTION ]",
+                    onClick = { showPasswordOption = false },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                RetroButton(
+                    text = "[ USE ONE-TIME PASSWORD TO INSTALL KEY ]",
+                    onClick = { showPasswordOption = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             if (state.publicKey.isNotBlank()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

@@ -34,10 +34,37 @@ class AddEditServerScreenTest {
         composeRule.setContent {
             TerminalHubTheme { AddEditServerScreen(serverId = null, onBack = {}) }
         }
-        composeRule.onNodeWithText("Hostname / IP *", useUnmergedTree = true)
+        composeRule.onNodeWithText("Host or IP address *", useUnmergedTree = true)
             .performTextInput("192.168.1.1")
-        composeRule.onNodeWithText("Username *", useUnmergedTree = true)
+        composeRule.onNodeWithText("SSH username *", useUnmergedTree = true)
             .performTextInput("admin")
         composeRule.onNodeWithText("[ SAVE ]").assertIsEnabled()
+    }
+
+    @Test
+    fun privateKeyEntryIsHiddenUntilUserExplicitlyRequestsIt() {
+        composeRule.setContent {
+            TerminalHubTheme { AddEditServerScreen(serverId = null, onBack = {}) }
+        }
+
+        composeRule.onNodeWithText("[ I HAVE A PRIVATE KEY ]").assertIsDisplayed()
+        composeRule.onNodeWithText("Paste an existing PEM private key to replace the local key.")
+            .assertDoesNotExist()
+
+        composeRule.onNodeWithText("[ I HAVE A PRIVATE KEY ]").performClick()
+        composeRule.onNodeWithText("Paste an existing PEM private key to replace the local key.")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun serverSetupGuideIsAvailableBeforeEnteringCredentials() {
+        composeRule.setContent {
+            TerminalHubTheme { AddEditServerScreen(serverId = null, onBack = {}) }
+        }
+
+        composeRule.onNodeWithText("[ HOW TO START A SERVER / FIND ITS IP ]").performClick()
+        composeRule.onNodeWithText("START OR FIND A SERVER").assertIsDisplayed()
+        composeRule.onNodeWithText("1. Start SSH on the computer you want to reach.")
+            .assertIsDisplayed()
     }
 }
