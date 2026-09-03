@@ -867,7 +867,7 @@ fun SessionHostScreen(
                                 )
                                 Spacer(Modifier.height(12.dp))
                                 Text(
-                                    "1  ADD SERVER   →   2  TEST SSH   →   3  ADD PROJECT   →   4  ENABLE ACTIVE NOTIFICATION",
+                                    "1  ADD SERVER   →   2  TEST SSH   →   3  ADD PROJECT   →   4  ACTIVE NOTIFICATION   →   5  BATTERY: UNRESTRICTED",
                                     color = MegaDrivePrimary,
                                     fontSize = 10.sp,
                                     fontFamily = MonoFontFamily

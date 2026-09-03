@@ -38,4 +38,10 @@ class SettingsHierarchyTest {
         assertEquals("Active tab only", backgroundScopeLabel(BackgroundKeepaliveScope.ACTIVE_TAB_ONLY))
         assertEquals("All SSH sessions", backgroundScopeLabel(BackgroundKeepaliveScope.ALL_SESSIONS))
     }
+
+    @Test
+    fun `battery optimization status clearly distinguishes completed setup`() {
+        assertEquals("Exemption detected", batteryOptimizationStatusLabel(exempt = true))
+        assertEquals("Not exempt — recommended", batteryOptimizationStatusLabel(exempt = false))
+    }
 }

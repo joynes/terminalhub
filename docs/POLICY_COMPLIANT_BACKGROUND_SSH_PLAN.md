@@ -147,12 +147,14 @@ the requirement and keep the mode off.
 Do not restore `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` in the first version.
 Google Play restricts direct exemption requests to narrow acceptable use cases.
 
-TerminalHub may provide a secondary **Open Android battery settings** link using
-the general battery-optimization settings intent. This should:
+TerminalHub provides an explicit **Battery optimization** row in Connection &
+Background using the general battery-optimization settings intent. It reports
+the Android Doze-exemption status after the user returns. This should:
 
 - avoid declaring the direct exemption permission;
 - avoid launching settings automatically;
-- explain that changing the setting is optional;
+- recommend the change for users who choose persistent background SSH while
+  making clear that it remains a user-controlled system setting;
 - avoid claiming that an exemption guarantees a live connection; and
 - remain separate from the primary foreground-service opt-in.
 

@@ -94,6 +94,7 @@ fun AddEditServerScreen(
                     Text("macOS: System Settings → General → Sharing → Remote Login.\nUbuntu/Debian: sudo apt install openssh-server && sudo systemctl enable --now ssh\nWindows: Settings → System → Optional features → OpenSSH Server, then start the OpenSSH SSH Server service.")
                     Text("2. Find its local IP address. macOS/Linux: hostname -I or ip addr. Windows: ipconfig. Use an address such as 192.168.1.42 while your phone is on the same Wi-Fi.")
                     Text("3. Enter that IP, port 22, and the username from the computer. Generate an SSH key, install or copy only its public part, then Test SSH and verify the displayed fingerprint.")
+                    Text("4. After your first connection, enable Active notification and open TerminalHub Settings → Connection & Background → Battery optimization. In Android, choose Unrestricted or Don't optimize. This reduces reconnects when the screen is off or you switch apps.")
                     Text("For access away from home, use a secure private network such as Tailscale or configure your network carefully. Do not expose SSH to the internet without understanding the security implications.")
                 }
             },

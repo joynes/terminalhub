@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -50,9 +51,11 @@ import se.joynes.terminalhub.ui.components.RetroCard
 import se.joynes.terminalhub.ui.components.RetroTopBar
 import se.joynes.terminalhub.ui.theme.MegaDriveBg
 import se.joynes.terminalhub.ui.theme.MegaDriveDim
+import se.joynes.terminalhub.ui.theme.MegaDriveGreen
 import se.joynes.terminalhub.ui.theme.MegaDriveOnSurface
 import se.joynes.terminalhub.ui.theme.MegaDrivePrimary
 import se.joynes.terminalhub.ui.theme.MegaDriveSurface
+import se.joynes.terminalhub.ui.theme.MegaDriveWarning
 import se.joynes.terminalhub.ui.theme.MonoFontFamily
 
 internal enum class SettingsSectionId {
@@ -72,6 +75,15 @@ internal val settingsSectionOrder = listOf(
 internal fun isSettingsSectionExpandedByDefault(section: SettingsSectionId): Boolean =
     section == SettingsSectionId.CONNECTIONS || section == SettingsSectionId.TERMINAL_INPUT
 
+internal fun batteryOptimizationStatusLabel(exempt: Boolean): String =
+    if (exempt) "Exemption detected" else "Not exempt — recommended"
+
+private fun isBatteryOptimizationExempt(context: android.content.Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
+    val powerManager = context.getSystemService(PowerManager::class.java) ?: return false
+    return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+}
+
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
@@ -90,6 +102,9 @@ fun SettingsScreen(
         else -> "Ready — tap Start"
     }
     val context = LocalContext.current
+    var batteryOptimizationExempt by remember {
+        mutableStateOf(isBatteryOptimizationExempt(context))
+    }
     var showBackgroundSshConfirmation by remember { mutableStateOf(false) }
     var connectionsExpanded by rememberSaveable {
         mutableStateOf(isSettingsSectionExpandedByDefault(SettingsSectionId.CONNECTIONS))
@@ -122,6 +137,12 @@ fun SettingsScreen(
             viewModel.notificationPermissionDenied()
             showStartResult(BackgroundSshStartResult.NOTIFICATION_PERMISSION_REQUIRED)
         }
+    }
+
+    val batterySettingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        batteryOptimizationExempt = isBatteryOptimizationExempt(context)
     }
 
     fun requestBackgroundSshStart() {
@@ -235,6 +256,41 @@ fun SettingsScreen(
                             onCheckedChange = viewModel::setPreferFastResume
                         )
                         SettingsSeparator()
+                        SettingsSubheading(
+                            title = "BATTERY OPTIMIZATION",
+                            description = "Recommended for reliable SSH when the screen is off or you switch apps. Open Android settings, find TerminalHub, and choose Unrestricted or Don't optimize."
+                        )
+                        Text(
+                            batteryOptimizationStatusLabel(batteryOptimizationExempt),
+                            color = if (batteryOptimizationExempt) MegaDriveGreen else MegaDriveWarning,
+                            fontFamily = MonoFontFamily,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        RetroButton(
+                            text = if (batteryOptimizationExempt) {
+                                "OPEN BATTERY SETTINGS"
+                            } else {
+                                "SET BATTERY TO UNRESTRICTED"
+                            },
+                            onClick = {
+                                runCatching {
+                                    batterySettingsLauncher.launch(
+                                        Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                    )
+                                }.onFailure {
+                                    Toast.makeText(context, "Battery settings are unavailable", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text(
+                            "Return here after changing it; the status refreshes automatically. Some phone brands also have a separate per-app battery setting that Android cannot report.",
+                            color = MegaDriveDim,
+                            fontFamily = MonoFontFamily,
+                            fontSize = 11.sp
+                        )
+                        SettingsSeparator()
                         RetroButton(
                             text = "RECONNECT ALL",
                             onClick = onReconnectAll,
@@ -316,25 +372,6 @@ fun SettingsScreen(
                                 )
                             }
                         }
-                        SettingsSeparator()
-                        RetroButton(
-                            text = "ANDROID BATTERY SETTINGS",
-                            onClick = {
-                                runCatching {
-                                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                                }.onFailure {
-                                    Toast.makeText(context, "Battery settings are unavailable", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "TerminalHub never requests a battery-optimization exemption automatically.",
-                            color = MegaDriveDim,
-                            fontFamily = MonoFontFamily,
-                            fontSize = 11.sp
-                        )
                     }
                 }
                 item {
