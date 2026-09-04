@@ -48,6 +48,18 @@ class SshConnection @Inject constructor(
     private var outputStream: OutputStream? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val writeLock = Any()
+    private val orderedWriter = OrderedByteWriter(scope) { bytes ->
+        synchronized(writeLock) {
+            try {
+                val os = outputStream ?: return@synchronized
+                os.write(bytes)
+                os.flush()
+                lastTxAtMs = System.currentTimeMillis()
+            } catch (e: Exception) {
+                logger.log(LogLevel.WARN, TAG, "Send failed: ${e.javaClass.simpleName}: ${e.message} snapshot=${debugSnapshot()}")
+            }
+        }
+    }
 
     private val _output = MutableSharedFlow<ByteArray>(replay = 200, extraBufferCapacity = 512)
     val output: SharedFlow<ByteArray> = _output.asSharedFlow()
@@ -377,19 +389,13 @@ class SshConnection @Inject constructor(
     } ?: false
 
     fun sendBytes(bytes: ByteArray) {
-        scope.launch {
-            synchronized(writeLock) {
-                try {
-                    val os = outputStream ?: return@synchronized
-                    os.write(bytes)
-                    os.flush()
-                    lastTxAtMs = System.currentTimeMillis()
-                } catch (e: Exception) {
-                    logger.log(LogLevel.WARN, TAG, "Send failed: ${e.javaClass.simpleName}: ${e.message} snapshot=${debugSnapshot()}")
-                }
-            }
+        if (!orderedWriter.enqueue(bytes)) {
+            logger.log(LogLevel.WARN, TAG, "Send queue rejected ${bytes.size} bytes snapshot=${debugSnapshot()}")
         }
     }
+
+    /** Wait until every terminal write queued before this call has been flushed. */
+    suspend fun awaitPendingWrites() = orderedWriter.awaitDrained()
 
     fun disconnect() {
         disconnectReason = "disconnect()"

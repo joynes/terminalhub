@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -853,6 +854,26 @@ class SessionHostViewModel @Inject constructor(
 
     fun sendBytesToSession(id: TerminalSessionId, bytes: ByteArray) =
         sessionManager.sendBytesToSession(id, bytes)
+
+    /**
+     * Paste first, wait until the complete bracketed-paste sequence is flushed, and only then
+     * start the delay before Enter. ViewModel scope keeps the submission alive across IME-driven
+     * recomposition or configuration changes.
+     */
+    fun sendTextInputToActive(text: String, executeImmediately: Boolean) {
+        val submission = terminalTextInputSubmission(text, executeImmediately)
+        val targetSessionId = sessionManager.pasteTextToActive(submission.pasteText) ?: return
+        if (submission.sendEnter) {
+            viewModelScope.launch {
+                sessionManager.awaitPendingWrites(targetSessionId)
+                delay(submission.enterDelayMs)
+                sessionManager.sendBytesToSession(
+                    targetSessionId,
+                    byteArrayOf('\r'.code.toByte())
+                )
+            }
+        }
+    }
     fun resizeActivePty(cols: Int, rows: Int) = sessionManager.resizeActivePty(cols, rows)
 
     /** Returns the last 10 text-input history entries for a given project. */

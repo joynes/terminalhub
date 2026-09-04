@@ -324,6 +324,11 @@ class TerminalSessionManager @Inject constructor(
         sendBytes(entry, bytes)
     }
 
+    /** Wait until preceding remote writes for this session have reached the SSH stream. */
+    suspend fun awaitPendingWrites(id: TerminalSessionId) {
+        entries[id.value]?.conn?.awaitPendingWrites()
+    }
+
     /**
      * Paste into the active terminal using its current DECSET 2004 state. Interactive programs
      * such as Codex then receive one bracketed paste event instead of a burst of typed keys.

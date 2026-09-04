@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
@@ -132,7 +131,6 @@ fun SessionHostScreen(
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
     val exportImportState by exportImportViewModel.state.collectAsState()
-    val textInputSendScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         viewModel.uiMessages.collect { message ->
@@ -360,17 +358,7 @@ fun SessionHostScreen(
     }
 
     fun sendTextInputToTerminal(text: String) {
-        val submission = terminalTextInputSubmission(text, executeTextInputOnSend)
-        val targetSessionId = viewModel.pasteTextToActive(submission.pasteText) ?: return
-        if (submission.sendEnter) {
-            textInputSendScope.launch {
-                delay(submission.enterDelayMs)
-                viewModel.sendBytesToSession(
-                    targetSessionId,
-                    byteArrayOf('\r'.code.toByte())
-                )
-            }
-        }
+        viewModel.sendTextInputToActive(text, executeTextInputOnSend)
     }
 
     fun syncRemotePty(tv: TerminalView, force: Boolean = false) {
