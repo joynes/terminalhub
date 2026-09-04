@@ -76,7 +76,7 @@ internal fun isSettingsSectionExpandedByDefault(section: SettingsSectionId): Boo
     section == SettingsSectionId.CONNECTIONS || section == SettingsSectionId.TERMINAL_INPUT
 
 internal fun batteryOptimizationStatusLabel(exempt: Boolean): String =
-    if (exempt) "Exemption detected" else "Not exempt — recommended"
+    if (exempt) "Unrestricted" else "Restricted — change recommended"
 
 private fun isBatteryOptimizationExempt(context: android.content.Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
@@ -161,11 +161,10 @@ fun SettingsScreen(
             title = { Text("KEEP SSH ACTIVE IN BACKGROUND?") },
             text = {
                 Text(
-                    "TerminalHub will show an ongoing notification, even when no SSH sessions are open, " +
-                        "and may use battery and mobile data. " +
-                        "You can stop it from Settings or the notification; stopping closes SSH transports " +
-                        "but leaves tmux sessions running. Android or the network can still interrupt it, " +
-                        "so tmux remains the reliable fallback."
+                    "Keeps SSH connections active while you use other apps. An ongoing notification " +
+                        "will be shown, and battery or mobile data use may increase. You can stop it " +
+                        "from Settings or the notification. Remote tmux sessions keep running if the " +
+                        "connection is interrupted."
                 )
             },
             confirmButton = {
@@ -210,7 +209,7 @@ fun SettingsScreen(
                     ) {
                         SettingsToggleRow(
                             title = "Keep SSH active in background",
-                            description = "Recommended when switching apps: without it, Android may disconnect SSH and you will need to reconnect. Your choice is remembered after updates and process restarts; tap Start to resume it.",
+                            description = "Keeps SSH connections active while you use other apps. Shows an ongoing notification and may use more battery or mobile data.",
                             status = backgroundSshStatus,
                             checked = settings.keepSshActiveInBackground,
                             onCheckedChange = { enabled ->
@@ -233,7 +232,7 @@ fun SettingsScreen(
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Text(
-                                "Android stopped the previous service. Your preference is saved, but this explicit tap is required to start it again.",
+                                "Background SSH is not running. Tap Start to resume it.",
                                 color = MegaDriveDim,
                                 fontFamily = MonoFontFamily,
                                 fontSize = 11.sp
@@ -242,7 +241,7 @@ fun SettingsScreen(
                         SettingsSeparator()
                         SettingsToggleRow(
                             title = "SSH keepalive",
-                            description = "Reduces silent disconnects while Android keeps TerminalHub running.",
+                            description = "Helps detect broken SSH connections and keep them responsive.",
                             status = if (settings.sshKeepaliveEnabled) "Enabled" else "Disabled",
                             checked = settings.sshKeepaliveEnabled,
                             onCheckedChange = viewModel::setSshKeepaliveEnabled
@@ -250,7 +249,7 @@ fun SettingsScreen(
                         SettingsSeparator()
                         SettingsToggleRow(
                             title = "Fast resume",
-                            description = "Restores terminal focus and redraw behavior quickly when returning to the app.",
+                            description = "Makes the terminal ready faster when you return to the app.",
                             status = if (settings.preferFastResume) "Enabled" else "Disabled",
                             checked = settings.preferFastResume,
                             onCheckedChange = viewModel::setPreferFastResume
@@ -285,7 +284,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(
-                            "Return here after changing it; the status refreshes automatically. Some phone brands also have a separate per-app battery setting that Android cannot report.",
+                            "Return here after changing it to confirm the status. On some phones, also allow TerminalHub to run in the background.",
                             color = MegaDriveDim,
                             fontFamily = MonoFontFamily,
                             fontSize = 11.sp
@@ -297,7 +296,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(
-                            "Reconnects every disconnected SSH project tab in parallel.",
+                            "Reconnects all disconnected project tabs.",
                             color = MegaDriveDim,
                             fontFamily = MonoFontFamily,
                             fontSize = 11.sp
@@ -322,7 +321,7 @@ fun SettingsScreen(
                         SettingsSeparator()
                         SettingsSubheading(
                             title = "KEY BAR LAYOUT",
-                            description = "Tap a key to replace or remove it. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows. Included in export/import."
+                            description = "Tap a key to replace or remove it. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows."
                         )
                         Spacer(Modifier.height(10.dp))
                         KeyBarSettingsEditor(
@@ -340,8 +339,8 @@ fun SettingsScreen(
                         onExpandedChange = { advancedExpanded = it }
                     ) {
                         SettingsSubheading(
-                            title = "KEEPALIVE PROFILE",
-                            description = "How often opportunistic keepalives run while the app remains in memory."
+                            title = "CONNECTION CHECK FREQUENCY",
+                            description = "How often TerminalHub checks active SSH connections."
                         )
                         SettingsValue("Current", backgroundProfileLabel(settings.backgroundKeepaliveProfile))
                         Spacer(Modifier.height(10.dp))
@@ -357,7 +356,7 @@ fun SettingsScreen(
                         }
                         SettingsSeparator()
                         SettingsSubheading(
-                            title = "KEEPALIVE SCOPE",
+                            title = "CONNECTIONS TO CHECK",
                             description = "Active tab only uses the least background network traffic."
                         )
                         SettingsValue("Current", backgroundScopeLabel(settings.backgroundKeepaliveScope))

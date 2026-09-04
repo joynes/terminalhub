@@ -41,7 +41,7 @@ class SettingsHierarchyTest {
 
     @Test
     fun `battery optimization status clearly distinguishes completed setup`() {
-        assertEquals("Exemption detected", batteryOptimizationStatusLabel(exempt = true))
-        assertEquals("Not exempt — recommended", batteryOptimizationStatusLabel(exempt = false))
+        assertEquals("Unrestricted", batteryOptimizationStatusLabel(exempt = true))
+        assertEquals("Restricted — change recommended", batteryOptimizationStatusLabel(exempt = false))
     }
 }

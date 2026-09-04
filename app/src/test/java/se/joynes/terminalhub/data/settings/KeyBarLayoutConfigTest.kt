@@ -25,6 +25,26 @@ class KeyBarLayoutConfigTest {
     }
 
     @Test
+    fun `all printable ascii symbols are available as literal keys`() {
+        val expected = "!\"#\$%&'()*+,-./:;<=>?@[\\]^_`{|}~".toSet()
+        val actual = KeyBarLayoutConfig.availableKeys
+            .filter { it.group == "Symbols" }
+            .mapNotNull { it.text?.singleOrNull() }
+            .filterNot { it == ' ' }
+            .toSet()
+
+        assertEquals(expected, actual)
+        assertEquals("!", KeyBarLayoutConfig.definition("EXCLAMATION")?.text)
+    }
+
+    @Test
+    fun `new shell symbols survive persistence round trip`() {
+        val rows = listOf(listOf("EXCLAMATION", "DOLLAR", "BACKTICK", "LEFT_BRACE", "RIGHT_BRACE"))
+
+        assertEquals(rows, KeyBarLayoutConfig.decode(KeyBarLayoutConfig.encode(rows)))
+    }
+
+    @Test
     fun `keys and rows can be added removed and reordered`() {
         val withRow = KeyBarLayoutConfig.addRow(KeyBarLayoutConfig.defaultRows)
         val withKey = KeyBarLayoutConfig.addKey(withRow, 2, "ENTER")

@@ -20,7 +20,50 @@ object KeyBarLayoutConfig {
                 KeyBarKeyDefinition("BACKSPACE", "BKSP", "Terminal"),
                 KeyBarKeyDefinition("CTRL", "CTRL", "Modifiers"),
                 KeyBarKeyDefinition("ALT", "ALT", "Modifiers"),
-                KeyBarKeyDefinition("SHIFT", "SHIFT", "Modifiers"),
+                KeyBarKeyDefinition("SHIFT", "SHIFT", "Modifiers")
+            )
+        )
+        // Keep symbols close to the top of the picker: they are the keys most often
+        // missing from Android's compact terminal keyboard.
+        addAll(
+            listOf(
+                KeyBarKeyDefinition("EXCLAMATION", "!", "Symbols", "!"),
+                KeyBarKeyDefinition("DOUBLE_QUOTE", "\"", "Symbols", "\""),
+                KeyBarKeyDefinition("HASH", "#", "Symbols", "#"),
+                KeyBarKeyDefinition("DOLLAR", "\$", "Symbols", "\$"),
+                KeyBarKeyDefinition("PERCENT", "%", "Symbols", "%"),
+                KeyBarKeyDefinition("AMPERSAND", "&", "Symbols", "&"),
+                KeyBarKeyDefinition("SINGLE_QUOTE", "'", "Symbols", "'"),
+                KeyBarKeyDefinition("LEFT_PAREN", "(", "Symbols", "("),
+                KeyBarKeyDefinition("RIGHT_PAREN", ")", "Symbols", ")"),
+                KeyBarKeyDefinition("ASTERISK", "*", "Symbols", "*"),
+                KeyBarKeyDefinition("PLUS", "+", "Symbols", "+"),
+                KeyBarKeyDefinition("COMMA", ",", "Symbols", ","),
+                KeyBarKeyDefinition("DASH", "-", "Symbols", "-"),
+                KeyBarKeyDefinition("DOT", ".", "Symbols", "."),
+                KeyBarKeyDefinition("SLASH", "/", "Symbols", "/"),
+                KeyBarKeyDefinition("COLON", ":", "Symbols", ":"),
+                KeyBarKeyDefinition("SEMICOLON", ";", "Symbols", ";"),
+                KeyBarKeyDefinition("LESS_THAN", "<", "Symbols", "<"),
+                KeyBarKeyDefinition("EQUALS", "=", "Symbols", "="),
+                KeyBarKeyDefinition("GREATER_THAN", ">", "Symbols", ">"),
+                KeyBarKeyDefinition("QUESTION", "?", "Symbols", "?"),
+                KeyBarKeyDefinition("AT", "@", "Symbols", "@"),
+                KeyBarKeyDefinition("LEFT_BRACKET", "[", "Symbols", "["),
+                KeyBarKeyDefinition("BACKSLASH", "\\", "Symbols", "\\"),
+                KeyBarKeyDefinition("RIGHT_BRACKET", "]", "Symbols", "]"),
+                KeyBarKeyDefinition("CARET", "^", "Symbols", "^"),
+                KeyBarKeyDefinition("UNDERSCORE", "_", "Symbols", "_"),
+                KeyBarKeyDefinition("BACKTICK", "`", "Symbols", "`"),
+                KeyBarKeyDefinition("LEFT_BRACE", "{", "Symbols", "{"),
+                KeyBarKeyDefinition("PIPE", "|", "Symbols", "|"),
+                KeyBarKeyDefinition("RIGHT_BRACE", "}", "Symbols", "}"),
+                KeyBarKeyDefinition("TILDE", "~", "Symbols", "~"),
+                KeyBarKeyDefinition("SPACE", "SPACE", "Symbols", " ")
+            )
+        )
+        addAll(
+            listOf(
                 KeyBarKeyDefinition("UP", "UP", "Navigation"),
                 KeyBarKeyDefinition("DOWN", "DOWN", "Navigation"),
                 KeyBarKeyDefinition("LEFT", "LEFT", "Navigation"),
@@ -42,24 +85,6 @@ object KeyBarLayoutConfig {
         ('0'..'9').forEach { digit ->
             add(KeyBarKeyDefinition("DIGIT_$digit", digit.toString(), "Numbers", digit.toString()))
         }
-        addAll(
-            listOf(
-                KeyBarKeyDefinition("COLON", ":", "Symbols", ":"),
-                KeyBarKeyDefinition("SEMICOLON", ";", "Symbols", ";"),
-                KeyBarKeyDefinition("SLASH", "/", "Symbols", "/"),
-                KeyBarKeyDefinition("BACKSLASH", "\\", "Symbols", "\\"),
-                KeyBarKeyDefinition("AT", "@", "Symbols", "@"),
-                KeyBarKeyDefinition("DASH", "-", "Symbols", "-"),
-                KeyBarKeyDefinition("UNDERSCORE", "_", "Symbols", "_"),
-                KeyBarKeyDefinition("DOT", ".", "Symbols", "."),
-                KeyBarKeyDefinition("COMMA", ",", "Symbols", ","),
-                KeyBarKeyDefinition("PIPE", "|", "Symbols", "|"),
-                KeyBarKeyDefinition("EQUALS", "=", "Symbols", "="),
-                KeyBarKeyDefinition("PLUS", "+", "Symbols", "+"),
-                KeyBarKeyDefinition("TILDE", "~", "Symbols", "~"),
-                KeyBarKeyDefinition("SPACE", "SPACE", "Symbols", " ")
-            )
-        )
     }
 
     private val definitionsById = availableKeys.associateBy { it.id }
