@@ -131,12 +131,6 @@ fun AppNavGraph(
         composable(Screen.Settings.route) {
             SettingsScreen(
                 onBack = { navController.popBackStack() },
-                onOpenSessions = {
-                    navController.navigate(Screen.SessionHost.createRoute()) {
-                        launchSingleTop = true
-                    }
-                },
-                onOpenServers = { navController.navigate(Screen.ServerList.route) },
                 onReconnectAll = {
                     navController.navigate(Screen.SessionHost.createRoute(reconnectAll = true)) {
                         launchSingleTop = true

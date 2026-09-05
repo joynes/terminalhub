@@ -16,6 +16,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -73,6 +74,22 @@ private data class PendingTmuxRestart(
     val projectId: Long,
     val projectName: String
 )
+
+internal enum class TerminalConnectionOverlay {
+    NONE,
+    PROGRESS,
+    DISCONNECTED
+}
+
+internal fun terminalConnectionOverlay(
+    hasRenderedSession: Boolean,
+    hasConnectingRemoteTabs: Boolean,
+    activeRemoteTabDisconnected: Boolean
+): TerminalConnectionOverlay = when {
+    hasRenderedSession && hasConnectingRemoteTabs -> TerminalConnectionOverlay.PROGRESS
+    activeRemoteTabDisconnected -> TerminalConnectionOverlay.DISCONNECTED
+    else -> TerminalConnectionOverlay.NONE
+}
 
 @Composable
 fun SessionHostScreen(
@@ -283,6 +300,20 @@ fun SessionHostScreen(
         projectTabs.firstOrNull { it.projectId == recoveryId && it.connectionError != null }
             ?: projectTabs.firstOrNull { it.connectionError != null }
     }
+    val connectingRemoteTabs = remember(projectTabs) {
+        projectTabs.filter {
+            it.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH && it.isConnecting
+        }
+    }
+    val connectionOverlay = terminalConnectionOverlay(
+        hasRenderedSession = session != null,
+        hasConnectingRemoteTabs = connectingRemoteTabs.isNotEmpty(),
+        activeRemoteTabDisconnected = activeTab != null &&
+            activeTab.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH &&
+            !activeTab.isConnected &&
+            !activeTab.isConnecting &&
+            activeTab.sessionId != null
+    )
     val canReconnectActiveTab = activeTab != null &&
         activeTab.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH
     val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
@@ -964,16 +995,26 @@ fun SessionHostScreen(
                                     .background(MegaDriveBg),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    if (runtimeState.recoveryPending) {
-                                        "RESTORING ${restoringTab.projectName.uppercase()}..."
-                                    } else {
-                                        "CONNECTING..."
-                                    },
-                                    color = MegaDrivePrimary,
-                                    fontSize = 12.sp,
-                                    fontFamily = MonoFontFamily
-                                )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        color = MegaDrivePrimary,
+                                        strokeWidth = 2.dp,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Text(
+                                        if (runtimeState.recoveryPending) {
+                                            "RESTORING ${restoringTab.projectName.uppercase()}…"
+                                        } else {
+                                            connectionProgressLabel(listOf(restoringTab.projectName))
+                                        },
+                                        color = MegaDrivePrimary,
+                                        fontSize = 12.sp,
+                                        fontFamily = MonoFontFamily
+                                    )
+                                }
                             }
                         } else if (failedConnectionTab != null) {
                             Box(
@@ -1022,11 +1063,32 @@ fun SessionHostScreen(
                             }
                         }
 
-                        if (activeTab != null &&
-                            activeTab.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH &&
-                            !activeTab.isConnected &&
-                            activeTab.sessionId != null
-                        ) {
+                        if (connectionOverlay == TerminalConnectionOverlay.PROGRESS) {
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 12.dp)
+                                    .background(MegaDriveSurface)
+                                    .border(1.dp, MegaDrivePrimary.copy(alpha = 0.65f))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                CircularProgressIndicator(
+                                    color = MegaDrivePrimary,
+                                    strokeWidth = 2.dp,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    connectionProgressLabel(connectingRemoteTabs.map { it.projectName }),
+                                    color = MegaDrivePrimary,
+                                    fontSize = 12.sp,
+                                    fontFamily = MonoFontFamily
+                                )
+                            }
+                        }
+
+                        if (connectionOverlay == TerminalConnectionOverlay.DISCONNECTED && activeTab != null) {
                             val disconnectedCount = projectTabs.count { tab ->
                                 tab.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH &&
                                 !tab.isConnected && !tab.isConnecting

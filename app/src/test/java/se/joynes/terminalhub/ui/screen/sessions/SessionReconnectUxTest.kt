@@ -77,12 +77,32 @@ class SessionReconnectUxTest {
     }
 
     @Test
-    fun `reconnect feedback says whether there is work to do`() {
-        assertEquals("All SSH tabs are already connected", reconnectFeedbackMessage(emptyList()))
-        assertEquals("Reconnecting api…", reconnectFeedbackMessage(listOf("api")))
+    fun `connection progress clearly identifies one or several tabs`() {
+        assertEquals("CONNECTING…", connectionProgressLabel(emptyList()))
+        assertEquals("CONNECTING API…", connectionProgressLabel(listOf("api")))
         assertEquals(
-            "Reconnecting 3 tabs in parallel…",
-            reconnectFeedbackMessage(listOf("api", "web", "worker"))
+            "CONNECTING 3 TABS…",
+            connectionProgressLabel(listOf("api", "web", "worker"))
+        )
+    }
+
+    @Test
+    fun `reconnect progress replaces disconnected popup instead of stacking`() {
+        assertEquals(
+            TerminalConnectionOverlay.PROGRESS,
+            terminalConnectionOverlay(
+                hasRenderedSession = true,
+                hasConnectingRemoteTabs = true,
+                activeRemoteTabDisconnected = true
+            )
+        )
+        assertEquals(
+            TerminalConnectionOverlay.DISCONNECTED,
+            terminalConnectionOverlay(
+                hasRenderedSession = true,
+                hasConnectingRemoteTabs = false,
+                activeRemoteTabDisconnected = true
+            )
         )
     }
 

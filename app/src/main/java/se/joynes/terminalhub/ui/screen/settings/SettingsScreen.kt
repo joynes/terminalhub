@@ -78,6 +78,9 @@ internal fun isSettingsSectionExpandedByDefault(section: SettingsSectionId): Boo
 internal fun batteryOptimizationStatusLabel(exempt: Boolean): String =
     if (exempt) "Unrestricted" else "Restricted — change recommended"
 
+internal fun backgroundSshRecommendationText(enabled: Boolean): String? =
+    if (enabled) null else "RECOMMENDED: keeps SSH connected when you switch apps."
+
 private fun isBatteryOptimizationExempt(context: android.content.Context): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return true
     val powerManager = context.getSystemService(PowerManager::class.java) ?: return false
@@ -87,8 +90,6 @@ private fun isBatteryOptimizationExempt(context: android.content.Context): Boole
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    onOpenSessions: () -> Unit,
-    onOpenServers: () -> Unit,
     onReconnectAll: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -194,51 +195,25 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    QuickAccessCard(
-                        onOpenSessions = onOpenSessions,
-                        onOpenServers = onOpenServers
+                    BackgroundSshSettingCard(
+                        status = backgroundSshStatus,
+                        enabled = settings.keepSshActiveInBackground,
+                        serviceRunning = backgroundSshIsRunning,
+                        onEnabledChange = { enabled ->
+                            if (enabled) showBackgroundSshConfirmation = true
+                            else viewModel.stopBackgroundSsh()
+                        },
+                        onStart = ::requestBackgroundSshStart
                     )
                 }
                 item {
                     ExpandableSettingsSection(
-                        title = "CONNECTION & BACKGROUND",
-                        summary = "Background ${backgroundSshStatus.lowercase()} · SSH keepalive ${if (settings.sshKeepaliveEnabled) "on" else "off"}",
+                        title = "CONNECTION & RECOVERY",
+                        summary = "SSH keepalive ${if (settings.sshKeepaliveEnabled) "on" else "off"} · Battery ${if (batteryOptimizationExempt) "unrestricted" else "restricted"}",
                         importance = "MOST IMPORTANT",
                         expanded = connectionsExpanded,
                         onExpandedChange = { connectionsExpanded = it }
                     ) {
-                        SettingsToggleRow(
-                            title = "Keep SSH active in background",
-                            description = "Keeps SSH connections active while you use other apps. Shows an ongoing notification and may use more battery or mobile data.",
-                            status = backgroundSshStatus,
-                            checked = settings.keepSshActiveInBackground,
-                            onCheckedChange = { enabled ->
-                                if (enabled) showBackgroundSshConfirmation = true
-                                else viewModel.stopBackgroundSsh()
-                            }
-                        )
-                        if (!settings.keepSshActiveInBackground) {
-                            Text(
-                                "RECOMMENDED: enable this for a smoother experience when switching apps.",
-                                color = MegaDrivePrimary,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 11.sp
-                            )
-                        }
-                        if (settings.keepSshActiveInBackground && !backgroundSshIsRunning) {
-                            RetroButton(
-                                text = "START ACTIVE NOTIFICATION",
-                                onClick = ::requestBackgroundSshStart,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                            Text(
-                                "Background SSH is not running. Tap Start to resume it.",
-                                color = MegaDriveDim,
-                                fontFamily = MonoFontFamily,
-                                fontSize = 11.sp
-                            )
-                        }
-                        SettingsSeparator()
                         SettingsToggleRow(
                             title = "SSH keepalive",
                             description = "Helps detect broken SSH connections and keep them responsive.",
@@ -398,38 +373,48 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun QuickAccessCard(
-    onOpenSessions: () -> Unit,
-    onOpenServers: () -> Unit
+private fun BackgroundSshSettingCard(
+    status: String,
+    enabled: Boolean,
+    serviceRunning: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    onStart: () -> Unit
 ) {
     RetroCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(MegaDriveSurface)
-                .padding(12.dp)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                "QUICK ACCESS",
-                color = MegaDrivePrimary,
-                fontFamily = MonoFontFamily,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                RetroButton(
-                    text = "SESSIONS",
-                    onClick = onOpenSessions,
-                    modifier = Modifier.weight(1f)
+            backgroundSshRecommendationText(enabled)?.let { recommendation ->
+                Text(
+                    recommendation,
+                    color = MegaDrivePrimary,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
                 )
+            }
+            SettingsToggleRow(
+                title = "Keep SSH active in background",
+                description = "Keeps SSH connections active while you use other apps. Shows an ongoing notification and may use more battery or mobile data.",
+                status = status,
+                checked = enabled,
+                onCheckedChange = onEnabledChange
+            )
+            if (enabled && !serviceRunning) {
                 RetroButton(
-                    text = "SERVERS",
-                    onClick = onOpenServers,
-                    modifier = Modifier.weight(1f)
+                    text = "START ACTIVE NOTIFICATION",
+                    onClick = onStart,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "Background SSH is not running. Tap Start to resume it.",
+                    color = MegaDriveDim,
+                    fontFamily = MonoFontFamily,
+                    fontSize = 11.sp
                 )
             }
         }

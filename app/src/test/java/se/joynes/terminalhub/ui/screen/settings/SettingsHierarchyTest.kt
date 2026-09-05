@@ -2,6 +2,7 @@ package se.joynes.terminalhub.ui.screen.settings
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveProfile
@@ -43,5 +44,14 @@ class SettingsHierarchyTest {
     fun `battery optimization status clearly distinguishes completed setup`() {
         assertEquals("Unrestricted", batteryOptimizationStatusLabel(exempt = true))
         assertEquals("Restricted — change recommended", batteryOptimizationStatusLabel(exempt = false))
+    }
+
+    @Test
+    fun `background SSH stays visibly recommended until enabled`() {
+        assertEquals(
+            "RECOMMENDED: keeps SSH connected when you switch apps.",
+            backgroundSshRecommendationText(enabled = false)
+        )
+        assertNull(backgroundSshRecommendationText(enabled = true))
     }
 }
