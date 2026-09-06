@@ -45,3 +45,5 @@ internal fun insertTextAtCursor(value: TextFieldValue, insertedText: String): Te
     val cursor = start + insertedText.length
     return TextFieldValue(updated, TextRange(cursor))
 }
+
+internal fun uploadedFileNamesText(fileNames: List<String>): String = fileNames.joinToString(" ")

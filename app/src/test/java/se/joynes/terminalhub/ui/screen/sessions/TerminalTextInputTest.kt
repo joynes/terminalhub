@@ -66,4 +66,15 @@ class TerminalTextInputTest {
         assertEquals("inspect /remote/new.txt now", result.text)
         assertEquals("inspect /remote/new.txt".length, result.selection.start)
     }
+
+    @Test
+    fun allUploadedFileNamesAreInsertedWithoutRemotePaths() {
+        val inserted = uploadedFileNamesText(
+            listOf("first.txt", "second.jpg", "third-file.pdf")
+        )
+        val result = insertTextAtCursor(TextFieldValue("open ", TextRange(5)), inserted)
+
+        assertEquals("open first.txt second.jpg third-file.pdf", result.text)
+        assertEquals(result.text.length, result.selection.start)
+    }
 }

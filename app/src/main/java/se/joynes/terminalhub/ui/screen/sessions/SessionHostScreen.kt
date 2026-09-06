@@ -332,19 +332,6 @@ fun SessionHostScreen(
         activeProjectId?.let { fileDownloadViewModel.downloadState(it) } ?: kotlinx.coroutines.flow.flowOf(DownloadState.Idle)
     }.collectAsState(initial = DownloadState.Idle)
 
-    LaunchedEffect(activeProjectId, fileUploadState) {
-        val projectId = activeProjectId ?: return@LaunchedEffect
-        val completed = fileUploadState as? UploadState.Done ?: return@LaunchedEffect
-        val draft = textInputDraftByProject[projectId] ?: TextFieldValue()
-        textInputDraftByProject[projectId] = insertTextAtCursor(draft, completed.remotePath)
-        fileUploadVisibleByProject[projectId] = false
-        fileUploadSelectedUriByProject[projectId] = null
-        fileUploadSelectedNameByProject[projectId] = ""
-        fileUploadViewModel.reset(projectId)
-        textInputVisibleByProject[projectId] = true
-        Toast.makeText(context, "Uploaded path inserted in text input", Toast.LENGTH_SHORT).show()
-    }
-
     // Shared modifier manager: toggles in SpecialKeyBar are read by TerminalViewClientImpl
     val modifierManager = remember { MutableModifierManager() }
 
@@ -1172,6 +1159,28 @@ fun SessionHostScreen(
                                 onSelectedUriChange = { fileUploadSelectedUriByProject[activeProjectId] = it },
                                 onSelectedNameChange = { fileUploadSelectedNameByProject[activeProjectId] = it },
                                 initialUri = activeFileUploadSelectedUri,
+                                onUploadsCompleted = { fileNames ->
+                                    val projectId = activeProjectId
+                                    val draft = textInputDraftByProject[projectId] ?: TextFieldValue()
+                                    textInputDraftByProject[projectId] = insertTextAtCursor(
+                                        draft,
+                                        uploadedFileNamesText(fileNames)
+                                    )
+                                    fileUploadVisibleByProject[projectId] = false
+                                    fileUploadSelectedUriByProject[projectId] = null
+                                    fileUploadSelectedNameByProject[projectId] = ""
+                                    fileUploadViewModel.reset(projectId)
+                                    textInputVisibleByProject[projectId] = true
+                                    Toast.makeText(
+                                        context,
+                                        if (fileNames.size == 1) {
+                                            "Uploaded filename inserted in text input"
+                                        } else {
+                                            "${fileNames.size} uploaded filenames inserted in text input"
+                                        },
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                },
                                 onDismiss = {
                                     fileUploadVisibleByProject[activeProjectId] = false
                                     terminalViewRef.value?.requestFocus()
