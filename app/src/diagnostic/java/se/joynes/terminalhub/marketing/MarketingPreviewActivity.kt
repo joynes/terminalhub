@@ -239,6 +239,7 @@ private fun DemoTerminalWorkspace(scene: String) {
                 selectedName = "requirements.md",
                 onSelectedUriChange = {},
                 onSelectedNameChange = {},
+                onUploadsCompleted = {},
                 onDismiss = {}
             )
         }

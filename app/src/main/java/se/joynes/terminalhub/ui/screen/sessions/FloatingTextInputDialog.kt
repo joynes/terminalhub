@@ -122,12 +122,13 @@ fun FloatingTextInputDialog(
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .width(panelWidthDp)
                 .background(MegaDriveSurface.copy(alpha = effectivePanelOpacity), RoundedCornerShape(4.dp))
-                // Consume all pointer events so they don't reach the dismiss handler above
+                // Keep the panel in the hit-test chain without consuming events from children.
+                // Consuming every change here made TextField's long-press selection gesture race
+                // with its parent, so the Android copy/paste toolbar only appeared intermittently.
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
-                            val event = awaitPointerEvent()
-                            event.changes.forEach { it.consume() }
+                            awaitPointerEvent()
                         }
                     }
                 }
@@ -281,6 +282,7 @@ fun FloatingTextInputDialog(
                     .padding(8.dp)
                     .height(108.dp)
                     .focusRequester(focusRequester)
+                    .semantics { contentDescription = "Terminal text input" }
             )
         }
     }
