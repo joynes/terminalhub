@@ -42,4 +42,21 @@ class ExportKeyBarLayoutTest {
 
         assertEquals(listOf(listOf("CTRL", "CHAR_C"), listOf("ENTER")), extractKeyBarLayoutFromYaml(yaml))
     }
+
+    @Test
+    fun `backup restores text input panel opacity`() {
+        val yaml = """
+            version: 2
+            settings:
+              textInputPanelOpacity: 0.65
+            servers: []
+        """.trimIndent()
+
+        assertEquals(0.65f, extractTextInputPanelOpacityFromYaml(yaml))
+    }
+
+    @Test
+    fun `old backup leaves current text input opacity untouched`() {
+        assertNull(extractTextInputPanelOpacityFromYaml("version: 1\nservers: []"))
+    }
 }

@@ -36,6 +36,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.terminalhub.ui.theme.*
+import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
+import se.joynes.terminalhub.data.settings.MAX_TEXT_INPUT_PANEL_OPACITY_SETTING
+import se.joynes.terminalhub.data.settings.MIN_TEXT_INPUT_PANEL_OPACITY_SETTING
+import se.joynes.terminalhub.data.settings.normalizeTextInputPanelOpacitySetting
 import kotlin.math.roundToInt
 
 /**
@@ -57,7 +61,7 @@ fun FloatingTextInputDialog(
 ) {
     val density = LocalDensity.current
     var showHistory by remember { mutableStateOf(false) }
-    var localPanelOpacity by rememberSaveable { mutableStateOf(0.50f) }
+    var localPanelOpacity by rememberSaveable { mutableStateOf(DEFAULT_TEXT_INPUT_PANEL_OPACITY) }
     val effectivePanelOpacity = normalizeTextInputPanelOpacity(panelOpacity ?: localPanelOpacity)
     val focusRequester = remember { FocusRequester() }
 
@@ -288,11 +292,11 @@ fun FloatingTextInputDialog(
     }
 }
 
-internal const val MIN_TEXT_INPUT_PANEL_OPACITY = 0.15f
-internal const val MAX_TEXT_INPUT_PANEL_OPACITY = 1f
+internal const val MIN_TEXT_INPUT_PANEL_OPACITY = MIN_TEXT_INPUT_PANEL_OPACITY_SETTING
+internal const val MAX_TEXT_INPUT_PANEL_OPACITY = MAX_TEXT_INPUT_PANEL_OPACITY_SETTING
 
 internal fun normalizeTextInputPanelOpacity(value: Float): Float =
-    value.coerceIn(MIN_TEXT_INPUT_PANEL_OPACITY, MAX_TEXT_INPUT_PANEL_OPACITY)
+    normalizeTextInputPanelOpacitySetting(value)
 
 internal fun textInputHistoryPreview(entry: String): String =
     entry.replace(Regex("\\s+"), " ").trim()

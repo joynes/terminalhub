@@ -199,6 +199,10 @@ class SessionHostViewModel @Inject constructor(
         settingsRepository.settings
             .map { it.executeTextInputOnSend }
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.executeTextInputOnSend)
+    val textInputPanelOpacity: StateFlow<Float> =
+        settingsRepository.settings
+            .map { it.textInputPanelOpacity }
+            .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.textInputPanelOpacity)
     val keyBarRows: StateFlow<List<List<String>>> =
         settingsRepository.settings
             .map { it.keyBarRows }
@@ -889,6 +893,9 @@ class SessionHostViewModel @Inject constructor(
     }
 
     fun setPreferFastResume(enabled: Boolean) = settingsRepository.setPreferFastResume(enabled)
+
+    fun setTextInputPanelOpacity(opacity: Float) =
+        settingsRepository.setTextInputPanelOpacity(opacity)
 
     fun debugSnapshot(): String = buildString {
         append("vm=").append(instanceId)

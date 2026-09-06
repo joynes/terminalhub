@@ -9,10 +9,17 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 internal const val DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND = true
+internal const val DEFAULT_TEXT_INPUT_PANEL_OPACITY = 0.50f
+internal const val MIN_TEXT_INPUT_PANEL_OPACITY_SETTING = 0.15f
+internal const val MAX_TEXT_INPUT_PANEL_OPACITY_SETTING = 1f
+
+internal fun normalizeTextInputPanelOpacitySetting(value: Float): Float =
+    value.coerceIn(MIN_TEXT_INPUT_PANEL_OPACITY_SETTING, MAX_TEXT_INPUT_PANEL_OPACITY_SETTING)
 
 data class AppSettings(
     val preferFastResume: Boolean = true,
     val executeTextInputOnSend: Boolean = DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND,
+    val textInputPanelOpacity: Float = DEFAULT_TEXT_INPUT_PANEL_OPACITY,
     val sshKeepaliveEnabled: Boolean = true,
     val keepSshActiveInBackground: Boolean = false,
     val backgroundSshRecommendationHandled: Boolean = false,
@@ -46,6 +53,9 @@ class AppSettingsRepository @Inject constructor(
                 KEY_EXECUTE_TEXT_INPUT_ON_SEND,
                 DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND
             ),
+            textInputPanelOpacity = normalizeTextInputPanelOpacitySetting(
+                prefs.getFloat(KEY_TEXT_INPUT_PANEL_OPACITY, DEFAULT_TEXT_INPUT_PANEL_OPACITY)
+            ),
             sshKeepaliveEnabled = prefs.getBoolean(KEY_SSH_KEEPALIVE, true),
             keepSshActiveInBackground = prefs.getBoolean(KEY_KEEP_SSH_ACTIVE_IN_BACKGROUND, false),
             backgroundSshRecommendationHandled = prefs.getBoolean(KEY_BACKGROUND_SSH_RECOMMENDATION_HANDLED, false),
@@ -66,6 +76,14 @@ class AppSettingsRepository @Inject constructor(
 
     fun setExecuteTextInputOnSend(enabled: Boolean) {
         update(_settings.value.copy(executeTextInputOnSend = enabled))
+    }
+
+    fun setTextInputPanelOpacity(opacity: Float) {
+        update(
+            _settings.value.copy(
+                textInputPanelOpacity = normalizeTextInputPanelOpacitySetting(opacity)
+            )
+        )
     }
 
     fun setSshKeepaliveEnabled(enabled: Boolean) {
@@ -97,6 +115,7 @@ class AppSettingsRepository @Inject constructor(
         prefs.edit()
             .putBoolean(KEY_FAST_RESUME, next.preferFastResume)
             .putBoolean(KEY_EXECUTE_TEXT_INPUT_ON_SEND, next.executeTextInputOnSend)
+            .putFloat(KEY_TEXT_INPUT_PANEL_OPACITY, next.textInputPanelOpacity)
             .putBoolean(KEY_SSH_KEEPALIVE, next.sshKeepaliveEnabled)
             .putBoolean(KEY_KEEP_SSH_ACTIVE_IN_BACKGROUND, next.keepSshActiveInBackground)
             .putBoolean(KEY_BACKGROUND_SSH_RECOMMENDATION_HANDLED, next.backgroundSshRecommendationHandled)
@@ -109,6 +128,7 @@ class AppSettingsRepository @Inject constructor(
     companion object {
         private const val KEY_FAST_RESUME = "prefer_fast_resume"
         private const val KEY_EXECUTE_TEXT_INPUT_ON_SEND = "execute_text_input_on_send"
+        private const val KEY_TEXT_INPUT_PANEL_OPACITY = "text_input_panel_opacity"
         private const val KEY_SSH_KEEPALIVE = "ssh_keepalive_enabled"
         private const val KEY_KEEP_SSH_ACTIVE_IN_BACKGROUND = "keep_ssh_active_in_background"
         private const val KEY_BACKGROUND_SSH_RECOMMENDATION_HANDLED = "background_ssh_recommendation_handled"

@@ -17,6 +17,7 @@ import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.settings.KeyBarLayoutConfig
+import se.joynes.terminalhub.data.settings.normalizeTextInputPanelOpacitySetting
 import se.joynes.terminalhub.domain.TerminalSessionManager
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -56,6 +57,7 @@ class ExportImportManager @Inject constructor(
         sb.appendLine("version: 2")
         sb.appendLine("settings:")
         sb.appendLine("  keyBarLayout: ${ys(KeyBarLayoutConfig.encode(settingsRepository.settings.value.keyBarRows))}")
+        sb.appendLine("  textInputPanelOpacity: ${settingsRepository.settings.value.textInputPanelOpacity}")
         sb.appendLine("servers:")
         for (server in servers) {
             val projects = projectsForServer(server)
@@ -104,9 +106,11 @@ class ExportImportManager @Inject constructor(
             ?: error("Cannot read file")
 
         val servers = parseYaml(text)
-        // Backups created before version 2 have no settings section. Keep the user's
-        // current key bar in that case instead of silently resetting it.
+        // Older backups may omit individual settings. Keep each current value in that case
+        // instead of silently resetting it during import.
         val keyBarRows = extractKeyBarLayoutFromYaml(text) ?: settingsRepository.settings.value.keyBarRows
+        val textInputPanelOpacity = extractTextInputPanelOpacityFromYaml(text)
+            ?: settingsRepository.settings.value.textInputPanelOpacity
         var serversImported = 0
         var projectsImported = 0
 
@@ -154,6 +158,7 @@ class ExportImportManager @Inject constructor(
             }
         }
         settingsRepository.setKeyBarRows(keyBarRows)
+        settingsRepository.setTextInputPanelOpacity(textInputPanelOpacity)
         return ImportResult(serversImported, projectsImported)
     }
 
@@ -254,6 +259,28 @@ internal fun extractKeyBarLayoutFromYaml(text: String): List<List<String>>? {
         if (inSettings && indent == 2 && line.startsWith("keyBarLayout:")) {
             val rawValue = line.substringAfter(':').trim()
             return KeyBarLayoutConfig.decode(decodeYamlScalar(rawValue))
+        }
+    }
+    return null
+}
+
+internal fun extractTextInputPanelOpacityFromYaml(text: String): Float? {
+    val rawValue = extractSettingsValue(text, "textInputPanelOpacity") ?: return null
+    return rawValue.toFloatOrNull()
+        ?.let(::normalizeTextInputPanelOpacitySetting)
+}
+
+private fun extractSettingsValue(text: String, key: String): String? {
+    var inSettings = false
+    for (rawLine in text.lines()) {
+        val indent = rawLine.length - rawLine.trimStart().length
+        val line = rawLine.trim()
+        if (indent == 0) {
+            inSettings = line == "settings:"
+            continue
+        }
+        if (inSettings && indent == 2 && line.startsWith("$key:")) {
+            return decodeYamlScalar(line.substringAfter(':').trim())
         }
     }
     return null

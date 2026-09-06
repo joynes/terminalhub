@@ -20,7 +20,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -119,6 +118,7 @@ fun SessionHostScreen(
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
     val executeTextInputOnSend by viewModel.executeTextInputOnSend.collectAsState()
+    val textInputPanelOpacity by viewModel.textInputPanelOpacity.collectAsState()
     val keyBarRows by viewModel.keyBarRows.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -143,7 +143,6 @@ fun SessionHostScreen(
     var searchVisible by remember { mutableStateOf(false) }
     var searchInitialQuery by remember { mutableStateOf("") }
     var isTerminalAtBottom by remember { mutableStateOf(true) }
-    var textInputPanelOpacity by rememberSaveable { mutableStateOf(1f) }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
@@ -1144,7 +1143,7 @@ fun SessionHostScreen(
                                 },
                                 bottomAvoidanceDp = bottomBarReservedHeight,
                                 panelOpacity = textInputPanelOpacity,
-                                onPanelOpacityChange = { textInputPanelOpacity = it }
+                                onPanelOpacityChange = viewModel::setTextInputPanelOpacity
                             )
                         }
 
