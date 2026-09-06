@@ -115,13 +115,16 @@ fun AddEditProjectScreen(
             // -- Project name ----------------------------------------------
             RetroTextField(
                 state.name,
-                { viewModel.update { copy(name = it.replace(" ", "-")) } },
+                viewModel::updateName,
                 "Project Name *",
                 Modifier.fillMaxWidth()
             )
             Text(
-                "No spaces allowed (use dashes). Path and tmux session are derived from this name.",
-                color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily
+                state.nameError
+                    ?: "Use A-Z, a-z, 0-9, dots, dashes or underscores. Spaces become dashes.",
+                color = if (state.nameError == null) MegaDriveDim else MegaDriveError,
+                fontSize = 10.sp,
+                fontFamily = MonoFontFamily
             )
 
             // -- ADVANCED (collapsible) ------------------------------------
@@ -249,6 +252,7 @@ fun AddEditProjectScreen(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.name.isNotBlank() &&
+                    state.nameError == null &&
                     (state.targetType == ProjectTargetType.LOCAL || state.selectedServerId != null)
             )
         }

@@ -1,10 +1,18 @@
 package se.joynes.terminalhub.ui.screen.projects
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 import se.joynes.terminalhub.data.model.ProjectTargetType
 
 class AddEditProjectViewModelTest {
+    @Test
+    fun updateNameShowsErrorForSwedishCharacters() {
+        val error = se.joynes.terminalhub.data.model.projectNameValidationError("mitt-projekt-ö")
+
+        assertNotNull(error)
+    }
+
     @Test
     fun normalizeGitUrlConvertsGithubHttpsToSshForServerProjects() {
         val normalized = AddEditProjectViewModel.normalizeGitUrl(

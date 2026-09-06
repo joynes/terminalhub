@@ -9,6 +9,7 @@ import se.joynes.terminalhub.BuildConfig
 import se.joynes.terminalhub.data.model.LOCAL_PROJECT_SERVER_ID
 import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.ProjectTargetType
+import se.joynes.terminalhub.data.model.projectNameValidationError
 import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import javax.inject.Inject
@@ -23,6 +24,7 @@ data class AddEditProjectState(
     val selectedServerId: Long? = null,
     val serverOptions: List<ProjectServerOption> = emptyList(),
     val name: String = "",
+    val nameError: String? = null,
     val useTmux: Boolean = !BuildConfig.IS_DIAGNOSTIC,
     val customScript: String = "cd {{PROJECT_PATH}}",
     val aiCommand: String = "",
@@ -64,6 +66,7 @@ class AddEditProjectViewModel @Inject constructor(
                 selectedServerId = p.serverId,
                 serverOptions = options,
                 name = p.name,
+                nameError = projectNameValidationError(p.name),
                 useTmux = p.useTmux,
                 customScript = p.customScript,
                 aiCommand = p.aiCommand,
@@ -77,9 +80,24 @@ class AddEditProjectViewModel @Inject constructor(
         _state.value = _state.value.block()
     }
 
+    fun updateName(value: String) {
+        val normalized = value.replace(" ", "-")
+        _state.update {
+            it.copy(
+                name = normalized,
+                nameError = projectNameValidationError(normalized)
+            )
+        }
+    }
+
     fun save() {
         viewModelScope.launch {
             val s = _state.value
+            val nameError = projectNameValidationError(s.name)
+            if (nameError != null) {
+                _state.value = s.copy(nameError = nameError)
+                return@launch
+            }
             val selectedServerId = if (s.targetType == ProjectTargetType.LOCAL) {
                 LOCAL_PROJECT_SERVER_ID
             } else {
@@ -97,7 +115,7 @@ class AddEditProjectViewModel @Inject constructor(
                 gitUrl = normalizeGitUrl(s.gitUrl, s.targetType)
             )
             if (editingId != null) repo.update(project) else repo.save(project)
-            _state.value = s.copy(saved = true)
+            _state.value = s.copy(saved = true, nameError = null)
         }
     }
 

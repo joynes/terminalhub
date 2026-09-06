@@ -8,6 +8,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -83,6 +85,26 @@ class AddEditProjectScreenTest {
         val updated = projectRepo.getById(existingId)!!
         assertEquals("keep-color-renamed", updated.name)
         assertEquals(123456789, updated.colorSeed)
+    }
+
+    @Test
+    fun projectWithSwedishCharactersCannotBeSaved() = runBlocking {
+        val viewModel = AddEditProjectViewModel(projectRepo, serverRepo)
+        viewModel.update {
+            copy(
+                targetType = ProjectTargetType.LOCAL,
+                selectedServerId = null,
+                name = "räksmörgås",
+                useTmux = false
+            )
+        }
+
+        viewModel.save()
+
+        assertTrue(waitUntil(2_000) { viewModel.state.value.nameError != null })
+        assertFalse(viewModel.state.value.saved)
+        assertNotNull(viewModel.state.value.nameError)
+        assertTrue(projectRepo.getAll().first().isEmpty())
     }
 
     private fun waitUntil(timeoutMs: Long, condition: () -> Boolean): Boolean {

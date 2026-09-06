@@ -6,6 +6,7 @@ import se.joynes.terminalhub.data.db.dao.ProjectDao
 import se.joynes.terminalhub.data.db.entity.ProjectEntity
 import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.ProjectTargetType
+import se.joynes.terminalhub.data.model.projectNameValidationError
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,9 +21,15 @@ class ProjectRepository @Inject constructor(
 
     suspend fun getById(id: Long): Project? = dao.getById(id)?.toModel()
 
-    suspend fun save(project: Project): Long = dao.insert(project.withColorSeed().toEntity())
+    suspend fun save(project: Project): Long {
+        requireValidProjectName(project)
+        return dao.insert(project.withColorSeed().toEntity())
+    }
 
-    suspend fun update(project: Project) = dao.update(project.withColorSeed().toEntity())
+    suspend fun update(project: Project) {
+        requireValidProjectName(project)
+        dao.update(project.withColorSeed().toEntity())
+    }
 
     suspend fun delete(project: Project) = dao.delete(project.toEntity())
 
@@ -61,5 +68,10 @@ class ProjectRepository @Inject constructor(
         if (colorSeed != 0) return this
         val fallbackSeed = ((name.hashCode().toLong() shl 32) xor System.nanoTime()).toInt()
         return copy(colorSeed = if (fallbackSeed != 0) fallbackSeed else 1)
+    }
+
+    private fun requireValidProjectName(project: Project) {
+        val error = projectNameValidationError(project.name)
+        require(error == null) { error ?: "Invalid project name." }
     }
 }
