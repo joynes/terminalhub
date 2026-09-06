@@ -16,6 +16,7 @@ class ScpDownloaderCommandTest {
     fun `file listing works in zsh when optional hidden globs do not match`() {
         val remoteDir = temporaryFolder.newFolder("remote project")
         File(remoteDir, "audio.wav").writeBytes(byteArrayOf(1, 2, 3))
+        File(remoteDir, "stems").mkdir()
         val shell = File("/bin/zsh").takeIf { it.isFile }?.absolutePath ?: "/bin/sh"
 
         val process = ProcessBuilder(shell, "-c", remoteFileListCommand(remoteDir.absolutePath))
@@ -25,7 +26,10 @@ class ScpDownloaderCommandTest {
         val stderr = process.errorStream.bufferedReader().readText()
 
         assertEquals("stderr=$stderr", 0, process.waitFor())
-        assertEquals("audio.wav\t3\n", stdout)
+        assertEquals(
+            setOf("f\taudio.wav\t3", "d\tstems\t0"),
+            stdout.lineSequence().filter { it.isNotEmpty() }.toSet()
+        )
     }
 
     @Test
@@ -44,5 +48,16 @@ class ScpDownloaderCommandTest {
     @Test
     fun `remote home path expands HOME but keeps project name literal`() {
         assertEquals("\"\$HOME/projects/price\\\$list\"", shellRemotePath("~/projects/price\$list"))
+    }
+
+    @Test
+    fun `remote subdirectory stays below project root`() {
+        assertEquals("~/projects/demo/assets/audio", remoteSubdirectory("~/projects/demo", "assets/audio"))
+        assertEquals("~/projects/demo", remoteSubdirectory("~/projects/demo/", ""))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `remote subdirectory rejects traversal`() {
+        remoteSubdirectory("~/projects/demo", "assets/../../secrets")
     }
 }

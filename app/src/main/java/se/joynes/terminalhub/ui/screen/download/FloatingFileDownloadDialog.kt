@@ -69,14 +69,21 @@ fun FloatingFileDownloadDialog(
 
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
-    var pendingFile by remember { mutableStateOf<RemoteFileEntry?>(null) }
+    var pendingFile by remember { mutableStateOf<PendingRemoteDownload?>(null) }
 
     val destinationPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri ->
-        val file = pendingFile
-        if (uri != null && file != null) {
-            viewModel.startDownload(serverId, projectId, file.name, uri, context)
+        val pending = pendingFile
+        if (uri != null && pending != null) {
+            viewModel.startDownload(
+                serverId = serverId,
+                projectId = projectId,
+                relativeDirectory = pending.directory,
+                fileName = pending.file.name,
+                uri = uri,
+                context = context
+            )
         }
         pendingFile = null
     }
@@ -140,16 +147,45 @@ fun FloatingFileDownloadDialog(
                         Text("Loading remote files...", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
                     }
                     is DownloadState.Listed -> {
+                        Text(
+                            remoteDirectoryLabel(downloadState.directory),
+                            color = MegaDriveDim,
+                            fontSize = 10.sp,
+                            fontFamily = MonoFontFamily,
+                            maxLines = 2
+                        )
                         RemoteFileList(
-                            files = downloadState.files,
+                            entries = downloadState.entries,
+                            onOpenDirectory = { directory ->
+                                viewModel.loadRemoteFiles(
+                                    serverId,
+                                    projectId,
+                                    childRemoteDirectory(downloadState.directory, directory.name)
+                                )
+                            },
                             onDownload = { file ->
-                                pendingFile = file
+                                pendingFile = PendingRemoteDownload(downloadState.directory, file)
                                 destinationPicker.launch(file.name)
                             }
                         )
+                        if (downloadState.directory.isNotEmpty()) {
+                            RetroButton(
+                                text = "UP ONE LEVEL",
+                                onClick = {
+                                    viewModel.loadRemoteFiles(
+                                        serverId,
+                                        projectId,
+                                        parentRemoteDirectory(downloadState.directory)
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         RetroButton(
                             text = "REFRESH",
-                            onClick = { viewModel.loadRemoteFiles(serverId, projectId) },
+                            onClick = {
+                                viewModel.loadRemoteFiles(serverId, projectId, downloadState.directory)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -194,7 +230,9 @@ fun FloatingFileDownloadDialog(
                         )
                         RetroButton(
                             text = "TRY AGAIN",
-                            onClick = { viewModel.loadRemoteFiles(serverId, projectId) },
+                            onClick = {
+                                viewModel.loadRemoteFiles(serverId, projectId, downloadState.directory)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -255,11 +293,12 @@ internal fun downloadedFileMimeType(fileName: String): String {
 
 @Composable
 private fun RemoteFileList(
-    files: List<RemoteFileEntry>,
+    entries: List<RemoteFileEntry>,
+    onOpenDirectory: (RemoteFileEntry) -> Unit,
     onDownload: (RemoteFileEntry) -> Unit
 ) {
-    if (files.isEmpty()) {
-        Text("No files in the remote project folder.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
+    if (entries.isEmpty()) {
+        Text("This remote folder is empty.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
         return
     }
 
@@ -270,35 +309,55 @@ private fun RemoteFileList(
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        files.forEach { file ->
+        entries.forEach { entry ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MegaDriveBg, RoundedCornerShape(4.dp))
-                    .clickable { onDownload(file) }
+                    .clickable {
+                        if (entry.isDirectory) onOpenDirectory(entry) else onDownload(entry)
+                    }
                     .padding(horizontal = 8.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    file.name,
+                    if (entry.isDirectory) "[DIR]  ${entry.name}" else entry.name,
                     color = MegaDrivePrimary,
                     fontSize = 11.sp,
                     fontFamily = MonoFontFamily,
                     maxLines = 2,
                     modifier = Modifier.weight(1f)
                 )
-                Text(
-                    formatBytes(file.size),
-                    color = MegaDriveDim,
-                    fontSize = 10.sp,
-                    fontFamily = MonoFontFamily,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
+                if (entry.isDirectory) {
+                    Text(">", color = MegaDrivePrimary, fontSize = 11.sp, fontFamily = MonoFontFamily)
+                } else {
+                    Text(
+                        formatBytes(entry.size),
+                        color = MegaDriveDim,
+                        fontSize = 10.sp,
+                        fontFamily = MonoFontFamily,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
             }
         }
     }
 }
+
+private data class PendingRemoteDownload(val directory: String, val file: RemoteFileEntry)
+
+internal fun childRemoteDirectory(parent: String, childName: String): String {
+    require(childName.isNotBlank() && '/' !in childName && childName != "." && childName != "..") {
+        "Invalid remote directory"
+    }
+    return listOf(parent.trim('/'), childName).filter { it.isNotEmpty() }.joinToString("/")
+}
+
+internal fun parentRemoteDirectory(directory: String): String = directory.substringBeforeLast('/', "")
+
+internal fun remoteDirectoryLabel(directory: String): String =
+    if (directory.isEmpty()) "PROJECT /" else "PROJECT / $directory"
 
 private fun formatBytes(bytes: Long): String {
     if (bytes < 1024) return "$bytes B"

@@ -1,7 +1,11 @@
 package se.joynes.terminalhub.ui.screen.download
 
+import android.content.ContentResolver
+import android.content.Context
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -25,8 +29,10 @@ import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.security.SecurePrefsManager
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
+import se.joynes.terminalhub.data.ssh.ScpDownloadProgress
 import se.joynes.terminalhub.data.ssh.ScpDownloader
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
+import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FileDownloadViewModelTest {
@@ -73,12 +79,38 @@ class FileDownloadViewModelTest {
         viewModel.loadRemoteFiles(server.id, project.id)
         advanceUntilIdle()
 
-        assertEquals(DownloadState.Listed(expected), viewModel.downloadState(project.id).first())
+        assertEquals(DownloadState.Listed("", expected), viewModel.downloadState(project.id).first())
         verify(downloader).listFiles(
             server = eq(server),
             password = isNull(),
             privateKeyPem = isNull(),
             remoteDir = eq("~/projects with spaces/midi-musik")
+        )
+    }
+
+    @Test
+    fun loadRemoteFilesListsSelectedSubdirectory() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val expected = listOf(RemoteFileEntry("beat.wav", 456L))
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(
+            downloader.listFiles(
+                server = eq(server),
+                password = isNull(),
+                privateKeyPem = isNull(),
+                remoteDir = eq("~/terminalhub/music/stems/drums")
+            )
+        ).thenReturn(expected)
+        val viewModel = createViewModel()
+
+        viewModel.loadRemoteFiles(server.id, project.id, "stems/drums")
+        advanceUntilIdle()
+
+        assertEquals(
+            DownloadState.Listed("stems/drums", expected),
+            viewModel.downloadState(project.id).first()
         )
     }
 
@@ -101,6 +133,44 @@ class FileDownloadViewModelTest {
         val state = viewModel.downloadState(project.id).first()
         assertTrue(state is DownloadState.Error)
         assertEquals("Remote download is only available for SSH projects", (state as DownloadState.Error).message)
+    }
+
+    @Test
+    fun downloadUsesSelectedSubdirectoryBelowProjectRoot() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val context: Context = mock()
+        val resolver: ContentResolver = mock()
+        val uri: Uri = mock()
+        val output = ByteArrayOutputStream()
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(context.contentResolver).thenReturn(resolver)
+        whenever(resolver.openOutputStream(uri)).thenReturn(output)
+        whenever(
+            downloader.download(
+                server = eq(server),
+                password = isNull(),
+                privateKeyPem = isNull(),
+                remoteDir = eq("~/terminalhub/music/stems/drums"),
+                fileName = eq("beat.wav"),
+                outputStream = eq(output)
+            )
+        ).thenReturn(flowOf(ScpDownloadProgress("beat.wav", 456L, 456L)))
+        val viewModel = createViewModel()
+
+        viewModel.startDownload(server.id, project.id, "stems/drums", "beat.wav", uri, context)
+        advanceUntilIdle()
+
+        assertEquals(DownloadState.Done("beat.wav", 456L, uri), viewModel.downloadState(project.id).first())
+        verify(downloader).download(
+            server = eq(server),
+            password = isNull(),
+            privateKeyPem = isNull(),
+            remoteDir = eq("~/terminalhub/music/stems/drums"),
+            fileName = eq("beat.wav"),
+            outputStream = eq(output)
+        )
     }
 
     private fun createViewModel() = FileDownloadViewModel(

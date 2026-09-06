@@ -15,7 +15,8 @@ import javax.inject.Inject
 
 data class RemoteFileEntry(
     val name: String,
-    val size: Long
+    val size: Long,
+    val isDirectory: Boolean = false
 )
 
 data class ScpDownloadProgress(
@@ -47,16 +48,18 @@ class ScpDownloader @Inject constructor(
                 if (stderr.contains(REMOTE_DIR_MISSING_MARKER)) {
                     throw IOException("Remote project folder not found: $remoteDir")
                 }
-                val files = rows.mapNotNull { row ->
+                val entries = rows.mapNotNull { row ->
                     val parts = row.split('\t')
-                    val name = parts.getOrNull(0)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                    val size = parts.getOrNull(1)?.toLongOrNull() ?: 0L
-                    RemoteFileEntry(name, size)
-                }.sortedBy { it.name.lowercase() }
+                    val type = parts.getOrNull(0) ?: return@mapNotNull null
+                    if (type != "d" && type != "f") return@mapNotNull null
+                    val name = parts.getOrNull(1)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    val size = parts.getOrNull(2)?.toLongOrNull() ?: 0L
+                    RemoteFileEntry(name, size, isDirectory = type == "d")
+                }.sortedWith(compareBy<RemoteFileEntry> { !it.isDirectory }.thenBy { it.name.lowercase() })
                 if (stderr.isNotBlank()) {
                     logger.log(LogLevel.WARN, TAG, "Remote list stderr: $stderr")
                 }
-                files
+                entries
             } finally {
                 sess.close()
             }
@@ -182,12 +185,24 @@ internal fun remoteFileListCommand(remoteDir: String): String {
     val script = "if [ ! -d \"\$1\" ]; then " +
         "printf '${ScpDownloader.REMOTE_DIR_MISSING_MARKER}\\n' >&2; exit 3; fi; " +
         "for f in \"\$1\"/* \"\$1\"/.[!.]* \"\$1\"/..?*; do " +
-        "[ -f \"\$f\" ] || continue; " +
-        "size=\$(wc -c < \"\$f\" | tr -d ' '); " +
+        "[ -L \"\$f\" ] && continue; " +
+        "if [ -d \"\$f\" ]; then type=d; size=0; " +
+        "elif [ -f \"\$f\" ]; then type=f; size=\$(wc -c < \"\$f\" | tr -d ' '); " +
+        "else continue; fi; " +
         "name=\${f##*/}; " +
-        "printf '%s\\t%s\\n' \"\$name\" \"\$size\"; " +
+        "printf '%s\\t%s\\t%s\\n' \"\$type\" \"\$name\" \"\$size\"; " +
         "done"
     return "sh -c ${shellSingleQuote(script)} sh ${shellRemotePath(remoteDir)}"
+}
+
+internal fun remoteSubdirectory(projectRoot: String, relativeDirectory: String): String {
+    val segments = relativeDirectory.split('/').filter { it.isNotEmpty() }
+    require(!relativeDirectory.startsWith('/')) { "Invalid remote directory" }
+    require(segments.all { it != "." && it != ".." && '\u0000' !in it && '\\' !in it }) {
+        "Invalid remote directory"
+    }
+    return if (segments.isEmpty()) projectRoot.trimEnd('/')
+    else projectRoot.trimEnd('/') + "/" + segments.joinToString("/")
 }
 
 internal fun shellRemotePath(path: String): String {

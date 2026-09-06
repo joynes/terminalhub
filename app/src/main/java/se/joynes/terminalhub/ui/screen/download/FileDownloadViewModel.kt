@@ -17,16 +17,17 @@ import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.security.SecurePrefsManager
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 import se.joynes.terminalhub.data.ssh.ScpDownloader
+import se.joynes.terminalhub.data.ssh.remoteSubdirectory
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
 import javax.inject.Inject
 
 sealed interface DownloadState {
     object Idle : DownloadState
-    object LoadingList : DownloadState
-    data class Listed(val files: List<RemoteFileEntry>) : DownloadState
+    data class LoadingList(val directory: String) : DownloadState
+    data class Listed(val directory: String, val entries: List<RemoteFileEntry>) : DownloadState
     data class Downloading(val fileName: String, val progress: Float) : DownloadState
     data class Done(val fileName: String, val bytes: Long, val uri: Uri) : DownloadState
-    data class Error(val message: String) : DownloadState
+    data class Error(val message: String, val directory: String = "") : DownloadState
 }
 
 @HiltViewModel
@@ -47,31 +48,43 @@ class FileDownloadViewModel @Inject constructor(
         states.update { it - projectId }
     }
 
-    fun loadRemoteFiles(serverId: Long, projectId: Long) {
+    fun loadRemoteFiles(serverId: Long, projectId: Long, relativeDirectory: String = "") {
         val current = states.value[projectId]
         if (current is DownloadState.LoadingList || current is DownloadState.Downloading) return
         viewModelScope.launch {
-            setState(projectId, DownloadState.LoadingList)
+            setState(projectId, DownloadState.LoadingList(relativeDirectory))
             try {
                 val (server, project) = resolveRemoteProject(serverId, projectId)
-                val files = scpDownloader.listFiles(
+                val directory = remoteSubdirectory(engine.projectPath(server, project), relativeDirectory)
+                val entries = scpDownloader.listFiles(
                     server = server,
                     password = securePrefs.getPassword(server.id),
                     privateKeyPem = securePrefs.getPrivateKey(server.id),
-                    remoteDir = engine.projectPath(server, project)
+                    remoteDir = directory
                 )
-                setState(projectId, DownloadState.Listed(files))
+                setState(projectId, DownloadState.Listed(relativeDirectory, entries))
             } catch (e: Exception) {
-                setState(projectId, DownloadState.Error(e.message ?: "Could not list remote files"))
+                setState(
+                    projectId,
+                    DownloadState.Error(e.message ?: "Could not list remote files", relativeDirectory)
+                )
             }
         }
     }
 
-    fun startDownload(serverId: Long, projectId: Long, fileName: String, uri: Uri, context: Context) {
+    fun startDownload(
+        serverId: Long,
+        projectId: Long,
+        relativeDirectory: String,
+        fileName: String,
+        uri: Uri,
+        context: Context
+    ) {
         if (states.value[projectId] is DownloadState.Downloading) return
         viewModelScope.launch {
             try {
                 val (server, project) = resolveRemoteProject(serverId, projectId)
+                val directory = remoteSubdirectory(engine.projectPath(server, project), relativeDirectory)
                 val output = context.contentResolver.openOutputStream(uri) ?: error("Cannot open destination")
 
                 setState(projectId, DownloadState.Downloading(fileName, 0f))
@@ -80,7 +93,7 @@ class FileDownloadViewModel @Inject constructor(
                     server = server,
                     password = securePrefs.getPassword(server.id),
                     privateKeyPem = securePrefs.getPrivateKey(server.id),
-                    remoteDir = engine.projectPath(server, project),
+                    remoteDir = directory,
                     fileName = fileName,
                     outputStream = output
                 ).collect { progress ->
