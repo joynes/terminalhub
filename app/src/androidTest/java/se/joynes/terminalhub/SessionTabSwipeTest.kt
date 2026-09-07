@@ -2,6 +2,7 @@ package se.joynes.terminalhub
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.runtime.mutableStateOf
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -90,6 +91,34 @@ class SessionTabSwipeTest {
 
         composeRule.onNodeWithText("DISCONNECTED").performClick()
         composeRule.runOnIdle { assertEquals(42L, selectedProjectId) }
+    }
+
+    @Test
+    fun closingOneProjectTabLeavesOtherProjectUsable() {
+        val first = makeTab(1L, "first")
+        val second = makeTab(2L, "second")
+        val visibleTabs = mutableStateOf(listOf(first, second))
+        composeRule.setContent {
+            TerminalHubTheme {
+                SessionTabBar(
+                    tabs = visibleTabs.value,
+                    activeId = second.sessionId,
+                    onSelect = {},
+                    onClose = { projectId, _ ->
+                        visibleTabs.value = visibleTabs.value.filterNot { it.projectId == projectId }
+                    },
+                    onRestartTmux = {},
+                    onReorder = {},
+                    onAddProject = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("FIRST").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Close").performClick()
+
+        composeRule.onNodeWithText("FIRST").assertDoesNotExist()
+        composeRule.onNodeWithText("SECOND").assertIsDisplayed().performClick()
     }
 
     @Test

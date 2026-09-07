@@ -7,9 +7,7 @@ import javax.inject.Inject
 
 class SshConnectionFactory @Inject constructor(
     private val logger: AppLogger,
-    private val settingsRepository: AppSettingsRepository,
-    private val runtimeRepository: AppRuntimeRepository,
-    private val hostKeyVerifier: TerminalHubHostKeyVerifier
+    private val transportPool: SharedSshTransportPool
 ) {
-    fun create(): SshConnection = SshConnection(logger, settingsRepository, runtimeRepository, hostKeyVerifier)
+    fun create(): SshConnection = SshConnection(logger, transportPool)
 }

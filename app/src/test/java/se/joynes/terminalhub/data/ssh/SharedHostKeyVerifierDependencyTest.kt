@@ -7,8 +7,7 @@ class SharedHostKeyVerifierDependencyTest {
     @Test
     fun `every raw SSH and SCP client requires shared verifier`() {
         listOf(
-            SshConnection::class.java,
-            SshConnectionFactory::class.java,
+            TrileadSshTransportConnector::class.java,
             ScpUploader::class.java,
             ScpDownloader::class.java,
             SshPublicKeyInstaller::class.java

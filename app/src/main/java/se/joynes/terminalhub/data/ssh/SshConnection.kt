@@ -1,12 +1,9 @@
 package se.joynes.terminalhub.data.ssh
 
 import com.trilead.ssh2.ChannelCondition
-import com.trilead.ssh2.Connection
 import com.trilead.ssh2.Session
-import com.trilead.ssh2.crypto.PEMDecoder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -26,10 +23,6 @@ import se.joynes.terminalhub.data.logging.AppLogger
 import se.joynes.terminalhub.data.logging.LogEvent
 import se.joynes.terminalhub.data.logging.LogLevel
 import se.joynes.terminalhub.data.model.Server
-import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
-import se.joynes.terminalhub.data.settings.AppSettingsRepository
-import se.joynes.terminalhub.data.settings.BackgroundKeepaliveProfile
-import se.joynes.terminalhub.data.settings.BackgroundKeepaliveScope
 import se.joynes.terminalhub.data.security.HostKeyChallenge
 import java.io.IOException
 import java.io.OutputStream
@@ -39,11 +32,9 @@ import javax.inject.Inject
 
 class SshConnection @Inject constructor(
     private val logger: AppLogger,
-    private val settingsRepository: AppSettingsRepository,
-    private val runtimeRepository: AppRuntimeRepository,
-    private val hostKeyVerifier: TerminalHubHostKeyVerifier
+    private val transportPool: SharedSshTransportPool
 ) {
-    private var connection: Connection? = null
+    private var transportLease: SshTransportLease? = null
     private var shellSession: Session? = null
     private var outputStream: OutputStream? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -77,7 +68,6 @@ class SshConnection @Inject constructor(
     private val instanceId = System.identityHashCode(this)
     private var serverLabel: String = "unknown"
     private var connectAttempt = 0
-    private var keepaliveJob: Job? = null
     @Volatile private var projectId: Long? = null
     @Volatile private var projectName: String? = null
     @Volatile private var createdAtMs = System.currentTimeMillis()
@@ -90,6 +80,7 @@ class SshConnection @Inject constructor(
     fun bindProject(projectId: Long, projectName: String) {
         this.projectId = projectId
         this.projectName = projectName
+        transportLease?.bindProject(projectId)
     }
 
     fun connect(server: Server, password: String?, privateKeyPem: String? = null) {
@@ -106,29 +97,12 @@ class SshConnection @Inject constructor(
                     LogEvent.SshConnect(server.host, server.port)
                 )
 
-                val conn = Connection(server.host, server.port)
-                // Bound both the TCP connection and SSH key exchange. Without explicit
-                // limits the library may wait at OS socket timeout length when the phone
-                // has no route, leaving the UI in RESTORING/CONNECTING for minutes.
-                withVerifiedHostKey(hostKeyVerifier, server.host, server.port) {
-                    conn.connect(hostKeyVerifier, CONNECT_TIMEOUT_MS, CONNECT_TIMEOUT_MS)
-                }
-
-                val authenticated = when {
-                    !privateKeyPem.isNullOrBlank() -> {
-                        val keyPair = PEMDecoder.decode(privateKeyPem.toCharArray(), null)
-                        conn.authenticateWithPublicKey(server.username, keyPair)
-                    }
-                    !password.isNullOrBlank() -> conn.authenticateWithPassword(server.username, password)
-                    else -> conn.authenticateWithNone(server.username)
-                }
-
-                if (!authenticated) throw IOException("SSH authentication failed")
-
-                connection = conn
+                val lease = transportPool.acquire(server, password, privateKeyPem)
+                transportLease = lease
+                projectId?.let(lease::bindProject)
                 connectedAtMs = System.currentTimeMillis()
 
-                val sess = conn.openSession()
+                val sess = lease.openSession()
                 sess.requestPTY("xterm-256color", 80, 24, 0, 0, null)
                 sess.startShell()
                 shellSession = sess
@@ -136,9 +110,13 @@ class SshConnection @Inject constructor(
                 disconnectReason = null
                 _connected.value = true
                 logger.log(LogLevel.INFO, TAG, "Connected to $serverLabel")
-                startKeepaliveLoop(conn)
                 readOutput(sess)
             } catch (e: Exception) {
+                try { shellSession?.close() } catch (_: Exception) {}
+                shellSession = null
+                outputStream = null
+                transportLease?.release()
+                transportLease = null
                 if (e is HostKeyVerificationException) _hostKeyChallenge.value = e.challenge
                 val message = describeConnectionError(e)
                 _lastErrorMessage.value = message
@@ -176,12 +154,12 @@ class SshConnection @Inject constructor(
 
     /** Run a command silently via a non-PTY exec channel and wait for it to finish. */
     suspend fun runSilent(command: String): String {
-        val conn = connection ?: return ""
+        val lease = transportLease ?: return ""
         return withContext(Dispatchers.IO) {
             var session: Session? = null
             val stdoutText = StringBuilder()
             try {
-                session = conn.openSession()
+                session = lease.openSession()
                 session.execCommand("bash -lc '${command.replace("'", "'\\''")}'")
                 val stdout = session.stdout
                 val stderr = session.stderr
@@ -296,10 +274,10 @@ class SshConnection @Inject constructor(
         remoteDir: String
     ): Flow<ScpUploadProgress> = channelFlow {
         withContext(Dispatchers.IO) {
-            val conn = connection ?: error("SSH not connected")
+            val lease = transportLease ?: error("SSH not connected")
             var sess: Session? = null
             try {
-                sess = conn.openSession()
+                sess = lease.openSession()
                 // Wrap in bash -lc so that ~ is expanded (raw execCommand has no shell)
                 val sanitized = remoteDir.replace("'", "'\\''")
                 sess.execCommand("bash -lc 'scp -t \"$sanitized\"'")
@@ -400,8 +378,6 @@ class SshConnection @Inject constructor(
     fun disconnect() {
         disconnectReason = "disconnect()"
         _connected.value = false
-        keepaliveJob?.cancel()
-        keepaliveJob = null
         scope.launch {
             logger.log(LogLevel.INFO, TAG, "Disconnecting from $serverLabel")
             try {
@@ -412,53 +388,11 @@ class SshConnection @Inject constructor(
             } catch (e: Exception) {
                 logger.log(LogLevel.WARN, TAG, "Session close failed: ${e.javaClass.simpleName}: ${e.message}")
             }
-            try {
-                connection?.close()
-            } catch (e: Exception) {
-                logger.log(LogLevel.WARN, TAG, "Connection close failed: ${e.javaClass.simpleName}: ${e.message}")
-            }
+            transportLease?.release()
             shellSession = null
-            connection = null
+            transportLease = null
             outputStream = null
             logger.log(LogLevel.INFO, TAG, "Disconnected from $serverLabel")
-        }
-    }
-
-    private fun startKeepaliveLoop(conn: Connection) {
-        keepaliveJob?.cancel()
-        keepaliveJob = scope.launch {
-            while (_connected.value) {
-                delay(nextKeepaliveDelayMs())
-                if (!_connected.value) break
-                val settings = settingsRepository.settings.value
-                if (!settings.sshKeepaliveEnabled) continue
-                if (!shouldSendKeepalive(settings.backgroundKeepaliveScope)) continue
-                try {
-                    conn.sendIgnorePacket()
-                } catch (e: Exception) {
-                    logger.log(LogLevel.WARN, TAG, "Keepalive failed: ${e.javaClass.simpleName}: ${e.message}")
-                }
-            }
-        }
-    }
-
-    private fun nextKeepaliveDelayMs(): Long {
-        val runtimeState = runtimeRepository.state.value
-        if (runtimeState.appInForeground) return FOREGROUND_KEEPALIVE_MS
-        return when (settingsRepository.settings.value.backgroundKeepaliveProfile) {
-            BackgroundKeepaliveProfile.AGGRESSIVE -> 30_000L
-            BackgroundKeepaliveProfile.BALANCED -> 120_000L
-            BackgroundKeepaliveProfile.BATTERY_SAVER -> 300_000L
-            BackgroundKeepaliveProfile.ULTRA_BATTERY_SAVER -> 600_000L
-        }
-    }
-
-    private fun shouldSendKeepalive(scope: BackgroundKeepaliveScope): Boolean {
-        val runtimeState = runtimeRepository.state.value
-        if (runtimeState.appInForeground) return true
-        return when (scope) {
-            BackgroundKeepaliveScope.ALL_SESSIONS -> true
-            BackgroundKeepaliveScope.ACTIVE_TAB_ONLY -> projectId != null && projectId == runtimeState.activeProjectId
         }
     }
 
@@ -471,7 +405,7 @@ class SshConnection @Inject constructor(
             append(",projectName=").append(projectName)
             append(",server=").append(serverLabel)
             append(",connected=").append(_connected.value)
-            append(",connection=").append(connection?.let { System.identityHashCode(it) })
+            append(",transport=").append(transportLease?.debugTransportIdentity())
             append(",shell=").append(shellSession?.let { System.identityHashCode(it) })
             append(",createdAgoMs=").append(now - createdAtMs)
             append(",connectedAgoMs=").append(connectedAtMs?.let { now - it })
@@ -502,7 +436,5 @@ class SshConnection @Inject constructor(
 
     companion object {
         private const val TAG = "SshConnection"
-        private const val CONNECT_TIMEOUT_MS = 15_000
-        private const val FOREGROUND_KEEPALIVE_MS = 60_000L
     }
 }

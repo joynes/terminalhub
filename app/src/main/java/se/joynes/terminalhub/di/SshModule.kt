@@ -18,10 +18,22 @@ object SshModule {
     @Singleton
     fun provideConnectionFactory(
         logger: AppLogger,
+        transportPool: SharedSshTransportPool
+    ): SshConnectionFactory = SshConnectionFactory(logger, transportPool)
+
+    @Provides
+    @Singleton
+    fun provideSshTransportConnector(
+        logger: AppLogger,
         settingsRepository: AppSettingsRepository,
         runtimeRepository: AppRuntimeRepository,
         hostKeyVerifier: TerminalHubHostKeyVerifier
-    ): SshConnectionFactory = SshConnectionFactory(logger, settingsRepository, runtimeRepository, hostKeyVerifier)
+    ): SshTransportConnector = TrileadSshTransportConnector(
+        logger,
+        settingsRepository,
+        runtimeRepository,
+        hostKeyVerifier
+    )
 
     @Provides
     @Singleton
