@@ -1,8 +1,9 @@
 package se.joynes.terminalhub.data.ssh
 
-import com.trilead.ssh2.Connection
-import com.trilead.ssh2.crypto.PEMDecoder
+import com.trilead.ssh2.SFTPv3Client
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.withContext
@@ -11,18 +12,19 @@ import se.joynes.terminalhub.data.logging.LogLevel
 import se.joynes.terminalhub.data.model.Server
 import java.io.IOException
 import java.io.InputStream
+import java.util.UUID
 import javax.inject.Inject
 
 /**
- * Standalone SCP uploader that opens its own raw SSH connection (no PTY, no background threads).
- * This avoids the TrileadSSH2 limitation where you can't open an exec channel concurrently
- * on a connection that already has an active PTY shell session.
+ * Uploads through a short-lived SFTP channel on the shared authenticated SSH transport.
+ *
+ * The legacy class name is retained to avoid changing the UI contract. A hidden temporary file is
+ * used so interrupted uploads never appear as complete files in the project directory.
  */
 class ScpUploader @Inject constructor(
     private val logger: AppLogger,
-    private val hostKeyVerifier: TerminalHubHostKeyVerifier
+    private val transportPool: SharedSshTransportPool
 ) {
-
     fun upload(
         server: Server,
         password: String?,
@@ -33,79 +35,85 @@ class ScpUploader @Inject constructor(
         remoteDir: String
     ): Flow<ScpUploadProgress> = channelFlow {
         withContext(Dispatchers.IO) {
-            val conn = Connection(server.host, server.port)
+            requireValidTransferFileName(fileName)
+            var lease: SshTransportLease? = null
             try {
-                withVerifiedHostKey(hostKeyVerifier, server.host, server.port) {
-                    conn.connect(hostKeyVerifier)
-                }
-                logger.log(LogLevel.INFO, TAG, "SCP auth to ${server.host}:${server.port}")
-
-                val authenticated = when {
-                    !privateKeyPem.isNullOrBlank() -> {
-                        val kp = PEMDecoder.decode(privateKeyPem.toCharArray(), null)
-                        conn.authenticateWithPublicKey(server.username, kp)
-                    }
-                    !password.isNullOrBlank() -> conn.authenticateWithPassword(server.username, password)
-                    else -> conn.authenticateWithNone(server.username)
-                }
-                if (!authenticated) throw IOException("SCP auth failed")
-
-                val sess = conn.openSession()
-                try {
-                    // Expand leading ~ via $HOME (tilde is NOT expanded inside double-quotes in bash,
-                    // but $HOME is). Use bash -c (not -lc) to avoid login profile output on stdout.
-                    val expandedDir = if (remoteDir.startsWith("~/")) "\$HOME${remoteDir.substring(1)}" else remoteDir
-                    val sanitized = expandedDir.replace("'", "'\\''")
-                    sess.execCommand("bash -c 'scp -t \"$sanitized\"'")
-
-                    val toRemote   = sess.stdin
-                    val fromRemote = sess.stdout
-
-                    fun readAck() {
-                        val code = fromRemote.read()
-                        if (code != 0) {
-                            val msg = StringBuilder()
-                            var c: Int
-                            while (fromRemote.read().also { c = it } != '\n'.code && c != -1) msg.append(c.toChar())
-                            throw IOException("SCP remote error ($code): $msg")
+                lease = transportPool.acquireTransfer(server, password, privateKeyPem)
+                lease.openSftpSession().use { session ->
+                    val client = session.client
+                    val resolvedDir = resolveSftpPath(client, remoteDir)
+                    val destination = joinRemotePath(resolvedDir, fileName)
+                    val temporary = joinRemotePath(resolvedDir, ".$fileName.${UUID.randomUUID()}.part")
+                    var completed = false
+                    try {
+                        var sent = 0L
+                        val handle = client.createFileTruncate(temporary)
+                        try {
+                            val buffer = ByteArray(BUFFER_SIZE)
+                            while (true) {
+                                currentCoroutineContext().ensureActive()
+                                val read = inputStream.read(buffer)
+                                if (read < 0) break
+                                client.write(handle, sent, buffer, 0, read)
+                                sent += read
+                                currentCoroutineContext().ensureActive()
+                                trySend(ScpUploadProgress(fileName, sent, fileSize))
+                            }
+                            if (fileSize > 0 && sent != fileSize) {
+                                throw IOException("Upload source changed while reading $fileName")
+                            }
+                        } finally {
+                            client.closeFile(handle)
                         }
+                        moveReplacingExisting(client, temporary, destination)
+                        completed = true
+                        val totalBytes = fileSize.takeIf { it > 0 } ?: sent
+                        trySend(ScpUploadProgress(fileName, sent, totalBytes))
+                        logger.log(LogLevel.INFO, TAG, "SFTP upload complete: $fileName")
+                    } finally {
+                        if (!completed) runCatching { client.rm(temporary) }
                     }
-
-                    // Read initial ready-ack from scp -t server
-                    readAck()
-
-                    // Send file header and wait for ack
-                    toRemote.write("C0644 $fileSize $fileName\n".toByteArray(Charsets.UTF_8))
-                    toRemote.flush()
-                    readAck()
-
-                    // Stream file bytes, emit progress per chunk
-                    val buf = ByteArray(8192)
-                    var sent = 0L
-                    var n: Int
-                    while (inputStream.read(buf).also { n = it } != -1) {
-                        toRemote.write(buf, 0, n)
-                        sent += n
-                        trySend(ScpUploadProgress(fileName, sent, fileSize))
-                    }
-                    toRemote.flush()
-
-                    // End-of-file marker + final ack
-                    toRemote.write(0)
-                    toRemote.flush()
-                    readAck()
-
-                    trySend(ScpUploadProgress(fileName, fileSize, fileSize))
-                    logger.log(LogLevel.INFO, TAG, "SCP upload complete: $fileName")
-                } finally {
-                    sess.close()
                 }
             } finally {
                 inputStream.close()
-                conn.close()
+                lease?.release()
             }
         }
     }
 
-    companion object { private const val TAG = "ScpUploader" }
+    private companion object {
+        const val TAG = "ScpUploader"
+        const val BUFFER_SIZE = 32 * 1024
+    }
+}
+
+internal fun requireValidTransferFileName(fileName: String) {
+    require(fileName.isNotBlank() && fileName != "." && fileName != "..") {
+        "Invalid remote file name"
+    }
+    require('/' !in fileName && '\\' !in fileName && '\u0000' !in fileName) {
+        "Invalid remote file name"
+    }
+}
+
+internal fun resolveSftpPath(client: SFTPv3Client, path: String): String = when {
+    path == "~" -> client.canonicalPath(".")
+    path.startsWith("~/") -> joinRemotePath(client.canonicalPath("."), path.removePrefix("~/"))
+    else -> path
+}
+
+internal fun joinRemotePath(directory: String, child: String): String =
+    directory.trimEnd('/') + "/" + child
+
+internal fun moveReplacingExisting(client: SFTPv3Client, source: String, destination: String) {
+    try {
+        client.mv(source, destination)
+    } catch (firstError: Exception) {
+        try {
+            client.rm(destination)
+        } catch (_: Exception) {
+            throw firstError
+        }
+        client.mv(source, destination)
+    }
 }

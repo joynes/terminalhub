@@ -19,6 +19,7 @@ import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 import se.joynes.terminalhub.data.ssh.ScpDownloader
 import se.joynes.terminalhub.data.ssh.remoteSubdirectory
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
+import java.io.File
 import javax.inject.Inject
 
 sealed interface DownloadState {
@@ -82,10 +83,15 @@ class FileDownloadViewModel @Inject constructor(
     ) {
         if (states.value[projectId] is DownloadState.Downloading) return
         viewModelScope.launch {
+            var temporaryFile: File? = null
             try {
                 val (server, project) = resolveRemoteProject(serverId, projectId)
                 val directory = remoteSubdirectory(engine.projectPath(server, project), relativeDirectory)
-                val output = context.contentResolver.openOutputStream(uri) ?: error("Cannot open destination")
+                val transferDirectory = File(context.cacheDir, "downloads").also { directory ->
+                    check(directory.exists() || directory.mkdirs()) { "Cannot prepare download" }
+                }
+                val stagedDownload = File.createTempFile("terminalhub-", ".part", transferDirectory)
+                temporaryFile = stagedDownload
 
                 setState(projectId, DownloadState.Downloading(fileName, 0f))
                 var bytes = 0L
@@ -95,14 +101,20 @@ class FileDownloadViewModel @Inject constructor(
                     privateKeyPem = securePrefs.getPrivateKey(server.id),
                     remoteDir = directory,
                     fileName = fileName,
-                    outputStream = output
+                    outputStream = stagedDownload.outputStream()
                 ).collect { progress ->
                     bytes = progress.bytesTransferred
                     setState(projectId, DownloadState.Downloading(progress.fileName, progress.percent / 100f))
                 }
+                val output = context.contentResolver.openOutputStream(uri) ?: error("Cannot open destination")
+                output.use { destination ->
+                    stagedDownload.inputStream().use { source -> source.copyTo(destination) }
+                }
                 setState(projectId, DownloadState.Done(fileName, bytes, uri))
             } catch (e: Exception) {
                 setState(projectId, DownloadState.Error(e.message ?: "Download failed"))
+            } finally {
+                temporaryFile?.delete()
             }
         }
     }

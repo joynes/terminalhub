@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
 import se.joynes.terminalhub.data.logging.AppLogger
 import se.joynes.terminalhub.data.logging.LogLevel
 import se.joynes.terminalhub.data.model.Server
@@ -32,26 +33,57 @@ class SharedSshTransportPool @Inject constructor(
 ) {
     internal class Entry(
         val transport: CompletableDeferred<SshTransport> = CompletableDeferred(),
-        val leases: MutableMap<String, Long?> = linkedMapOf()
+        val projectLeases: MutableMap<String, Long?> = linkedMapOf(),
+        val transferLeases: MutableSet<String> = linkedSetOf()
     )
+
+    internal enum class LeaseKind { PROJECT, TRANSFER }
 
     private val lock = Any()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val transferSlots = Semaphore(MAX_CONCURRENT_TRANSFERS)
     private val entries = mutableMapOf<SshTransportKey, MutableList<Entry>>()
 
     suspend fun acquire(
         server: Server,
         password: String?,
         privateKeyPem: String?
+    ): SshTransportLease = acquireLease(server, password, privateKeyPem, LeaseKind.PROJECT)
+
+    suspend fun acquireTransfer(
+        server: Server,
+        password: String?,
+        privateKeyPem: String?
+    ): SshTransportLease {
+        transferSlots.acquire()
+        return try {
+            acquireLease(server, password, privateKeyPem, LeaseKind.TRANSFER)
+        } catch (error: Exception) {
+            transferSlots.release()
+            throw error
+        }
+    }
+
+    private suspend fun acquireLease(
+        server: Server,
+        password: String?,
+        privateKeyPem: String?,
+        kind: LeaseKind
     ): SshTransportLease {
         val key = transportKey(server, password, privateKeyPem)
         val leaseId = UUID.randomUUID().toString()
         val entry = synchronized(lock) {
             entries[key]
-                ?.firstOrNull { it.leases.size < MAX_PROJECT_CHANNELS_PER_TRANSPORT }
-                ?.also { it.leases[leaseId] = null }
+                ?.filter { candidate ->
+                    when (kind) {
+                        LeaseKind.PROJECT -> candidate.projectLeases.size < MAX_PROJECT_CHANNELS_PER_TRANSPORT
+                        LeaseKind.TRANSFER -> candidate.transferLeases.size < MAX_TRANSFERS_PER_TRANSPORT
+                    }
+                }
+                ?.minByOrNull { it.transferLeases.size }
+                ?.also { it.addLease(leaseId, kind) }
                 ?: Entry().also {
-                    it.leases[leaseId] = null
+                    it.addLease(leaseId, kind)
                     entries.getOrPut(key, ::mutableListOf).add(it)
                     startConnection(key, it, server, password, privateKeyPem)
                 }
@@ -67,36 +99,41 @@ class SharedSshTransportPool @Inject constructor(
         }
         synchronized(lock) {
             if (entry in entries[key].orEmpty()) {
-                transport.updateProjectIds(entry.leases.values.filterNotNull().toSet())
+                transport.updateProjectIds(entry.projectLeases.values.filterNotNull().toSet())
             }
         }
-        return SshTransportLease(this, key, entry, leaseId, transport)
+        return SshTransportLease(this, key, entry, leaseId, transport, kind)
     }
 
     internal fun bindProject(lease: SshTransportLease, projectId: Long) {
         synchronized(lock) {
-            if (lease.entry !in entries[lease.key].orEmpty() || lease.leaseId !in lease.entry.leases) return
-            lease.entry.leases[lease.leaseId] = projectId
-            lease.transport.updateProjectIds(lease.entry.leases.values.filterNotNull().toSet())
+            if (lease.kind != LeaseKind.PROJECT) return
+            if (lease.entry !in entries[lease.key].orEmpty() || lease.leaseId !in lease.entry.projectLeases) return
+            lease.entry.projectLeases[lease.leaseId] = projectId
+            lease.transport.updateProjectIds(lease.entry.projectLeases.values.filterNotNull().toSet())
         }
     }
 
     internal fun release(lease: SshTransportLease) {
-        var closeTransport = false
-        synchronized(lock) {
-            val shards = entries[lease.key] ?: return
-            if (lease.entry !in shards) return
-            lease.entry.leases.remove(lease.leaseId)
-            closeTransport = lease.entry.leases.isEmpty()
-            if (closeTransport) {
-                shards.remove(lease.entry)
-                if (shards.isEmpty()) entries.remove(lease.key)
+        try {
+            var closeTransport = false
+            synchronized(lock) {
+                val shards = entries[lease.key] ?: return
+                if (lease.entry !in shards) return
+                lease.entry.removeLease(lease.leaseId, lease.kind)
+                closeTransport = lease.entry.isUnused()
+                if (closeTransport) {
+                    shards.remove(lease.entry)
+                    if (shards.isEmpty()) entries.remove(lease.key)
+                }
+                lease.transport.updateProjectIds(lease.entry.projectLeases.values.filterNotNull().toSet())
             }
-            lease.transport.updateProjectIds(lease.entry.leases.values.filterNotNull().toSet())
-        }
-        if (closeTransport) {
-            lease.transport.close()
-            logger.log(LogLevel.INFO, TAG, "Closed unused shared SSH transport")
+            if (closeTransport) {
+                lease.transport.close()
+                logger.log(LogLevel.INFO, TAG, "Closed unused shared SSH transport")
+            }
+        } finally {
+            if (lease.kind == LeaseKind.TRANSFER) transferSlots.release()
         }
     }
 
@@ -114,7 +151,7 @@ class SharedSshTransportPool @Inject constructor(
             try {
                 val transport = connector.connect(server, password, privateKeyPem)
                 val orphaned = synchronized(lock) {
-                    val isOrphaned = entry !in entries[key].orEmpty() || entry.leases.isEmpty()
+                    val isOrphaned = entry !in entries[key].orEmpty() || entry.isUnused()
                     if (!isOrphaned) entry.transport.complete(transport)
                     isOrphaned
                 }
@@ -138,8 +175,9 @@ class SharedSshTransportPool @Inject constructor(
         synchronized(lock) {
             val shards = entries[key] ?: return
             if (entry !in shards) return
-            entry.leases.remove(leaseId)
-            if (entry.leases.isEmpty()) {
+            entry.projectLeases.remove(leaseId)
+            entry.transferLeases.remove(leaseId)
+            if (entry.isUnused()) {
                 shards.remove(entry)
                 if (shards.isEmpty()) entries.remove(key)
             }
@@ -149,6 +187,8 @@ class SharedSshTransportPool @Inject constructor(
     internal companion object {
         private const val TAG = "SharedSshTransportPool"
         internal const val MAX_PROJECT_CHANNELS_PER_TRANSPORT = 8
+        internal const val MAX_TRANSFERS_PER_TRANSPORT = 2
+        internal const val MAX_CONCURRENT_TRANSFERS = 4
 
         fun transportKey(server: Server, password: String?, privateKeyPem: String?): SshTransportKey {
             val authMaterial = when {
@@ -167,6 +207,22 @@ class SharedSshTransportPool @Inject constructor(
             )
         }
     }
+
+    private fun Entry.addLease(leaseId: String, kind: LeaseKind) {
+        when (kind) {
+            LeaseKind.PROJECT -> projectLeases[leaseId] = null
+            LeaseKind.TRANSFER -> transferLeases += leaseId
+        }
+    }
+
+    private fun Entry.removeLease(leaseId: String, kind: LeaseKind) {
+        when (kind) {
+            LeaseKind.PROJECT -> projectLeases.remove(leaseId)
+            LeaseKind.TRANSFER -> transferLeases.remove(leaseId)
+        }
+    }
+
+    private fun Entry.isUnused(): Boolean = projectLeases.isEmpty() && transferLeases.isEmpty()
 }
 
 class SshTransportLease internal constructor(
@@ -174,12 +230,14 @@ class SshTransportLease internal constructor(
     internal val key: SshTransportKey,
     internal val entry: SharedSshTransportPool.Entry,
     internal val leaseId: String,
-    internal val transport: SshTransport
+    internal val transport: SshTransport,
+    internal val kind: SharedSshTransportPool.LeaseKind
 ) {
     @Volatile private var released = false
 
     fun openSession() = transport.openProjectSession()
     fun openAuxiliarySession() = transport.openAuxiliarySession()
+    fun openSftpSession() = transport.openSftpSession()
     fun bindProject(projectId: Long) = pool.bindProject(this, projectId)
 
     fun release() {

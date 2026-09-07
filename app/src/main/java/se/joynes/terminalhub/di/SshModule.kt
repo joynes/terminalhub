@@ -50,9 +50,6 @@ object SshModule {
     fun provideServerStatusPoller(logger: AppLogger): ServerStatusPoller = ServerStatusPoller(logger)
 
     @Provides
-    fun provideSftpUploader(logger: AppLogger): SftpUploader = SftpUploader(logger)
-
-    @Provides
-    fun provideScpDownloader(logger: AppLogger, hostKeyVerifier: TerminalHubHostKeyVerifier): ScpDownloader =
-        ScpDownloader(logger, hostKeyVerifier)
+    fun provideScpDownloader(logger: AppLogger, transportPool: SharedSshTransportPool): ScpDownloader =
+        ScpDownloader(logger, transportPool)
 }

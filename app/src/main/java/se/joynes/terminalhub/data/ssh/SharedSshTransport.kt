@@ -2,6 +2,7 @@ package se.joynes.terminalhub.data.ssh
 
 import com.trilead.ssh2.Connection
 import com.trilead.ssh2.Session
+import com.trilead.ssh2.SFTPv3Client
 import com.trilead.ssh2.crypto.PEMDecoder
 import java.io.IOException
 import java.util.concurrent.Semaphore
@@ -27,9 +28,26 @@ import javax.inject.Inject
 interface SshTransport {
     fun openProjectSession(): Session
     fun openAuxiliarySession(): SshAuxiliarySession
+    fun openSftpSession(): SshAuxiliarySftp
     fun updateProjectIds(projectIds: Set<Long>)
     fun close()
     fun debugIdentity(): Int
+}
+
+class SshAuxiliarySftp internal constructor(
+    val client: SFTPv3Client,
+    private val releasePermit: () -> Unit
+) : AutoCloseable {
+    private val closed = AtomicBoolean(false)
+
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        try {
+            client.close()
+        } finally {
+            releasePermit()
+        }
+    }
 }
 
 /** A short-lived channel which returns its reserved slot when closed. */
@@ -105,6 +123,16 @@ private class TrileadSshTransport(
         auxiliaryChannelPermits.acquire()
         return try {
             SshAuxiliarySession(connection.openSession(), auxiliaryChannelPermits::release)
+        } catch (error: Exception) {
+            auxiliaryChannelPermits.release()
+            throw error
+        }
+    }
+
+    override fun openSftpSession(): SshAuxiliarySftp {
+        auxiliaryChannelPermits.acquire()
+        return try {
+            SshAuxiliarySftp(SFTPv3Client(connection), auxiliaryChannelPermits::release)
         } catch (error: Exception) {
             auxiliaryChannelPermits.release()
             throw error

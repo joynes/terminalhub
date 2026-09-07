@@ -5,7 +5,7 @@ import android.content.Context
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -16,10 +16,14 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.mockito.kotlin.any
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.isNull
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 import se.joynes.terminalhub.data.model.Project
@@ -33,9 +37,14 @@ import se.joynes.terminalhub.data.ssh.ScpDownloadProgress
 import se.joynes.terminalhub.data.ssh.ScpDownloader
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
 import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.io.OutputStream
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class FileDownloadViewModelTest {
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
+
     private val dispatcher = StandardTestDispatcher()
     private val serverRepo: ServerRepository = mock()
     private val projectRepo: ProjectRepository = mock()
@@ -146,6 +155,7 @@ class FileDownloadViewModelTest {
         whenever(serverRepo.getById(server.id)).thenReturn(server)
         whenever(projectRepo.getById(project.id)).thenReturn(project)
         whenever(context.contentResolver).thenReturn(resolver)
+        whenever(context.cacheDir).thenReturn(temporaryFolder.root)
         whenever(resolver.openOutputStream(uri)).thenReturn(output)
         whenever(
             downloader.download(
@@ -154,9 +164,15 @@ class FileDownloadViewModelTest {
                 privateKeyPem = isNull(),
                 remoteDir = eq("~/terminalhub/music/stems/drums"),
                 fileName = eq("beat.wav"),
-                outputStream = eq(output)
+                outputStream = any()
             )
-        ).thenReturn(flowOf(ScpDownloadProgress("beat.wav", 456L, 456L)))
+        ).thenAnswer { invocation ->
+            val stagedOutput = invocation.getArgument<OutputStream>(5)
+            flow {
+                stagedOutput.write("complete file".toByteArray())
+                emit(ScpDownloadProgress("beat.wav", 456L, 456L))
+            }
+        }
         val viewModel = createViewModel()
 
         viewModel.startDownload(server.id, project.id, "stems/drums", "beat.wav", uri, context)
@@ -169,8 +185,43 @@ class FileDownloadViewModelTest {
             privateKeyPem = isNull(),
             remoteDir = eq("~/terminalhub/music/stems/drums"),
             fileName = eq("beat.wav"),
-            outputStream = eq(output)
+            outputStream = any()
         )
+        assertEquals("complete file", output.toString())
+        assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test
+    fun failedNetworkDownloadDoesNotOpenOrPartiallyWriteDestination() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val context: Context = mock()
+        val resolver: ContentResolver = mock()
+        val uri: Uri = mock()
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(context.contentResolver).thenReturn(resolver)
+        whenever(context.cacheDir).thenReturn(temporaryFolder.root)
+        whenever(
+            downloader.download(
+                server = eq(server),
+                password = isNull(),
+                privateKeyPem = isNull(),
+                remoteDir = eq("~/terminalhub/music"),
+                fileName = eq("beat.wav"),
+                outputStream = any()
+            )
+        ).thenReturn(flow { throw IOException("connection lost") })
+        val viewModel = createViewModel()
+
+        viewModel.startDownload(server.id, project.id, "", "beat.wav", uri, context)
+        advanceUntilIdle()
+
+        val state = viewModel.downloadState(project.id).first()
+        assertTrue(state is DownloadState.Error)
+        assertEquals("connection lost", (state as DownloadState.Error).message)
+        verify(resolver, never()).openOutputStream(uri)
+        assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
     }
 
     private fun createViewModel() = FileDownloadViewModel(

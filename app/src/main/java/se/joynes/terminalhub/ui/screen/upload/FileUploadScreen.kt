@@ -7,7 +7,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.terminalhub.ui.components.*
 import se.joynes.terminalhub.ui.theme.*
 
@@ -15,8 +14,7 @@ import se.joynes.terminalhub.ui.theme.*
 @Composable
 fun FileUploadScreen(
     serverId: Long,
-    onBack: () -> Unit,
-    viewModel: FileUploadViewModel = hiltViewModel()
+    onBack: () -> Unit
 ) {
     Scaffold(
         topBar = { RetroTopBar(title = "FILE UPLOAD", onBack = onBack) },

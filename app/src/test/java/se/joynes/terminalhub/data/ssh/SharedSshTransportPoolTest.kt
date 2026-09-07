@@ -1,6 +1,7 @@
 package se.joynes.terminalhub.data.ssh
 
 import com.trilead.ssh2.Session
+import com.trilead.ssh2.SFTPv3Client
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.Dispatchers
@@ -100,6 +101,85 @@ class SharedSshTransportPoolTest {
     }
 
     @Test
+    fun `two transfers reuse a project transport without consuming project capacity`() = runBlocking {
+        val connector = FakeConnector()
+        val pool = SharedSshTransportPool(logger, connector)
+        val projects = (1..8).map { pool.acquire(server(), "secret", null) }
+
+        val firstTransfer = pool.acquireTransfer(server(), "secret", null)
+        val secondTransfer = pool.acquireTransfer(server(), "secret", null)
+
+        assertEquals(1, connector.connectCount.get())
+        assertEquals(projects.first().debugTransportIdentity(), firstTransfer.debugTransportIdentity())
+        assertEquals(firstTransfer.debugTransportIdentity(), secondTransfer.debugTransportIdentity())
+    }
+
+    @Test
+    fun `third concurrent transfer opens another capacity bounded transport`() = runBlocking {
+        val connector = FakeConnector()
+        val pool = SharedSshTransportPool(logger, connector)
+
+        val transfers = (1..3).map { pool.acquireTransfer(server(), "secret", null) }
+
+        assertEquals(2, connector.connectCount.get())
+        assertEquals(listOf(1, 2), transfers.groupingBy { it.debugTransportIdentity() }.eachCount().values.sorted())
+    }
+
+    @Test
+    fun `fifth transfer waits in queue until a running transfer finishes`() = runBlocking {
+        val connector = FakeConnector()
+        val pool = SharedSshTransportPool(logger, connector)
+        val running = (1..4).map { pool.acquireTransfer(server(), "secret", null) }
+
+        val queued = async(Dispatchers.Default) { pool.acquireTransfer(server(), "secret", null) }
+        kotlinx.coroutines.delay(100)
+
+        assertFalse(queued.isCompleted)
+        running.first().release()
+        val admitted = queued.await()
+        assertTrue(queued.isCompleted)
+
+        admitted.release()
+        running.drop(1).forEach { it.release() }
+    }
+
+    @Test
+    fun `transfer lease keeps transport alive after last project closes`() = runBlocking {
+        val connector = FakeConnector()
+        val pool = SharedSshTransportPool(logger, connector)
+        val project = pool.acquire(server(), "secret", null)
+        val transfer = pool.acquireTransfer(server(), "secret", null)
+        val transport = connector.transports.single()
+
+        project.release()
+
+        assertFalse(transport.closed)
+        assertEquals(1, pool.activeTransportCount())
+
+        transfer.release()
+        assertTrue(transport.closed)
+        assertEquals(0, pool.activeTransportCount())
+    }
+
+    @Test
+    fun `transfer leases do not reduce eight reserved project channels`() = runBlocking {
+        val connector = FakeConnector()
+        val pool = SharedSshTransportPool(logger, connector)
+        val transfers = listOf(
+            pool.acquireTransfer(server(), "secret", null),
+            pool.acquireTransfer(server(), "secret", null)
+        )
+
+        val projects = (1..8).map { pool.acquire(server(), "secret", null) }
+
+        assertEquals(1, connector.connectCount.get())
+        assertEquals(
+            transfers.first().debugTransportIdentity(),
+            projects.last().debugTransportIdentity()
+        )
+    }
+
+    @Test
     fun `different authentication identities never share transport`() = runBlocking {
         val connector = FakeConnector()
         val pool = SharedSshTransportPool(logger, connector)
@@ -177,6 +257,8 @@ class SharedSshTransportPoolTest {
         }
         override fun openAuxiliarySession(): SshAuxiliarySession =
             SshAuxiliarySession(mock()) {}
+        override fun openSftpSession(): SshAuxiliarySftp =
+            SshAuxiliarySftp(mock<SFTPv3Client>()) {}
         override fun updateProjectIds(projectIds: Set<Long>) {
             projectUpdates += projectIds
         }
