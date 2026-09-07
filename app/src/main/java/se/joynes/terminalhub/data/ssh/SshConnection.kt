@@ -156,10 +156,11 @@ class SshConnection @Inject constructor(
     suspend fun runSilent(command: String): String {
         val lease = transportLease ?: return ""
         return withContext(Dispatchers.IO) {
-            var session: Session? = null
+            var auxiliarySession: SshAuxiliarySession? = null
             val stdoutText = StringBuilder()
             try {
-                session = lease.openSession()
+                auxiliarySession = lease.openAuxiliarySession()
+                val session = auxiliarySession.session
                 session.execCommand("bash -lc '${command.replace("'", "'\\''")}'")
                 val stdout = session.stdout
                 val stderr = session.stderr
@@ -200,7 +201,7 @@ class SshConnection @Inject constructor(
             } catch (e: Exception) {
                 logger.log(LogLevel.WARN, TAG, "Silent exec failed: ${e.message}")
             } finally {
-                session?.close()
+                auxiliarySession?.close()
             }
             stdoutText.toString()
         }
@@ -275,9 +276,10 @@ class SshConnection @Inject constructor(
     ): Flow<ScpUploadProgress> = channelFlow {
         withContext(Dispatchers.IO) {
             val lease = transportLease ?: error("SSH not connected")
-            var sess: Session? = null
+            var auxiliarySession: SshAuxiliarySession? = null
             try {
-                sess = lease.openSession()
+                auxiliarySession = lease.openAuxiliarySession()
+                val sess = auxiliarySession.session
                 // Wrap in bash -lc so that ~ is expanded (raw execCommand has no shell)
                 val sanitized = remoteDir.replace("'", "'\\''")
                 sess.execCommand("bash -lc 'scp -t \"$sanitized\"'")
@@ -319,7 +321,7 @@ class SshConnection @Inject constructor(
                 trySend(ScpUploadProgress(fileName, fileSize, fileSize))
             } finally {
                 inputStream.close()
-                sess?.close()
+                auxiliarySession?.close()
             }
         }
     }

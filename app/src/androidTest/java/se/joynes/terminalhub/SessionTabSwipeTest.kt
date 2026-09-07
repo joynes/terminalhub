@@ -122,6 +122,29 @@ class SessionTabSwipeTest {
     }
 
     @Test
+    fun twelveProjectTabsRemainVisibleAndSelectable() {
+        var selectedProjectId: Long? = null
+        val tabs = (1L..12L).map { makeTab(it, "project-$it") }
+        composeRule.setContent {
+            TerminalHubTheme {
+                SessionTabBar(
+                    tabs = tabs,
+                    activeId = tabs.first().sessionId,
+                    onSelect = { selectedProjectId = it },
+                    onClose = { _, _ -> },
+                    onRestartTmux = {},
+                    onReorder = {},
+                    onAddProject = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("PROJECT-1").assertIsDisplayed()
+        composeRule.onNodeWithText("PROJECT-12").assertIsDisplayed().performClick()
+        composeRule.runOnIdle { assertEquals(12L, selectedProjectId) }
+    }
+
+    @Test
     fun longPressShowsRestartTmuxForTmuxTab() {
         var restartedProjectId: Long? = null
         val tab = makeTab(7L, "tmux-project").copy(usesTmux = true)

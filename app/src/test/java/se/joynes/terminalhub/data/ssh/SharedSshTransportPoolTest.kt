@@ -33,7 +33,7 @@ class SharedSshTransportPoolTest {
     }
 
     @Test
-    fun `concurrent project startup performs only one handshake`() = runBlocking {
+    fun `concurrent project startup creates only capacity bounded transports`() = runBlocking {
         val connector = FakeConnector(connectDelayMs = 80)
         val pool = SharedSshTransportPool(logger, connector)
 
@@ -41,8 +41,28 @@ class SharedSshTransportPoolTest {
             async(Dispatchers.Default) { pool.acquire(server(), "secret", null) }
         }.awaitAll()
 
-        assertEquals(1, connector.connectCount.get())
-        assertEquals(1, leases.map { it.debugTransportIdentity() }.distinct().size)
+        assertEquals(3, connector.connectCount.get())
+        assertEquals(
+            listOf(4, 8, 8),
+            leases.groupingBy { it.debugTransportIdentity() }.eachCount().values.sorted()
+        )
+    }
+
+    @Test
+    fun `twelve projects spill into a second transport before server channel limit`() = runBlocking {
+        val connector = FakeConnector()
+        val pool = SharedSshTransportPool(logger, connector)
+
+        val leases = (1..12).map {
+            async(Dispatchers.Default) { pool.acquire(server(), "secret", null) }
+        }.awaitAll()
+
+        assertEquals(2, pool.activeTransportCount())
+        assertEquals(2, connector.connectCount.get())
+        assertEquals(
+            listOf(4, 8),
+            leases.groupingBy { it.debugTransportIdentity() }.eachCount().values.sorted()
+        )
     }
 
     @Test
@@ -151,10 +171,12 @@ class SharedSshTransportPoolTest {
         var closed = false
         var openSessionCount = 0
 
-        override fun openSession(): Session {
+        override fun openProjectSession(): Session {
             openSessionCount += 1
             return mock()
         }
+        override fun openAuxiliarySession(): SshAuxiliarySession =
+            SshAuxiliarySession(mock()) {}
         override fun updateProjectIds(projectIds: Set<Long>) {
             projectUpdates += projectIds
         }

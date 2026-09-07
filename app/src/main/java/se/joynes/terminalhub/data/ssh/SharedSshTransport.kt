@@ -4,6 +4,8 @@ import com.trilead.ssh2.Connection
 import com.trilead.ssh2.Session
 import com.trilead.ssh2.crypto.PEMDecoder
 import java.io.IOException
+import java.util.concurrent.Semaphore
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,10 +25,28 @@ import javax.inject.Inject
 
 /** One authenticated SSH transport which can multiplex several project channels. */
 interface SshTransport {
-    fun openSession(): Session
+    fun openProjectSession(): Session
+    fun openAuxiliarySession(): SshAuxiliarySession
     fun updateProjectIds(projectIds: Set<Long>)
     fun close()
     fun debugIdentity(): Int
+}
+
+/** A short-lived channel which returns its reserved slot when closed. */
+class SshAuxiliarySession internal constructor(
+    val session: Session,
+    private val releasePermit: () -> Unit
+) : AutoCloseable {
+    private val closed = AtomicBoolean(false)
+
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        try {
+            session.close()
+        } finally {
+            releasePermit()
+        }
+    }
 }
 
 interface SshTransportConnector {
@@ -76,9 +96,20 @@ private class TrileadSshTransport(
 ) : SshTransport {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val projectIds = AtomicReference<Set<Long>>(emptySet())
+    private val auxiliaryChannelPermits = Semaphore(AUXILIARY_CHANNEL_CAPACITY, true)
     private val keepaliveJob: Job = scope.launch { keepaliveLoop() }
 
-    override fun openSession(): Session = connection.openSession()
+    override fun openProjectSession(): Session = connection.openSession()
+
+    override fun openAuxiliarySession(): SshAuxiliarySession {
+        auxiliaryChannelPermits.acquire()
+        return try {
+            SshAuxiliarySession(connection.openSession(), auxiliaryChannelPermits::release)
+        } catch (error: Exception) {
+            auxiliaryChannelPermits.release()
+            throw error
+        }
+    }
 
     override fun updateProjectIds(projectIds: Set<Long>) {
         this.projectIds.set(projectIds)
@@ -131,5 +162,6 @@ private class TrileadSshTransport(
     private companion object {
         const val TAG = "SharedSshTransport"
         const val FOREGROUND_KEEPALIVE_MS = 60_000L
+        const val AUXILIARY_CHANNEL_CAPACITY = 2
     }
 }
