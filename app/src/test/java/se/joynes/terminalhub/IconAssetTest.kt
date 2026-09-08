@@ -15,6 +15,10 @@ class IconAssetTest {
 
         assertEquals(0, image.getRGB(0, 0).ushr(24))
         assertTrue(image.getRGB(image.width / 2, image.height / 2).ushr(24) > 0)
+        val opaqueColumns = (0 until image.width).filter { x ->
+            (0 until image.height).any { y -> image.getRGB(x, y).ushr(24) > 0 }
+        }
+        assertTrue(opaqueColumns.size <= image.width * 0.65)
     }
 
     @Test
