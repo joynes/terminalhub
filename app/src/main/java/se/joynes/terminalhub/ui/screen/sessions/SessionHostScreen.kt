@@ -682,7 +682,7 @@ fun SessionHostScreen(
                     Text(
                         "⚙",
                         color = MegaDrivePrimary,
-                        fontSize = 9.1.sp,
+                        fontSize = 13.sp,
                         fontFamily = MonoFontFamily
                     )
                     DropdownMenu(
