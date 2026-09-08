@@ -8,9 +8,28 @@ import se.joynes.terminalhub.data.security.HostKeyChallenge
 import se.joynes.terminalhub.data.security.HostKeyChallengeKind
 import se.joynes.terminalhub.data.security.SshEndpoint
 import se.joynes.terminalhub.data.runtime.BackgroundSshMode
+import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.domain.TerminalSessionId
 
 class SessionReconnectUxTest {
+    @Test
+    fun `settings reconnect includes connected and disconnected SSH tabs`() {
+        val tabs = listOf(
+            ProjectTabState(1L, "connected", TerminalSessionId("one"), isConnected = true),
+            ProjectTabState(2L, "disconnected", null, isConnected = false),
+            ProjectTabState(3L, "connecting", null, isConnected = false, isConnecting = true),
+            ProjectTabState(
+                4L,
+                "local",
+                TerminalSessionId("four"),
+                isConnected = true,
+                targetType = ProjectTargetType.LOCAL
+            )
+        )
+
+        assertEquals(listOf(1L, 2L), reconnectableProjectIdsForAll(tabs))
+    }
+
     @Test
     fun `identical host challenge from several tabs becomes one prompt`() {
         val challenge = challenge("server.example", 22, byteArrayOf(1, 2, 3))

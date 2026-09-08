@@ -271,7 +271,7 @@ fun SettingsScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                         Text(
-                            "Reconnects all disconnected project tabs.",
+                            "Reconnects every open SSH project tab.",
                             color = MegaDriveDim,
                             fontFamily = MonoFontFamily,
                             fontSize = 11.sp

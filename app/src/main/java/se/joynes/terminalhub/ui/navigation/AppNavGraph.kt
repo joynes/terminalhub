@@ -4,6 +4,9 @@ import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -28,6 +31,7 @@ fun AppNavGraph(
     onConsumeSharedUri: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+    var reconnectAllRequested by rememberSaveable { mutableStateOf(false) }
     NavHost(navController = navController, startDestination = Screen.Splash.route) {
         composable(Screen.Splash.route) {
             SplashScreen(onAuthSuccess = {
@@ -97,19 +101,18 @@ fun AppNavGraph(
             Screen.SessionHost.route,
             arguments = listOf(
                 navArgument("serverId") { type = NavType.LongType; defaultValue = -1L },
-                navArgument("projectId") { type = NavType.LongType; defaultValue = -1L },
-                navArgument("reconnectAll") { type = NavType.BoolType; defaultValue = false }
+                navArgument("projectId") { type = NavType.LongType; defaultValue = -1L }
             )
         ) { backStackEntry ->
             val requestedServerId = backStackEntry.arguments?.getLong("serverId")?.takeIf { it >= 0 }
             val requestedProjectId = backStackEntry.arguments?.getLong("projectId")?.takeIf { it >= 0 }
-            val reconnectAll = backStackEntry.arguments?.getBoolean("reconnectAll") == true
             val viewModel = androidx.hilt.navigation.compose.hiltViewModel<se.joynes.terminalhub.ui.screen.sessions.SessionHostViewModel>()
             val serverId by viewModel.serverId.collectAsState()
             SessionHostScreen(
                 requestedServerId = requestedServerId,
                 requestedProjectId = requestedProjectId,
-                reconnectAllRequested = reconnectAll,
+                reconnectAllRequested = reconnectAllRequested,
+                onReconnectAllConsumed = { reconnectAllRequested = false },
                 viewModel = viewModel,
                 sharedUri = sharedUri,
                 onConsumeSharedUri = onConsumeSharedUri,
@@ -132,9 +135,9 @@ fun AppNavGraph(
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onReconnectAll = {
-                    navController.navigate(Screen.SessionHost.createRoute(reconnectAll = true)) {
-                        launchSingleTop = true
-                        popUpTo(Screen.SessionHost.route) { inclusive = false }
+                    reconnectAllRequested = true
+                    if (!navController.popBackStack()) {
+                        navController.navigate(Screen.SessionHost.createRoute())
                     }
                 }
             )

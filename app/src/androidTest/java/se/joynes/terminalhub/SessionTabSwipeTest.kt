@@ -169,6 +169,32 @@ class SessionTabSwipeTest {
     }
 
     @Test
+    fun longPressCanReconnectOnlyTheSelectedTab() {
+        var reconnectedProjectId: Long? = null
+        val first = makeTab(7L, "first")
+        val second = makeTab(8L, "second")
+        composeRule.setContent {
+            TerminalHubTheme {
+                SessionTabBar(
+                    tabs = listOf(first, second),
+                    activeId = first.sessionId,
+                    onSelect = {},
+                    onClose = { _, _ -> },
+                    onReconnect = { reconnectedProjectId = it },
+                    onRestartTmux = {},
+                    onReorder = {},
+                    onAddProject = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("SECOND").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Reconnect tab").performClick()
+
+        composeRule.runOnIdle { assertEquals(8L, reconnectedProjectId) }
+    }
+
+    @Test
     fun longPressCanEnterDedicatedReorderMode() {
         var committedOrder: List<Long>? = null
         val tabs = listOf(makeTab(1L, "first"), makeTab(2L, "second"))

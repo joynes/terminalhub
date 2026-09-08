@@ -119,6 +119,10 @@ internal fun shouldShowBackgroundSshRecommendation(
     connectedRemoteSessionCount: Int
 ): Boolean = !recommendationHandled && !keepSshActiveInBackground && connectedRemoteSessionCount > 0
 
+internal fun reconnectableProjectIdsForAll(tabs: List<ProjectTabState>): List<Long> = tabs
+    .filter { it.targetType == ProjectTargetType.SSH && !it.isConnecting }
+    .map { it.projectId }
+
 internal fun shouldShowBackgroundSshRestartReminder(
     keepSshActiveInBackground: Boolean,
     foregroundServiceRunning: Boolean,
@@ -868,6 +872,34 @@ class SessionHostViewModel @Inject constructor(
             reconnectProject(
                 projectId = tab.projectId,
                 autoSwitch = tab.projectId == activeProjectId
+            )
+        }
+    }
+
+    fun reconnectAllProjects() {
+        val tabs = projectTabs.value
+        val projectIds = reconnectableProjectIdsForAll(tabs)
+        if (projectIds.isEmpty()) {
+            _uiMessages.tryEmit(
+                if (tabs.any { it.targetType == ProjectTargetType.SSH && it.isConnecting }) {
+                    "SSH tabs are already connecting"
+                } else {
+                    "No open SSH tabs to reconnect"
+                }
+            )
+            return
+        }
+        val activeProjectId = sessionManager.sessions.value
+            .firstOrNull { it.id == activeId.value }
+            ?.projectId
+        _uiMessages.tryEmit(
+            if (projectIds.size == 1) "Reconnecting SSH tab…"
+            else "Reconnecting all ${projectIds.size} SSH tabs…"
+        )
+        projectIds.forEach { projectId ->
+            reconnectProject(
+                projectId = projectId,
+                autoSwitch = projectId == activeProjectId
             )
         }
     }

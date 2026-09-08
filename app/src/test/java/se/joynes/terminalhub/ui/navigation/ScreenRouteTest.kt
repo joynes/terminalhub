@@ -5,10 +5,10 @@ import org.junit.Test
 
 class ScreenRouteTest {
     @Test
-    fun `settings reconnect route requests reconnect all`() {
+    fun `session route does not persist one-shot reconnect action`() {
         assertEquals(
-            "session_host?serverId=-1&projectId=-1&reconnectAll=true",
-            Screen.SessionHost.createRoute(reconnectAll = true)
+            "session_host?serverId=-1&projectId=-1",
+            Screen.SessionHost.createRoute()
         )
     }
 }

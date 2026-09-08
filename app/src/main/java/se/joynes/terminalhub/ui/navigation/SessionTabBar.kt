@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import se.joynes.terminalhub.domain.TerminalSessionId
+import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.terminalhub.ui.theme.*
 
@@ -50,6 +51,7 @@ fun SessionTabBar(
     activeId: TerminalSessionId?,
     onSelect: (Long) -> Unit,
     onClose: (Long, TerminalSessionId?) -> Unit,
+    onReconnect: (Long) -> Unit = {},
     onRestartTmux: (Long) -> Unit = {},
     onReorder: (List<Long>) -> Unit,
     onAddProject: () -> Unit,
@@ -260,6 +262,23 @@ fun SessionTabBar(
                             expanded = menuTabId == tab.projectId,
                             onDismissRequest = { menuTabId = null }
                         ) {
+                            if (tab.targetType == ProjectTargetType.SSH) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "Reconnect tab",
+                                            color = if (!tab.isConnecting) Color.White else MegaDriveDim,
+                                            fontFamily = MonoFontFamily,
+                                            fontSize = 12.sp
+                                        )
+                                    },
+                                    enabled = !tab.isConnecting,
+                                    onClick = {
+                                        menuTabId = null
+                                        onReconnect(tab.projectId)
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = {
                                     Text(

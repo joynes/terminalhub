@@ -95,6 +95,7 @@ fun SessionHostScreen(
     requestedServerId: Long? = null,
     requestedProjectId: Long? = null,
     reconnectAllRequested: Boolean = false,
+    onReconnectAllConsumed: () -> Unit = {},
     onOpenServers: () -> Unit,
     onAddServer: () -> Unit,
     onAddProject: (Long?) -> Unit,
@@ -105,7 +106,6 @@ fun SessionHostScreen(
     viewModel: SessionHostViewModel = hiltViewModel()
 ) {
     val projectTabs by viewModel.projectTabs.collectAsState()
-    var pendingReconnectAll by remember(reconnectAllRequested) { mutableStateOf(reconnectAllRequested) }
     val sessions by viewModel.sessionManager.sessions.collectAsState()
     val activeId by viewModel.activeId.collectAsState()
     val session by viewModel.activeSession.collectAsState()
@@ -324,8 +324,6 @@ fun SessionHostScreen(
             !activeTab.isConnecting &&
             activeTab.sessionId != null
     )
-    val canReconnectActiveTab = activeTab != null &&
-        activeTab.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH
     val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
     val activeTextInputDraft = activeProjectId?.let { textInputDraftByProject[it] } ?: TextFieldValue()
     val activeFileUploadVisible = activeProjectId?.let { fileUploadVisibleByProject[it] == true } ?: false
@@ -453,10 +451,10 @@ fun SessionHostScreen(
         viewModel.init()
     }
 
-    LaunchedEffect(pendingReconnectAll, projectTabs) {
-        if (pendingReconnectAll && projectTabs.isNotEmpty()) {
-            pendingReconnectAll = false
-            viewModel.reconnectAllDisconnected()
+    LaunchedEffect(reconnectAllRequested, projectTabs) {
+        if (reconnectAllRequested && projectTabs.isNotEmpty()) {
+            onReconnectAllConsumed()
+            viewModel.reconnectAllProjects()
         }
     }
 
@@ -648,6 +646,7 @@ fun SessionHostScreen(
                                 viewModel.closeSession(projectId, sessionId)
                             }
                         },
+                        onReconnect = viewModel::reconnectProject,
                         onRestartTmux = { projectId ->
                             projectTabs.firstOrNull { it.projectId == projectId }?.let { tab ->
                                 pendingTmuxRestart = PendingTmuxRestart(
@@ -690,22 +689,6 @@ fun SessionHostScreen(
                         expanded = showSettingsMenu,
                         onDismissRequest = { showSettingsMenu = false }
                     ) {
-                        if (canReconnectActiveTab) {
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        "Reconnect",
-                                        color = Color.White,
-                                        fontFamily = MonoFontFamily,
-                                        fontSize = 12.sp
-                                    )
-                                },
-                                onClick = {
-                                    showSettingsMenu = false
-                                    activeTab?.let { viewModel.reconnectProject(it.projectId) }
-                                }
-                            )
-                        }
                         DropdownMenuItem(
                             text = {
                                 Text(
