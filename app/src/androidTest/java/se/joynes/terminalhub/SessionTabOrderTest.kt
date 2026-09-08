@@ -90,6 +90,25 @@ class SessionTabOrderTest {
         assertEquals(listOf("gamma", "alpha", "beta"), viewModel.projectTabs.value.map { it.projectName })
     }
 
+    @Test
+    fun allPersistedTabsOpenAutomaticallyOnInitialLoad() = runBlocking {
+        projectRepo.save(localProject("alpha"))
+        projectRepo.save(localProject("beta"))
+        projectRepo.save(localProject("gamma"))
+
+        viewModel.init()
+
+        val allOpened = waitUntil(10_000) {
+            val tabs = viewModel.projectTabs.value
+            tabs.size == 3 && tabs.all { it.sessionId != null && it.isConnected }
+        }
+        assertEquals(true, allOpened)
+        assertEquals(
+            listOf("alpha", "beta", "gamma"),
+            viewModel.projectTabs.value.map { it.projectName }
+        )
+    }
+
     private fun localProject(name: String) = Project(
         serverId = LOCAL_PROJECT_SERVER_ID,
         targetType = ProjectTargetType.LOCAL,

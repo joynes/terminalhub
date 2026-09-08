@@ -89,6 +89,20 @@ internal fun recoveryProjectsInPriorityOrder(
     return if (primary == null) emptyList() else listOf(primary) + projects.filterNot { it.id == primary.id }
 }
 
+internal fun projectsToAutoActivateOnLoad(
+    visibleProjects: List<Project>,
+    liveProjectIds: Set<Long>,
+    preferredProjectId: Long?,
+    initialLoad: Boolean,
+    recoveryPending: Boolean
+): List<Project> {
+    if (!initialLoad && !recoveryPending) return emptyList()
+    return recoveryProjectsInPriorityOrder(
+        visibleProjects.filterNot { it.id in liveProjectIds },
+        preferredProjectId
+    )
+}
+
 data class HostKeyPrompt(
     val challenge: HostKeyChallenge,
     val projectIds: Set<Long>
@@ -278,26 +292,21 @@ class SessionHostViewModel @Inject constructor(
                 val preferredActive = runtimeRepository.state.value.recoveryActiveProjectId
                 _dbProjects.value = visible
                 val recoveryPending = runtimeRepository.state.value.recoveryPending
-                if (recoveryPending) {
-                    val recoveryRemoteIds = runtimeRepository.state.value.recoveryRemoteProjectIds
-                    val recoveryRemoteProjects = visible.filter {
-                        it.targetType == ProjectTargetType.SSH && it.id in recoveryRemoteIds
-                    }
-                    val orderedRecoveryProjects = recoveryProjectsInPriorityOrder(
-                        recoveryRemoteProjects,
-                        preferredActive
-                    )
-                    val primaryRecoveryProject = orderedRecoveryProjects.firstOrNull()
-
-                    visible.filter { it.targetType == ProjectTargetType.LOCAL }.forEach { localProject ->
-                        activateProject(localProject, autoSwitch = primaryRecoveryProject == null && localProject.id == preferredActive)
-                    }
-
-                    // activateProject creates one coroutine and one SSH connection per project.
-                    // Invoke every activation immediately so reconnects proceed in parallel while
-                    // only the previously active project is allowed to take UI focus.
-                    orderedRecoveryProjects.forEachIndexed { index, project ->
-                        activateProject(project, autoSwitch = index == 0)
+                val projectsToAutoActivate = projectsToAutoActivateOnLoad(
+                    visibleProjects = visible,
+                    liveProjectIds = sessionManager.sessions.value.mapTo(mutableSetOf()) { it.projectId },
+                    preferredProjectId = preferredActive,
+                    initialLoad = previousProjectIds.isEmpty(),
+                    recoveryPending = recoveryPending
+                )
+                if (projectsToAutoActivate.isNotEmpty()) {
+                    // Every open tab starts immediately and independently. The preferred tab may
+                    // take focus, but no tab has to be clicked before its connection begins.
+                    projectsToAutoActivate.forEachIndexed { index, project ->
+                        activateProject(
+                            project,
+                            autoSwitch = activeId.value == null && index == 0
+                        )
                     }
                 } else {
                     visible.filter { it.id in newlyAddedIds }.forEach { project ->
