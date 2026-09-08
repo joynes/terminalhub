@@ -7,6 +7,7 @@ import org.junit.Test
 import se.joynes.terminalhub.data.security.HostKeyChallenge
 import se.joynes.terminalhub.data.security.HostKeyChallengeKind
 import se.joynes.terminalhub.data.security.SshEndpoint
+import se.joynes.terminalhub.data.runtime.BackgroundSshMode
 import se.joynes.terminalhub.domain.TerminalSessionId
 
 class SessionReconnectUxTest {
@@ -62,6 +63,59 @@ class SessionReconnectUxTest {
                 recommendationHandled = false,
                 keepSshActiveInBackground = false,
                 connectedRemoteSessionCount = 0
+            )
+        )
+    }
+
+    @Test
+    fun `approved background SSH reminds when service is stopped`() {
+        assertTrue(
+            shouldShowBackgroundSshRestartReminder(
+                keepSshActiveInBackground = true,
+                foregroundServiceRunning = false,
+                mode = BackgroundSshMode.OFF,
+                connectedRemoteSessionCount = 3,
+                dismissedForThisScreen = false
+            )
+        )
+    }
+
+    @Test
+    fun `background SSH restart reminder does not duplicate invalid states`() {
+        assertFalse(
+            shouldShowBackgroundSshRestartReminder(
+                keepSshActiveInBackground = true,
+                foregroundServiceRunning = true,
+                mode = BackgroundSshMode.ACTIVE,
+                connectedRemoteSessionCount = 3,
+                dismissedForThisScreen = false
+            )
+        )
+        assertFalse(
+            shouldShowBackgroundSshRestartReminder(
+                keepSshActiveInBackground = true,
+                foregroundServiceRunning = false,
+                mode = BackgroundSshMode.STARTING,
+                connectedRemoteSessionCount = 3,
+                dismissedForThisScreen = false
+            )
+        )
+        assertFalse(
+            shouldShowBackgroundSshRestartReminder(
+                keepSshActiveInBackground = true,
+                foregroundServiceRunning = false,
+                mode = BackgroundSshMode.OFF,
+                connectedRemoteSessionCount = 3,
+                dismissedForThisScreen = true
+            )
+        )
+        assertFalse(
+            shouldShowBackgroundSshRestartReminder(
+                keepSshActiveInBackground = false,
+                foregroundServiceRunning = false,
+                mode = BackgroundSshMode.OFF,
+                connectedRemoteSessionCount = 3,
+                dismissedForThisScreen = false
             )
         )
     }

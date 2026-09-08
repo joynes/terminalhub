@@ -119,6 +119,18 @@ internal fun shouldShowBackgroundSshRecommendation(
     connectedRemoteSessionCount: Int
 ): Boolean = !recommendationHandled && !keepSshActiveInBackground && connectedRemoteSessionCount > 0
 
+internal fun shouldShowBackgroundSshRestartReminder(
+    keepSshActiveInBackground: Boolean,
+    foregroundServiceRunning: Boolean,
+    mode: BackgroundSshMode,
+    connectedRemoteSessionCount: Int,
+    dismissedForThisScreen: Boolean
+): Boolean = keepSshActiveInBackground &&
+    !foregroundServiceRunning &&
+    mode == BackgroundSshMode.OFF &&
+    connectedRemoteSessionCount > 0 &&
+    !dismissedForThisScreen
+
 internal fun shouldSwitchToReplacementSession(
     autoSwitch: Boolean,
     replacementSessionId: TerminalSessionId?,
@@ -234,6 +246,25 @@ class SessionHostViewModel @Inject constructor(
             recommendationHandled = settings.backgroundSshRecommendationHandled,
             keepSshActiveInBackground = settings.keepSshActiveInBackground,
             connectedRemoteSessionCount = connectedRemoteCount
+        )
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    private val backgroundSshRestartReminderDismissed = MutableStateFlow(false)
+    val showBackgroundSshRestartReminder: StateFlow<Boolean> = combine(
+        settingsRepository.settings,
+        sessionManager.sessions,
+        runtimeRepository.state,
+        backgroundSshModeController.mode,
+        backgroundSshRestartReminderDismissed
+    ) { settings, sessions, runtime, mode, dismissed ->
+        val connectedRemoteCount = sessions.count {
+            it.isConnected && it.projectId in runtime.remoteProjectIds
+        }
+        shouldShowBackgroundSshRestartReminder(
+            keepSshActiveInBackground = settings.keepSshActiveInBackground,
+            foregroundServiceRunning = runtime.foregroundServiceRunning,
+            mode = mode,
+            connectedRemoteSessionCount = connectedRemoteCount,
+            dismissedForThisScreen = dismissed
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val connectingJobs = mutableMapOf<Long, Job>()
@@ -538,7 +569,12 @@ class SessionHostViewModel @Inject constructor(
         settingsRepository.setBackgroundSshRecommendationHandled()
     }
 
+    fun dismissBackgroundSshRestartReminder() {
+        backgroundSshRestartReminderDismissed.value = true
+    }
+
     fun startRecommendedBackgroundSsh(notificationPermissionGranted: Boolean) {
+        backgroundSshRestartReminderDismissed.value = false
         settingsRepository.setBackgroundSshRecommendationHandled()
         val transition = backgroundSshModeController.dispatch(
             BackgroundSshEvent.UserStart(

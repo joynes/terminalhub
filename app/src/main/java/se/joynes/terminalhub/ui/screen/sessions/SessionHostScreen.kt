@@ -115,6 +115,7 @@ fun SessionHostScreen(
     val hostKeyPrompts by viewModel.hostKeyPrompts.collectAsState()
     val trustingHostKeys by viewModel.trustingHostKeys.collectAsState()
     val showBackgroundSshRecommendation by viewModel.showBackgroundSshRecommendation.collectAsState()
+    val showBackgroundSshRestartReminder by viewModel.showBackgroundSshRestartReminder.collectAsState()
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
     val executeTextInputOnSend by viewModel.executeTextInputOnSend.collectAsState()
@@ -242,6 +243,16 @@ fun SessionHostScreen(
             dismissButton = {
                 TextButton(onClick = viewModel::dismissBackgroundSshRecommendation) { Text("NOT NOW") }
             }
+        )
+    }
+
+    if (showBackgroundSshRestartReminder &&
+        !showBackgroundSshRecommendation &&
+        hostKeyPrompts.isEmpty()
+    ) {
+        BackgroundSshRestartReminderDialog(
+            onStart = ::acceptBackgroundSshRecommendation,
+            onNotNow = viewModel::dismissBackgroundSshRestartReminder
         )
     }
 
@@ -1313,6 +1324,30 @@ fun SessionHostScreen(
                 }
             }
     }
+}
+
+@Composable
+internal fun BackgroundSshRestartReminderDialog(
+    onStart: () -> Unit,
+    onNotNow: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onNotNow,
+        title = { Text("BACKGROUND SSH IS OFF") },
+        text = {
+            Text(
+                "You previously enabled background SSH, but its Android service is not running. " +
+                    "SSH tabs may disconnect when you switch apps. Start it again to show the " +
+                    "required active notification and keep connections alive."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onStart) { Text("START BACKGROUND SSH") }
+        },
+        dismissButton = {
+            TextButton(onClick = onNotNow) { Text("NOT NOW") }
+        }
+    )
 }
 
 internal fun textInputDraftAfterChange(
