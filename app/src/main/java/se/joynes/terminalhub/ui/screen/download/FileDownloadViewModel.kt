@@ -5,11 +5,13 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.data.repository.ProjectRepository
@@ -26,10 +28,18 @@ sealed interface DownloadState {
     object Idle : DownloadState
     data class LoadingList(val directory: String) : DownloadState
     data class Listed(val directory: String, val entries: List<RemoteFileEntry>) : DownloadState
-    data class Downloading(val fileName: String, val progress: Float) : DownloadState
+    data class Downloading(
+        val fileName: String,
+        val progress: Float,
+        val currentFile: Int = 1,
+        val totalFiles: Int = 1
+    ) : DownloadState
     data class Done(val fileName: String, val bytes: Long, val uri: Uri) : DownloadState
+    data class BatchDone(val files: List<DownloadedRemoteFile>) : DownloadState
     data class Error(val message: String, val directory: String = "") : DownloadState
 }
+
+data class DownloadedRemoteFile(val fileName: String, val bytes: Long, val uri: Uri)
 
 @HiltViewModel
 class FileDownloadViewModel @Inject constructor(
@@ -115,6 +125,80 @@ class FileDownloadViewModel @Inject constructor(
                 setState(projectId, DownloadState.Error(e.message ?: "Download failed"))
             } finally {
                 temporaryFile?.delete()
+            }
+        }
+    }
+
+    fun startDownloads(
+        serverId: Long,
+        projectId: Long,
+        relativeDirectory: String,
+        fileNames: List<String>,
+        context: Context,
+        createDestination: (String) -> Uri
+    ) {
+        if (fileNames.isEmpty() || states.value[projectId] is DownloadState.Downloading) return
+        viewModelScope.launch {
+            val completed = mutableListOf<DownloadedRemoteFile>()
+            try {
+                val (server, project) = resolveRemoteProject(serverId, projectId)
+                val directory = remoteSubdirectory(engine.projectPath(server, project), relativeDirectory)
+                val transferDirectory = File(context.cacheDir, "downloads").also { cacheDirectory ->
+                    check(cacheDirectory.exists() || cacheDirectory.mkdirs()) { "Cannot prepare download" }
+                }
+
+                fileNames.forEachIndexed { index, fileName ->
+                    var temporaryFile: File? = null
+                    try {
+                        val stagedDownload = File.createTempFile("terminalhub-", ".part", transferDirectory)
+                        temporaryFile = stagedDownload
+                        setState(
+                            projectId,
+                            DownloadState.Downloading(fileName, 0f, index + 1, fileNames.size)
+                        )
+                        var bytes = 0L
+                        scpDownloader.download(
+                            server = server,
+                            password = securePrefs.getPassword(server.id),
+                            privateKeyPem = securePrefs.getPrivateKey(server.id),
+                            remoteDir = directory,
+                            fileName = fileName,
+                            outputStream = stagedDownload.outputStream()
+                        ).collect { progress ->
+                            bytes = progress.bytesTransferred
+                            setState(
+                                projectId,
+                                DownloadState.Downloading(
+                                    progress.fileName,
+                                    progress.percent / 100f,
+                                    index + 1,
+                                    fileNames.size
+                                )
+                            )
+                        }
+                        val uri = withContext(Dispatchers.IO) { createDestination(fileName) }
+                        withContext(Dispatchers.IO) {
+                            val output = context.contentResolver.openOutputStream(uri)
+                                ?: error("Cannot open destination for $fileName")
+                            output.use { destination ->
+                                stagedDownload.inputStream().use { source -> source.copyTo(destination) }
+                            }
+                        }
+                        completed += DownloadedRemoteFile(fileName, bytes, uri)
+                    } finally {
+                        temporaryFile?.delete()
+                    }
+                }
+                setState(projectId, DownloadState.BatchDone(completed))
+            } catch (e: Exception) {
+                val completedPrefix = if (completed.isEmpty()) "" else "${completed.size} file(s) downloaded. "
+                setState(
+                    projectId,
+                    DownloadState.Error(
+                        completedPrefix + (e.message ?: "Download failed"),
+                        relativeDirectory
+                    )
+                )
             }
         }
     }

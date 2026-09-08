@@ -224,6 +224,76 @@ class FileDownloadViewModelTest {
         assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
     }
 
+    @Test
+    fun batchDownloadWritesEverySelectedFileAndReportsCombinedResult() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val context: Context = mock()
+        val resolver: ContentResolver = mock()
+        val firstUri: Uri = mock()
+        val secondUri: Uri = mock()
+        val firstOutput = ByteArrayOutputStream()
+        val secondOutput = ByteArrayOutputStream()
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(context.contentResolver).thenReturn(resolver)
+        whenever(context.cacheDir).thenReturn(temporaryFolder.root)
+        whenever(resolver.openOutputStream(firstUri)).thenReturn(firstOutput)
+        whenever(resolver.openOutputStream(secondUri)).thenReturn(secondOutput)
+        whenever(
+            downloader.download(
+                server = eq(server),
+                password = isNull(),
+                privateKeyPem = isNull(),
+                remoteDir = eq("~/terminalhub/music/stems"),
+                fileName = any(),
+                outputStream = any()
+            )
+        ).thenAnswer { invocation ->
+            val fileName = invocation.getArgument<String>(4)
+            val output = invocation.getArgument<OutputStream>(5)
+            flow {
+                val content = "content-$fileName".toByteArray()
+                output.write(content)
+                emit(ScpDownloadProgress(fileName, content.size.toLong(), content.size.toLong()))
+            }
+        }
+        val viewModel = createViewModel()
+
+        viewModel.startDownloads(
+            serverId = server.id,
+            projectId = project.id,
+            relativeDirectory = "stems",
+            fileNames = listOf("kick.wav", "snare.wav"),
+            context = context,
+            createDestination = { fileName ->
+                if (fileName == "kick.wav") firstUri else secondUri
+            }
+        )
+        var finalState: DownloadState = DownloadState.Idle
+        for (attempt in 0 until 100) {
+            advanceUntilIdle()
+            finalState = viewModel.downloadState(project.id).first()
+            if (finalState is DownloadState.BatchDone || finalState is DownloadState.Error) {
+                break
+            }
+            Thread.sleep(10)
+        }
+
+        assertEquals("content-kick.wav", firstOutput.toString())
+        assertEquals("content-snare.wav", secondOutput.toString())
+        assertEquals(
+            DownloadState.BatchDone(
+                listOf(
+                    DownloadedRemoteFile("kick.wav", 16L, firstUri),
+                    DownloadedRemoteFile("snare.wav", 17L, secondUri)
+                )
+            ),
+            finalState
+        )
+        assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
+    }
+
     private fun createViewModel() = FileDownloadViewModel(
         serverRepo = serverRepo,
         projectRepo = projectRepo,

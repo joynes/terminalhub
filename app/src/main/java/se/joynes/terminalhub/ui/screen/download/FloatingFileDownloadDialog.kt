@@ -3,6 +3,8 @@ package se.joynes.terminalhub.ui.screen.download
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.DocumentsContract
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,9 +22,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,28 +67,38 @@ fun FloatingFileDownloadDialog(
     val context = LocalContext.current
 
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val panelWidthDp = (configuration.screenWidthDp * 0.92f).dp
     val panelWidthPx = with(density) { panelWidthDp.toPx() }
+    val listMaxHeight = (configuration.screenHeightDp * 0.48f).dp
 
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
-    var pendingFile by remember { mutableStateOf<PendingRemoteDownload?>(null) }
+    var selectedFileNames by remember(projectId) { mutableStateOf<Set<String>>(emptySet()) }
 
     val destinationPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/octet-stream")
-    ) { uri ->
-        val pending = pendingFile
-        if (uri != null && pending != null) {
-            viewModel.startDownload(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { directoryUri ->
+        val state = downloadState as? DownloadState.Listed
+        val selected = selectedFileNames.toList()
+        if (directoryUri != null && state != null && selected.isNotEmpty()) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    directoryUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+            viewModel.startDownloads(
                 serverId = serverId,
                 projectId = projectId,
-                relativeDirectory = pending.directory,
-                fileName = pending.file.name,
-                uri = uri,
-                context = context
+                relativeDirectory = state.directory,
+                fileNames = selected,
+                context = context,
+                createDestination = { fileName ->
+                    createDownloadDocument(context, directoryUri, fileName)
+                }
             )
         }
-        pendingFile = null
     }
 
     LaunchedEffect(Unit) {
@@ -94,20 +107,21 @@ fun FloatingFileDownloadDialog(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    LaunchedEffect((downloadState as? DownloadState.Listed)?.directory) {
+        selectedFileNames = emptySet()
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable { }
+    ) {
         Column(
             modifier = Modifier
                 .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
                 .width(panelWidthDp)
+                .heightIn(max = (configuration.screenHeightDp * 0.82f).dp)
                 .background(MegaDriveSurface, RoundedCornerShape(4.dp))
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            event.changes.forEach { it.consume() }
-                        }
-                    }
-                }
         ) {
             Row(
                 modifier = Modifier
@@ -118,7 +132,10 @@ fun FloatingFileDownloadDialog(
                         detectDragGestures { change, drag ->
                             change.consume()
                             offsetX = (offsetX + drag.x).coerceIn(0f, screenWidthPx - panelWidthPx)
-                            offsetY = (offsetY + drag.y).coerceIn(0f, with(density) { 600.dp.toPx() })
+                            offsetY = (offsetY + drag.y).coerceIn(
+                                0f,
+                                screenHeightPx - with(density) { 48.dp.toPx() }
+                            )
                         }
                     }
                     .padding(horizontal = 10.dp),
@@ -156,6 +173,8 @@ fun FloatingFileDownloadDialog(
                         )
                         RemoteFileList(
                             entries = downloadState.entries,
+                            selectedFileNames = selectedFileNames,
+                            modifier = Modifier.heightIn(min = 140.dp, max = listMaxHeight),
                             onOpenDirectory = { directory ->
                                 viewModel.loadRemoteFiles(
                                     serverId,
@@ -163,11 +182,51 @@ fun FloatingFileDownloadDialog(
                                     childRemoteDirectory(downloadState.directory, directory.name)
                                 )
                             },
-                            onDownload = { file ->
-                                pendingFile = PendingRemoteDownload(downloadState.directory, file)
-                                destinationPicker.launch(file.name)
+                            onToggleFile = { file ->
+                                selectedFileNames = toggleRemoteFileSelection(
+                                    selectedFileNames,
+                                    file.name
+                                )
                             }
                         )
+                        val files = downloadState.entries.filterNot(RemoteFileEntry::isDirectory)
+                        if (files.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    "SELECT ALL",
+                                    color = MegaDrivePrimary,
+                                    fontSize = 10.sp,
+                                    fontFamily = MonoFontFamily,
+                                    modifier = Modifier
+                                        .clickable { selectedFileNames = files.map { it.name }.toSet() }
+                                        .padding(vertical = 6.dp)
+                                )
+                                Text(
+                                    "CLEAR",
+                                    color = MegaDriveDim,
+                                    fontSize = 10.sp,
+                                    fontFamily = MonoFontFamily,
+                                    modifier = Modifier
+                                        .clickable { selectedFileNames = emptySet() }
+                                        .padding(vertical = 6.dp)
+                                )
+                            }
+                            RetroButton(
+                                text = if (selectedFileNames.isEmpty()) {
+                                    "SELECT FILES TO DOWNLOAD"
+                                } else {
+                                    "DOWNLOAD SELECTED (${selectedFileNames.size})"
+                                },
+                                onClick = {
+                                    if (selectedFileNames.isNotEmpty()) destinationPicker.launch(null)
+                                },
+                                enabled = selectedFileNames.isNotEmpty(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         if (downloadState.directory.isNotEmpty()) {
                             RetroButton(
                                 text = "UP ONE LEVEL",
@@ -190,7 +249,13 @@ fun FloatingFileDownloadDialog(
                         )
                     }
                     is DownloadState.Downloading -> {
-                        Text(downloadState.fileName, color = MegaDrivePrimary, fontSize = 11.sp, fontFamily = MonoFontFamily, maxLines = 2)
+                        Text(
+                            "FILE ${downloadState.currentFile} OF ${downloadState.totalFiles}: ${downloadState.fileName}",
+                            color = MegaDrivePrimary,
+                            fontSize = 11.sp,
+                            fontFamily = MonoFontFamily,
+                            maxLines = 2
+                        )
                         PixelProgressBar(
                             progress = downloadState.progress,
                             label = "DOWNLOADING...",
@@ -221,6 +286,55 @@ fun FloatingFileDownloadDialog(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
+                    is DownloadState.BatchDone -> {
+                        Text(
+                            "DONE - ${downloadState.files.size} FILE(S)",
+                            color = MegaDrivePrimary,
+                            fontSize = 11.sp,
+                            fontFamily = MonoFontFamily
+                        )
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = listMaxHeight),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(downloadState.files, key = { it.uri.toString() }) { file ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MegaDriveBg, RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        file.fileName,
+                                        color = MegaDrivePrimary,
+                                        fontSize = 10.sp,
+                                        fontFamily = MonoFontFamily,
+                                        maxLines = 1,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        "OPEN",
+                                        color = MegaDriveAccent,
+                                        fontSize = 10.sp,
+                                        fontFamily = MonoFontFamily,
+                                        modifier = Modifier
+                                            .clickable {
+                                                openDownloadedFile(context, file.fileName, file.uri)
+                                            }
+                                            .padding(6.dp)
+                                    )
+                                }
+                            }
+                        }
+                        RetroButton(
+                            text = "CLOSE",
+                            onClick = { viewModel.reset(projectId); onDismiss() },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     is DownloadState.Error -> {
                         Text(
                             "ERROR: ${downloadState.message}",
@@ -243,16 +357,20 @@ fun FloatingFileDownloadDialog(
 }
 
 private fun openDownloadedFile(context: Context, download: DownloadState.Done) {
-    val reportedType = context.contentResolver.getType(download.uri)
+    openDownloadedFile(context, download.fileName, download.uri)
+}
+
+private fun openDownloadedFile(context: Context, fileName: String, uri: Uri) {
+    val reportedType = context.contentResolver.getType(uri)
     val mimeType = reportedType
         ?.takeUnless { it.equals("application/octet-stream", ignoreCase = true) }
-        ?: downloadedFileMimeType(download.fileName)
+        ?: downloadedFileMimeType(fileName)
     val viewIntent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(download.uri, mimeType)
-        clipData = ClipData.newUri(context.contentResolver, download.fileName, download.uri)
+        setDataAndType(uri, mimeType)
+        clipData = ClipData.newUri(context.contentResolver, fileName, uri)
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
-    val chooser = Intent.createChooser(viewIntent, "Open ${download.fileName}").apply {
+    val chooser = Intent.createChooser(viewIntent, "Open $fileName").apply {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
@@ -260,6 +378,17 @@ private fun openDownloadedFile(context: Context, download: DownloadState.Done) {
         .onFailure {
             Toast.makeText(context, "No app can open this file", Toast.LENGTH_LONG).show()
         }
+}
+
+internal fun createDownloadDocument(context: Context, directoryUri: Uri, fileName: String): Uri {
+    val parent = DocumentsContract.buildDocumentUriUsingTree(
+        directoryUri,
+        DocumentsContract.getTreeDocumentId(directoryUri)
+    )
+    val mimeType = downloadedFileMimeType(fileName).takeUnless { it == "*/*" }
+        ?: "application/octet-stream"
+    return DocumentsContract.createDocument(context.contentResolver, parent, mimeType, fileName)
+        ?: error("Could not create $fileName in the selected folder")
 }
 
 internal fun downloadedFileMimeType(fileName: String): String {
@@ -292,30 +421,29 @@ internal fun downloadedFileMimeType(fileName: String): String {
 }
 
 @Composable
-private fun RemoteFileList(
+internal fun RemoteFileList(
     entries: List<RemoteFileEntry>,
+    selectedFileNames: Set<String>,
+    modifier: Modifier = Modifier,
     onOpenDirectory: (RemoteFileEntry) -> Unit,
-    onDownload: (RemoteFileEntry) -> Unit
+    onToggleFile: (RemoteFileEntry) -> Unit
 ) {
     if (entries.isEmpty()) {
         Text("This remote folder is empty.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
         return
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 260.dp)
-            .verticalScroll(rememberScrollState()),
+    LazyColumn(
+        modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        entries.forEach { entry ->
+        items(entries, key = { "${it.isDirectory}:${it.name}" }) { entry ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MegaDriveBg, RoundedCornerShape(4.dp))
                     .clickable {
-                        if (entry.isDirectory) onOpenDirectory(entry) else onDownload(entry)
+                        if (entry.isDirectory) onOpenDirectory(entry) else onToggleFile(entry)
                     }
                     .padding(horizontal = 8.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -332,6 +460,10 @@ private fun RemoteFileList(
                 if (entry.isDirectory) {
                     Text(">", color = MegaDrivePrimary, fontSize = 11.sp, fontFamily = MonoFontFamily)
                 } else {
+                    Checkbox(
+                        checked = entry.name in selectedFileNames,
+                        onCheckedChange = { onToggleFile(entry) }
+                    )
                     Text(
                         formatBytes(entry.size),
                         color = MegaDriveDim,
@@ -345,7 +477,8 @@ private fun RemoteFileList(
     }
 }
 
-private data class PendingRemoteDownload(val directory: String, val file: RemoteFileEntry)
+internal fun toggleRemoteFileSelection(selected: Set<String>, fileName: String): Set<String> =
+    if (fileName in selected) selected - fileName else selected + fileName
 
 internal fun childRemoteDirectory(parent: String, childName: String): String {
     require(childName.isNotBlank() && '/' !in childName && childName != "." && childName != "..") {
