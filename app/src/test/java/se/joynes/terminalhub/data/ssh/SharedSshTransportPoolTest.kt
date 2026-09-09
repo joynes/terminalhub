@@ -224,6 +224,27 @@ class SharedSshTransportPoolTest {
         retry.release()
     }
 
+    @Test
+    fun `invalidated transport is closed and never reused by reconnect`() = runBlocking {
+        val connector = FakeConnector()
+        val pool = SharedSshTransportPool(logger, connector)
+        val failed = pool.acquire(server(), "secret", null)
+        val otherTab = pool.acquire(server(), "secret", null)
+        val failedIdentity = failed.debugTransportIdentity()
+
+        failed.invalidate()
+        val replacement = pool.acquire(server(), "secret", null)
+
+        assertTrue(connector.transports.first().closed)
+        assertEquals(2, connector.connectCount.get())
+        assertTrue(failedIdentity != replacement.debugTransportIdentity())
+        assertEquals(1, pool.activeTransportCount())
+
+        otherTab.release()
+        replacement.release()
+        assertEquals(0, pool.activeTransportCount())
+    }
+
     private fun server(
         id: Long = 1,
         name: String = "Server",

@@ -746,6 +746,12 @@ class SessionHostViewModel @Inject constructor(
     }
 
     fun reconnectProject(projectId: Long) {
+        val project = _allDbProjects.value.find { it.id == projectId }
+        if (projectId in connectingProjectIds.value) {
+            _uiMessages.tryEmit("${project?.name ?: "SSH tab"} is already reconnecting")
+            return
+        }
+        _uiMessages.tryEmit("Reconnecting ${project?.name ?: "SSH tab"}…")
         reconnectProject(projectId, autoSwitch = true)
     }
 
@@ -866,6 +872,10 @@ class SessionHostViewModel @Inject constructor(
             _uiMessages.tryEmit("All SSH tabs are already connected")
             return
         }
+        _uiMessages.tryEmit(
+            if (disconnected.size == 1) "Reconnecting SSH tab…"
+            else "Reconnecting all ${disconnected.size} SSH tabs…"
+        )
         // Each call launches its own connection job immediately. Keep focus on the tab that was
         // active when reconnect-all started instead of switching tabs as each connection finishes.
         disconnected.forEach { tab ->

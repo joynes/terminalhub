@@ -137,6 +137,30 @@ class SharedSshTransportPool @Inject constructor(
         }
     }
 
+    /**
+     * Removes a transport which failed while opening a channel. A completed transport used to
+     * remain reusable as long as another tab still held a lease, so every reconnect could pick
+     * the same dead connection until Android killed the whole app process.
+     */
+    internal fun invalidate(lease: SshTransportLease) {
+        var removed = false
+        try {
+            synchronized(lock) {
+                val shards = entries[lease.key] ?: return@synchronized
+                if (lease.entry !in shards) return@synchronized
+                shards.remove(lease.entry)
+                if (shards.isEmpty()) entries.remove(lease.key)
+                removed = true
+            }
+            if (removed) {
+                lease.transport.close()
+                logger.log(LogLevel.WARN, TAG, "Discarded unusable shared SSH transport")
+            }
+        } finally {
+            if (lease.kind == LeaseKind.TRANSFER) transferSlots.release()
+        }
+    }
+
     fun activeTransportCount(): Int = synchronized(lock) { entries.values.sumOf { it.size } }
 
     private fun startConnection(
@@ -247,6 +271,15 @@ class SshTransportLease internal constructor(
             released = true
         }
         pool.release(this)
+    }
+
+    fun invalidate() {
+        if (released) return
+        synchronized(this) {
+            if (released) return
+            released = true
+        }
+        pool.invalidate(this)
     }
 
     fun debugTransportIdentity(): Int = transport.debugIdentity()

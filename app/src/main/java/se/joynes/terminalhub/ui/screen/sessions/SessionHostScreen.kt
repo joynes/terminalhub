@@ -1091,6 +1091,17 @@ fun SessionHostScreen(
                                         fontSize = 12.sp,
                                         fontFamily = MonoFontFamily
                                     )
+                                    activeTab.connectionError
+                                        ?.takeIf { it.isNotBlank() }
+                                        ?.let { error ->
+                                            Text(
+                                                error,
+                                                color = MegaDriveOnSurface,
+                                                fontSize = 10.sp,
+                                                fontFamily = MonoFontFamily,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     RetroButton(
                                         text = "RECONNECT",
                                         onClick = { viewModel.reconnectProject(activeTab.projectId) }

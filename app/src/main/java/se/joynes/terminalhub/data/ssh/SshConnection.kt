@@ -94,14 +94,7 @@ class SshConnection @Inject constructor(
                     LogEvent.SshConnect(server.host, server.port)
                 )
 
-                val lease = transportPool.acquire(server, password, privateKeyPem)
-                transportLease = lease
-                projectId?.let(lease::bindProject)
-                connectedAtMs = System.currentTimeMillis()
-
-                val sess = lease.openSession()
-                sess.requestPTY("xterm-256color", 80, 24, 0, 0, null)
-                sess.startShell()
+                val (lease, sess) = openShellWithFreshTransportRetry(server, password, privateKeyPem)
                 shellSession = sess
                 outputStream = sess.stdin
                 disconnectReason = null
@@ -122,6 +115,44 @@ class SshConnection @Inject constructor(
                 _connected.value = false
             }
         }
+    }
+
+    private suspend fun openShellWithFreshTransportRetry(
+        server: Server,
+        password: String?,
+        privateKeyPem: String?
+    ): Pair<SshTransportLease, Session> {
+        var firstFailure: Exception? = null
+        repeat(2) { attempt ->
+            val lease = transportPool.acquire(server, password, privateKeyPem)
+            transportLease = lease
+            projectId?.let(lease::bindProject)
+            var session: Session? = null
+            try {
+                session = lease.openSession()
+                session.requestPTY("xterm-256color", 80, 24, 0, 0, null)
+                session.startShell()
+                connectedAtMs = System.currentTimeMillis()
+                return lease to session
+            } catch (error: Exception) {
+                try { session?.close() } catch (_: Exception) {}
+                transportLease = null
+                if (attempt == 0) {
+                    firstFailure = error
+                    lease.invalidate()
+                    logger.log(
+                        LogLevel.WARN,
+                        TAG,
+                        "SSH channel open failed; retrying on a fresh transport: " +
+                            "${error.javaClass.simpleName}: ${error.message}"
+                    )
+                } else {
+                    lease.release()
+                    throw error
+                }
+            }
+        }
+        throw firstFailure ?: IOException("Could not open SSH terminal channel")
     }
 
     private fun describeConnectionError(error: Exception): String {
