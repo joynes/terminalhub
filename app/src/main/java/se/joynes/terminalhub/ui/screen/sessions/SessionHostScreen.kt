@@ -581,7 +581,7 @@ fun SessionHostScreen(
             containerColor = MegaDriveSurface,
             title = {
                 Text(
-                    "RESTART TMUX?",
+                    "RESTART SESSION?",
                     color = MegaDrivePrimary,
                     fontFamily = MonoFontFamily,
                     fontSize = 14.sp
@@ -589,7 +589,7 @@ fun SessionHostScreen(
             },
             text = {
                 Text(
-                    "This stops the tmux session for ${pending.projectName}, including programs running inside it, then creates a fresh session in the same project tab.",
+                    "This stops the session for ${pending.projectName}, including programs running inside it, then creates a fresh session in the same project tab.",
                     color = Color.White,
                     fontFamily = MonoFontFamily,
                     fontSize = 12.sp

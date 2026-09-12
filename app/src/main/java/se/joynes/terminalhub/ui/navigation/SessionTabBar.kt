@@ -298,7 +298,7 @@ fun SessionTabBar(
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        "Restart tmux…",
+                                        "Restart session…",
                                         color = if (tab.usesTmux && !tab.isConnecting) {
                                             Color.White
                                         } else {

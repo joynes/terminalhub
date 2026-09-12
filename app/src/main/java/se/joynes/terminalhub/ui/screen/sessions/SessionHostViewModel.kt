@@ -758,7 +758,7 @@ class SessionHostViewModel @Inject constructor(
     fun restartTmuxProject(projectId: Long) {
         val project = _allDbProjects.value.find { it.id == projectId }
         if (project == null || project.targetType != ProjectTargetType.SSH || !project.useTmux) {
-            _uiMessages.tryEmit("This project does not use remote tmux")
+            _uiMessages.tryEmit("Session restart is only available for remote projects using tmux")
             return
         }
         if (projectId in connectingProjectIds.value) {
@@ -773,7 +773,7 @@ class SessionHostViewModel @Inject constructor(
         connectionErrors.value = connectionErrors.value - projectId
         connectingProjectIds.value = connectingProjectIds.value + projectId
         logger.log(LogLevel.INFO, "TmuxRestart", "Restart requested project=${project.name}")
-        _uiMessages.tryEmit("Restarting tmux for ${project.name}…")
+        _uiMessages.tryEmit("Restarting session for ${project.name}…")
 
         connectingJobs[projectId] = viewModelScope.launch {
             try {
@@ -822,15 +822,15 @@ class SessionHostViewModel @Inject constructor(
                 if (replacement == null) {
                     error(
                         connectionErrors.value[projectId]
-                            ?: "Tmux stopped, but TerminalHub could not reconnect. Tap Reconnect to try again."
+                            ?: "Session stopped, but TerminalHub could not reconnect. Tap Reconnect to try again."
                     )
                 }
-                _uiMessages.tryEmit("Tmux restarted for ${project.name}")
+                _uiMessages.tryEmit("Session restarted for ${project.name}")
                 logger.log(LogLevel.INFO, "TmuxRestart", "Restart completed project=${project.name}")
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                val message = error.message ?: "Could not restart tmux."
+                val message = error.message ?: "Could not restart session."
                 connectionErrors.value = connectionErrors.value + (projectId to message)
                 _uiMessages.tryEmit(message)
                 logger.log(

@@ -145,7 +145,7 @@ class SessionTabSwipeTest {
     }
 
     @Test
-    fun longPressShowsRestartTmuxForTmuxTab() {
+    fun longPressShowsRestartSessionForTmuxTab() {
         var restartedProjectId: Long? = null
         val tab = makeTab(7L, "tmux-project").copy(usesTmux = true)
         composeRule.setContent {
@@ -163,7 +163,7 @@ class SessionTabSwipeTest {
         }
 
         composeRule.onNodeWithText("TMUX-PROJECT").performTouchInput { longClick() }
-        composeRule.onNodeWithText("Restart tmux…").performClick()
+        composeRule.onNodeWithText("Restart session…").performClick()
 
         composeRule.runOnIdle { assertEquals(7L, restartedProjectId) }
     }
