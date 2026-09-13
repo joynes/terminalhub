@@ -225,6 +225,91 @@ class FileDownloadViewModelTest {
     }
 
     @Test
+    fun previewDownloadsMarkdownToMemoryWithoutCreatingADownloadDestination() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val entry = RemoteFileEntry("README.md", 27L)
+        val content = "# Project\n\nRemote preview"
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(
+            downloader.listFiles(
+                server = eq(server),
+                password = isNull(),
+                privateKeyPem = isNull(),
+                remoteDir = eq("~/terminalhub/music/docs")
+            )
+        ).thenReturn(listOf(entry))
+        whenever(
+            downloader.download(
+                server = eq(server),
+                password = isNull(),
+                privateKeyPem = isNull(),
+                remoteDir = eq("~/terminalhub/music/docs"),
+                fileName = eq(entry.name),
+                outputStream = any()
+            )
+        ).thenAnswer { invocation ->
+            val output = invocation.getArgument<OutputStream>(5)
+            flow {
+                output.write(content.toByteArray())
+                emit(ScpDownloadProgress(entry.name, content.length.toLong(), content.length.toLong()))
+            }
+        }
+        val viewModel = createViewModel()
+
+        viewModel.loadRemoteFiles(server.id, project.id, "docs")
+        advanceUntilIdle()
+        viewModel.previewRemoteFile(server.id, project.id, entry)
+        advanceUntilIdle()
+
+        assertEquals(
+            DownloadState.PreviewReady(
+                directory = "docs",
+                entries = listOf(entry),
+                fileName = entry.name,
+                content = content,
+                markdown = true
+            ),
+            viewModel.downloadState(project.id).first()
+        )
+    }
+
+    @Test
+    fun previewRejectsOversizedTextFileBeforeDownloading() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val entry = RemoteFileEntry("huge.txt", MAX_REMOTE_TEXT_PREVIEW_BYTES + 1)
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(
+            downloader.listFiles(
+                server = eq(server),
+                password = isNull(),
+                privateKeyPem = isNull(),
+                remoteDir = eq("~/terminalhub/music")
+            )
+        ).thenReturn(listOf(entry))
+        val viewModel = createViewModel()
+
+        viewModel.loadRemoteFiles(server.id, project.id)
+        advanceUntilIdle()
+        viewModel.previewRemoteFile(server.id, project.id, entry)
+
+        val state = viewModel.downloadState(project.id).first()
+        assertTrue(state is DownloadState.Error)
+        assertTrue((state as DownloadState.Error).message.contains("512 KB"))
+        verify(downloader, never()).download(
+            server = any(),
+            password = any(),
+            privateKeyPem = any(),
+            remoteDir = any(),
+            fileName = any(),
+            outputStream = any()
+        )
+    }
+
+    @Test
     fun batchDownloadWritesEverySelectedFileAndReportsCombinedResult() = runTest(dispatcher) {
         val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
         val project = Project(id = 11L, serverId = server.id, name = "music")

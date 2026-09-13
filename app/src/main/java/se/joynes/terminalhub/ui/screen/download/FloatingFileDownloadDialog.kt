@@ -111,6 +111,16 @@ fun FloatingFileDownloadDialog(
         selectedFileNames = emptySet()
     }
 
+    if (downloadState is DownloadState.PreviewReady) {
+        RemoteTextPreviewDialog(
+            fileName = downloadState.fileName,
+            content = downloadState.content,
+            markdown = downloadState.markdown,
+            onDismiss = { viewModel.closePreview(projectId) }
+        )
+        return
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -187,6 +197,9 @@ fun FloatingFileDownloadDialog(
                                     selectedFileNames,
                                     file.name
                                 )
+                            },
+                            onPreviewFile = { file ->
+                                viewModel.previewRemoteFile(serverId, projectId, file)
                             }
                         )
                         val files = downloadState.entries.filterNot(RemoteFileEntry::isDirectory)
@@ -262,6 +275,21 @@ fun FloatingFileDownloadDialog(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
+                    is DownloadState.PreviewLoading -> {
+                        Text(
+                            "PREPARING PREVIEW: ${downloadState.fileName}",
+                            color = MegaDrivePrimary,
+                            fontSize = 11.sp,
+                            fontFamily = MonoFontFamily,
+                            maxLines = 2
+                        )
+                        PixelProgressBar(
+                            progress = downloadState.progress,
+                            label = "LOADING PREVIEW...",
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    is DownloadState.PreviewReady -> Unit
                     is DownloadState.Done -> {
                         Text(
                             "DONE - ${downloadState.fileName}",
@@ -426,7 +454,8 @@ internal fun RemoteFileList(
     selectedFileNames: Set<String>,
     modifier: Modifier = Modifier,
     onOpenDirectory: (RemoteFileEntry) -> Unit,
-    onToggleFile: (RemoteFileEntry) -> Unit
+    onToggleFile: (RemoteFileEntry) -> Unit,
+    onPreviewFile: (RemoteFileEntry) -> Unit = {}
 ) {
     if (entries.isEmpty()) {
         Text("This remote folder is empty.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
@@ -460,6 +489,17 @@ internal fun RemoteFileList(
                 if (entry.isDirectory) {
                     Text(">", color = MegaDrivePrimary, fontSize = 11.sp, fontFamily = MonoFontFamily)
                 } else {
+                    if (isPreviewableTextFile(entry.name)) {
+                        Text(
+                            "PREVIEW",
+                            color = MegaDriveAccent,
+                            fontSize = 9.sp,
+                            fontFamily = MonoFontFamily,
+                            modifier = Modifier
+                                .clickable { onPreviewFile(entry) }
+                                .padding(horizontal = 7.dp, vertical = 6.dp)
+                        )
+                    }
                     Checkbox(
                         checked = entry.name in selectedFileNames,
                         onCheckedChange = { onToggleFile(entry) }

@@ -1,5 +1,6 @@
 package se.joynes.terminalhub
 
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -14,14 +15,15 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 import se.joynes.terminalhub.ui.screen.download.RemoteFileList
+import se.joynes.terminalhub.ui.screen.download.RemoteTextPreviewDialog
 import se.joynes.terminalhub.ui.screen.download.toggleRemoteFileSelection
 import se.joynes.terminalhub.ui.theme.TerminalHubTheme
-import androidx.compose.foundation.layout.height
 
 @RunWith(AndroidJUnit4::class)
 class RemoteFileListTest {
@@ -51,5 +53,49 @@ class RemoteFileListTest {
         composeRule.runOnIdle {
             assertEquals(setOf("file-1.txt", "file-40.txt"), selected)
         }
+    }
+
+    @Test
+    fun previewButtonPreviewsTextFileWithoutSelectingIt() {
+        val entry = RemoteFileEntry("README.md", 120L)
+        var previewed: RemoteFileEntry? = null
+        var selected by mutableStateOf<Set<String>>(emptySet())
+        composeRule.setContent {
+            TerminalHubTheme {
+                RemoteFileList(
+                    entries = listOf(entry),
+                    selectedFileNames = selected,
+                    onOpenDirectory = {},
+                    onToggleFile = { selected = toggleRemoteFileSelection(selected, it.name) },
+                    onPreviewFile = { previewed = it }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("PREVIEW").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(entry, previewed)
+            assertTrue(selected.isEmpty())
+        }
+    }
+
+    @Test
+    fun longMarkdownPreviewCanScrollToTheLastSection() {
+        val markdown = (1..60).joinToString("\n\n") { "## Section $it\nText for section $it" }
+        composeRule.setContent {
+            TerminalHubTheme {
+                RemoteTextPreviewDialog(
+                    fileName = "README.md",
+                    content = markdown,
+                    markdown = true,
+                    onDismiss = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag("remote-text-preview")
+            .performScrollToNode(hasText("Section 60"))
+        composeRule.onNodeWithText("Section 60").assertExists()
     }
 }
