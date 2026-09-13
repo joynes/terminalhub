@@ -122,6 +122,7 @@ fun SessionHostScreen(
     val textInputPanelOpacity by viewModel.textInputPanelOpacity.collectAsState()
     val keyBarRows by viewModel.keyBarRows.collectAsState()
     val keyBarHighlightedKeyIds by viewModel.keyBarHighlightedKeyIds.collectAsState()
+    val keyBarHighlightIntensity by viewModel.keyBarHighlightIntensity.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -1241,6 +1242,7 @@ fun SessionHostScreen(
                             modifierManager = modifierManager,
                             rows = keyBarRows,
                             highlightedKeyIds = keyBarHighlightedKeyIds,
+                            highlightIntensity = keyBarHighlightIntensity,
                             onKey = { keyStr ->
                                 if (activeTextInputVisible && activeProjectId != null) {
                                     when {

@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.AlertDialog
@@ -41,10 +43,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveProfile
 import se.joynes.terminalhub.data.settings.BackgroundKeepaliveScope
+import se.joynes.terminalhub.data.settings.MAX_KEY_BAR_HIGHLIGHT_INTENSITY
+import se.joynes.terminalhub.data.settings.MIN_KEY_BAR_HIGHLIGHT_INTENSITY
 import se.joynes.terminalhub.data.runtime.BackgroundSshMode
 import se.joynes.terminalhub.ui.components.RetroButton
 import se.joynes.terminalhub.ui.components.RetroCard
@@ -57,6 +63,7 @@ import se.joynes.terminalhub.ui.theme.MegaDrivePrimary
 import se.joynes.terminalhub.ui.theme.MegaDriveSurface
 import se.joynes.terminalhub.ui.theme.MegaDriveWarning
 import se.joynes.terminalhub.ui.theme.MonoFontFamily
+import kotlin.math.roundToInt
 
 internal enum class SettingsSectionId {
     CONNECTIONS,
@@ -297,6 +304,45 @@ fun SettingsScreen(
                         SettingsSubheading(
                             title = "KEY BAR LAYOUT",
                             description = "Tap a key name to replace it. Tap its star to highlight buttons you use often. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows."
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                "Highlight strength",
+                                color = MegaDriveOnSurface,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 11.sp
+                            )
+                            Text(
+                                "${(settings.keyBarHighlightIntensity * 100).roundToInt()}%",
+                                color = MegaDrivePrimary,
+                                fontFamily = MonoFontFamily,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Slider(
+                            value = settings.keyBarHighlightIntensity,
+                            onValueChange = viewModel::setKeyBarHighlightIntensity,
+                            valueRange = MIN_KEY_BAR_HIGHLIGHT_INTENSITY..MAX_KEY_BAR_HIGHLIGHT_INTENSITY,
+                            colors = SliderDefaults.colors(
+                                thumbColor = MegaDrivePrimary,
+                                activeTrackColor = MegaDrivePrimary,
+                                inactiveTrackColor = MegaDriveDim.copy(alpha = 0.45f)
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics { contentDescription = "Key bar highlight strength" }
+                        )
+                        Text(
+                            "Controls how strongly starred keys stand out in the terminal.",
+                            color = MegaDriveDim,
+                            fontFamily = MonoFontFamily,
+                            fontSize = 10.sp
                         )
                         Spacer(Modifier.height(10.dp))
                         KeyBarSettingsEditor(

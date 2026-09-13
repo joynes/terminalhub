@@ -9,6 +9,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
+import se.joynes.terminalhub.data.settings.DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY
 import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
 
 @RunWith(AndroidJUnit4::class)
@@ -30,5 +31,19 @@ class AppSettingsPersistenceTest {
 
         val recreatedRepository = AppSettingsRepository(context)
         assertEquals(0.72f, recreatedRepository.settings.value.textInputPanelOpacity)
+    }
+
+    @Test
+    fun keyBarHighlightIntensityIsSubtleByDefaultAndSurvivesRepositoryRecreation() {
+        val initialRepository = AppSettingsRepository(context)
+        assertEquals(
+            DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY,
+            initialRepository.settings.value.keyBarHighlightIntensity
+        )
+
+        initialRepository.setKeyBarHighlightIntensity(0.24f)
+
+        val recreatedRepository = AppSettingsRepository(context)
+        assertEquals(0.24f, recreatedRepository.settings.value.keyBarHighlightIntensity)
     }
 }

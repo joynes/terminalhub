@@ -22,6 +22,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.terminalhub.data.settings.KeyBarLayoutConfig
+import se.joynes.terminalhub.data.settings.DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY
+import se.joynes.terminalhub.data.settings.normalizeKeyBarHighlightIntensity
 import se.joynes.terminalhub.ui.theme.*
 
 private val KEY_H = 34.dp
@@ -32,6 +34,7 @@ fun SpecialKeyBar(
     onKey: (String) -> Unit,
     rows: List<List<String>> = KeyBarLayoutConfig.defaultRows,
     highlightedKeyIds: Set<String> = KeyBarLayoutConfig.defaultHighlightedKeyIds,
+    highlightIntensity: Float = DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY,
     onPaste: () -> Unit = {},
     onTextInput: () -> Unit = {},
     onFileUpload: () -> Unit = {},
@@ -47,6 +50,7 @@ fun SpecialKeyBar(
     val normalizedHighlights = remember(highlightedKeyIds) {
         KeyBarLayoutConfig.normalizeHighlights(highlightedKeyIds)
     }
+    val normalizedHighlightIntensity = normalizeKeyBarHighlightIntensity(highlightIntensity)
 
     fun modified(normal: String): String {
         // Read the manager directly. A second, very quick tap can arrive before Compose
@@ -134,6 +138,7 @@ fun SpecialKeyBar(
                         modifier = Modifier.weight(1f),
                         active = active,
                         highlighted = keyId in normalizedHighlights,
+                        highlightIntensity = normalizedHighlightIntensity,
                         fontSize = if (keyId in LARGE_GLYPH_KEYS) 16.sp else if (row.size > 10) 9.sp else 11.sp,
                         onClick = { press(keyId) }
                     )
@@ -149,6 +154,7 @@ private fun TermKey(
     modifier: Modifier = Modifier,
     active: Boolean = false,
     highlighted: Boolean = false,
+    highlightIntensity: Float = DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY,
     fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
     onClick: () -> Unit
 ) {
@@ -161,15 +167,19 @@ private fun TermKey(
     val backgroundColor = when {
         pressed -> MegaDriveOnSurface
         active -> MegaDrivePrimary
-        highlighted -> MegaDriveAccent.copy(alpha = 0.30f)
+        highlighted -> MegaDriveAccent.copy(alpha = highlightIntensity)
         else -> MegaDriveBg
     }
     val foregroundColor = when {
         pressed || active -> MegaDriveBg
-        highlighted -> MegaDriveOnSurface
+        highlighted -> MegaDrivePrimary
         else -> MegaDrivePrimary
     }
-    val borderColor = if (highlighted && !pressed && !active) MegaDriveAccent else backgroundColor
+    val borderColor = if (highlighted && !pressed && !active) {
+        MegaDriveAccent.copy(alpha = (highlightIntensity * 2.5f).coerceIn(0.20f, 1f))
+    } else {
+        backgroundColor
+    }
 
     Box(
         modifier = Modifier

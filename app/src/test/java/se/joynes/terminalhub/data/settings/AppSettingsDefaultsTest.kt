@@ -31,4 +31,13 @@ class AppSettingsDefaultsTest {
             AppSettings().keyBarHighlightedKeyIds
         )
     }
+
+    @Test
+    fun `key bar highlights are subtle by default and constrained to safe values`() {
+        assertEquals(0.12f, DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY)
+        assertEquals(DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY, AppSettings().keyBarHighlightIntensity)
+        assertEquals(MIN_KEY_BAR_HIGHLIGHT_INTENSITY, normalizeKeyBarHighlightIntensity(-1f))
+        assertEquals(MAX_KEY_BAR_HIGHLIGHT_INTENSITY, normalizeKeyBarHighlightIntensity(1f))
+        assertEquals(0.25f, normalizeKeyBarHighlightIntensity(0.25f))
+    }
 }

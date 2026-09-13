@@ -17,6 +17,7 @@ import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.settings.KeyBarLayoutConfig
+import se.joynes.terminalhub.data.settings.normalizeKeyBarHighlightIntensity
 import se.joynes.terminalhub.data.settings.normalizeTextInputPanelOpacitySetting
 import se.joynes.terminalhub.domain.TerminalSessionManager
 import javax.inject.Inject
@@ -58,6 +59,7 @@ class ExportImportManager @Inject constructor(
         sb.appendLine("settings:")
         sb.appendLine("  keyBarLayout: ${ys(KeyBarLayoutConfig.encode(settingsRepository.settings.value.keyBarRows))}")
         sb.appendLine("  keyBarHighlights: ${ys(KeyBarLayoutConfig.encodeHighlights(settingsRepository.settings.value.keyBarHighlightedKeyIds))}")
+        sb.appendLine("  keyBarHighlightIntensity: ${settingsRepository.settings.value.keyBarHighlightIntensity}")
         sb.appendLine("  textInputPanelOpacity: ${settingsRepository.settings.value.textInputPanelOpacity}")
         sb.appendLine("servers:")
         for (server in servers) {
@@ -112,6 +114,8 @@ class ExportImportManager @Inject constructor(
         val keyBarRows = extractKeyBarLayoutFromYaml(text) ?: settingsRepository.settings.value.keyBarRows
         val keyBarHighlightedKeyIds = extractKeyBarHighlightsFromYaml(text)
             ?: settingsRepository.settings.value.keyBarHighlightedKeyIds
+        val keyBarHighlightIntensity = extractKeyBarHighlightIntensityFromYaml(text)
+            ?: settingsRepository.settings.value.keyBarHighlightIntensity
         val textInputPanelOpacity = extractTextInputPanelOpacityFromYaml(text)
             ?: settingsRepository.settings.value.textInputPanelOpacity
         var serversImported = 0
@@ -162,6 +166,7 @@ class ExportImportManager @Inject constructor(
         }
         settingsRepository.setKeyBarRows(keyBarRows)
         settingsRepository.setKeyBarHighlightedKeyIds(keyBarHighlightedKeyIds)
+        settingsRepository.setKeyBarHighlightIntensity(keyBarHighlightIntensity)
         settingsRepository.setTextInputPanelOpacity(textInputPanelOpacity)
         return ImportResult(serversImported, projectsImported)
     }
@@ -277,6 +282,11 @@ internal fun extractTextInputPanelOpacityFromYaml(text: String): Float? {
 internal fun extractKeyBarHighlightsFromYaml(text: String): Set<String>? {
     val rawValue = extractSettingsValue(text, "keyBarHighlights") ?: return null
     return KeyBarLayoutConfig.decodeHighlights(rawValue)
+}
+
+internal fun extractKeyBarHighlightIntensityFromYaml(text: String): Float? {
+    val rawValue = extractSettingsValue(text, "keyBarHighlightIntensity") ?: return null
+    return rawValue.toFloatOrNull()?.let(::normalizeKeyBarHighlightIntensity)
 }
 
 private fun extractSettingsValue(text: String, key: String): String? {

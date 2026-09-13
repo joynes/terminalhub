@@ -79,4 +79,29 @@ class ExportKeyBarLayoutTest {
     fun `old backup leaves current key bar highlights untouched`() {
         assertNull(extractKeyBarHighlightsFromYaml("version: 1\nservers: []"))
     }
+
+    @Test
+    fun `backup restores key bar highlight intensity`() {
+        val yaml = """
+            version: 2
+            settings:
+              keyBarHighlightIntensity: 0.22
+            servers: []
+        """.trimIndent()
+
+        assertEquals(0.22f, extractKeyBarHighlightIntensityFromYaml(yaml))
+    }
+
+    @Test
+    fun `highlight intensity from backup is constrained and optional`() {
+        val oversized = """
+            version: 2
+            settings:
+              keyBarHighlightIntensity: 2.0
+            servers: []
+        """.trimIndent()
+
+        assertEquals(0.40f, extractKeyBarHighlightIntensityFromYaml(oversized))
+        assertNull(extractKeyBarHighlightIntensityFromYaml("version: 1\nservers: []"))
+    }
 }

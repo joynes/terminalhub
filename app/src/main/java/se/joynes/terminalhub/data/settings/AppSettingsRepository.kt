@@ -12,9 +12,15 @@ internal const val DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND = true
 internal const val DEFAULT_TEXT_INPUT_PANEL_OPACITY = 0.50f
 internal const val MIN_TEXT_INPUT_PANEL_OPACITY_SETTING = 0.15f
 internal const val MAX_TEXT_INPUT_PANEL_OPACITY_SETTING = 1f
+internal const val DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY = 0.12f
+internal const val MIN_KEY_BAR_HIGHLIGHT_INTENSITY = 0.05f
+internal const val MAX_KEY_BAR_HIGHLIGHT_INTENSITY = 0.40f
 
 internal fun normalizeTextInputPanelOpacitySetting(value: Float): Float =
     value.coerceIn(MIN_TEXT_INPUT_PANEL_OPACITY_SETTING, MAX_TEXT_INPUT_PANEL_OPACITY_SETTING)
+
+internal fun normalizeKeyBarHighlightIntensity(value: Float): Float =
+    value.coerceIn(MIN_KEY_BAR_HIGHLIGHT_INTENSITY, MAX_KEY_BAR_HIGHLIGHT_INTENSITY)
 
 data class AppSettings(
     val preferFastResume: Boolean = true,
@@ -26,7 +32,8 @@ data class AppSettings(
     val backgroundKeepaliveProfile: BackgroundKeepaliveProfile = BackgroundKeepaliveProfile.BALANCED,
     val backgroundKeepaliveScope: BackgroundKeepaliveScope = BackgroundKeepaliveScope.ACTIVE_TAB_ONLY,
     val keyBarRows: List<List<String>> = KeyBarLayoutConfig.defaultRows,
-    val keyBarHighlightedKeyIds: Set<String> = KeyBarLayoutConfig.defaultHighlightedKeyIds
+    val keyBarHighlightedKeyIds: Set<String> = KeyBarLayoutConfig.defaultHighlightedKeyIds,
+    val keyBarHighlightIntensity: Float = DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY
 )
 
 enum class BackgroundKeepaliveProfile {
@@ -69,6 +76,9 @@ class AppSettingsRepository @Inject constructor(
             keyBarRows = KeyBarLayoutConfig.decode(prefs.getString(KEY_KEY_BAR_LAYOUT, null)),
             keyBarHighlightedKeyIds = KeyBarLayoutConfig.decodeHighlights(
                 prefs.getString(KEY_KEY_BAR_HIGHLIGHTS, null)
+            ),
+            keyBarHighlightIntensity = normalizeKeyBarHighlightIntensity(
+                prefs.getFloat(KEY_KEY_BAR_HIGHLIGHT_INTENSITY, DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY)
             )
         )
     )
@@ -122,6 +132,14 @@ class AppSettingsRepository @Inject constructor(
         )
     }
 
+    fun setKeyBarHighlightIntensity(intensity: Float) {
+        update(
+            _settings.value.copy(
+                keyBarHighlightIntensity = normalizeKeyBarHighlightIntensity(intensity)
+            )
+        )
+    }
+
     private fun update(next: AppSettings) {
         _settings.value = next
         prefs.edit()
@@ -138,6 +156,7 @@ class AppSettingsRepository @Inject constructor(
                 KEY_KEY_BAR_HIGHLIGHTS,
                 KeyBarLayoutConfig.encodeHighlights(next.keyBarHighlightedKeyIds)
             )
+            .putFloat(KEY_KEY_BAR_HIGHLIGHT_INTENSITY, next.keyBarHighlightIntensity)
             .apply()
     }
 
@@ -152,5 +171,6 @@ class AppSettingsRepository @Inject constructor(
         private const val KEY_BACKGROUND_KEEPALIVE_SCOPE = "background_keepalive_scope"
         private const val KEY_KEY_BAR_LAYOUT = "key_bar_layout"
         private const val KEY_KEY_BAR_HIGHLIGHTS = "key_bar_highlights"
+        private const val KEY_KEY_BAR_HIGHLIGHT_INTENSITY = "key_bar_highlight_intensity"
     }
 }
