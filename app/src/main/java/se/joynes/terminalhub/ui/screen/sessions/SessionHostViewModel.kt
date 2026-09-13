@@ -237,6 +237,14 @@ class SessionHostViewModel @Inject constructor(
         settingsRepository.settings
             .map { it.keyBarRows }
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.keyBarRows)
+    val keyBarHighlightedKeyIds: StateFlow<Set<String>> =
+        settingsRepository.settings
+            .map { it.keyBarHighlightedKeyIds }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                settingsRepository.settings.value.keyBarHighlightedKeyIds
+            )
     val runtimeState = runtimeRepository.state
     val showBackgroundSshRecommendation: StateFlow<Boolean> = combine(
         settingsRepository.settings,

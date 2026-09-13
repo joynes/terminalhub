@@ -107,6 +107,10 @@ class SettingsViewModel @Inject constructor(
     fun setKeyBarRows(rows: List<List<String>>) {
         settingsRepository.setKeyBarRows(rows)
     }
+
+    fun setKeyBarHighlightedKeyIds(keyIds: Set<String>) {
+        settingsRepository.setKeyBarHighlightedKeyIds(keyIds)
+    }
 }
 
 enum class BackgroundSshStartResult {

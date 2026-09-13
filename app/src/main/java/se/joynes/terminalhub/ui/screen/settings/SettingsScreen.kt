@@ -296,12 +296,14 @@ fun SettingsScreen(
                         SettingsSeparator()
                         SettingsSubheading(
                             title = "KEY BAR LAYOUT",
-                            description = "Tap a key to replace or remove it. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows."
+                            description = "Tap a key name to replace it. Tap its star to highlight buttons you use often. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows."
                         )
                         Spacer(Modifier.height(10.dp))
                         KeyBarSettingsEditor(
                             rows = settings.keyBarRows,
-                            onRowsChange = viewModel::setKeyBarRows
+                            highlightedKeyIds = settings.keyBarHighlightedKeyIds,
+                            onRowsChange = viewModel::setKeyBarRows,
+                            onHighlightedKeyIdsChange = viewModel::setKeyBarHighlightedKeyIds
                         )
                     }
                 }

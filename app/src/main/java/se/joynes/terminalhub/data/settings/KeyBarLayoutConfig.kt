@@ -94,6 +94,8 @@ object KeyBarLayoutConfig {
         listOf("CTRL", "ALT", "SHIFT", "KEYBOARD", "TEXT_INPUT", "UPLOAD", "LEFT", "DOWN", "RIGHT")
     )
 
+    val defaultHighlightedKeyIds: Set<String> = linkedSetOf("TEXT_INPUT", "UPLOAD", "DOWNLOAD")
+
     fun definition(id: String): KeyBarKeyDefinition? = definitionsById[id]
 
     fun normalize(rows: List<List<String>>): List<List<String>> {
@@ -110,6 +112,19 @@ object KeyBarLayoutConfig {
     fun decode(encoded: String?): List<List<String>> {
         if (encoded.isNullOrBlank()) return defaultRows
         return normalize(encoded.split('|').map { row -> row.split(',').filter(String::isNotBlank) })
+    }
+
+    fun normalizeHighlights(keyIds: Set<String>): Set<String> = availableKeys
+        .map(KeyBarKeyDefinition::id)
+        .filterTo(linkedSetOf()) { it in keyIds }
+
+    fun encodeHighlights(keyIds: Set<String>): String =
+        normalizeHighlights(keyIds).joinToString(",")
+
+    fun decodeHighlights(encoded: String?): Set<String> {
+        if (encoded == null) return defaultHighlightedKeyIds
+        if (encoded.isBlank()) return emptySet()
+        return normalizeHighlights(encoded.split(',').map(String::trim).filter(String::isNotBlank).toSet())
     }
 
     fun replaceKey(rows: List<List<String>>, rowIndex: Int, keyIndex: Int, keyId: String): List<List<String>> {

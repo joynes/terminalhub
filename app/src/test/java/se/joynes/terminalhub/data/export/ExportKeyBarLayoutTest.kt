@@ -59,4 +59,24 @@ class ExportKeyBarLayoutTest {
     fun `old backup leaves current text input opacity untouched`() {
         assertNull(extractTextInputPanelOpacityFromYaml("version: 1\nservers: []"))
     }
+
+    @Test
+    fun `backup restores key bar highlights`() {
+        val yaml = """
+            version: 2
+            settings:
+              keyBarHighlights: "TEXT_INPUT,UPLOAD,CHAR_C"
+            servers: []
+        """.trimIndent()
+
+        assertEquals(
+            setOf("TEXT_INPUT", "UPLOAD", "CHAR_C"),
+            extractKeyBarHighlightsFromYaml(yaml)
+        )
+    }
+
+    @Test
+    fun `old backup leaves current key bar highlights untouched`() {
+        assertNull(extractKeyBarHighlightsFromYaml("version: 1\nservers: []"))
+    }
 }

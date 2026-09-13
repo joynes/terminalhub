@@ -43,4 +43,30 @@ class SpecialKeyBarFeedbackTest {
         key.performTouchInput { up() }
         key.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Ready"))
     }
+
+    @Test
+    fun frequentActionKeysAreHighlightedByDefault() {
+        composeRule.setContent {
+            TerminalHubTheme {
+                SpecialKeyBar(
+                    modifierManager = MutableModifierManager(),
+                    rows = listOf(listOf("TEXT_INPUT", "UPLOAD", "DOWNLOAD", "CHAR_C")),
+                    onKey = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("✎").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Highlighted")
+        )
+        composeRule.onNodeWithText("+").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Highlighted")
+        )
+        composeRule.onNodeWithText("⇩").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Highlighted")
+        )
+        composeRule.onNodeWithText("C").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Ready")
+        )
+    }
 }

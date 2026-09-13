@@ -27,12 +27,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.terminalhub.data.settings.KeyBarKeyDefinition
 import se.joynes.terminalhub.data.settings.KeyBarLayoutConfig
 import se.joynes.terminalhub.ui.components.RetroButton
 import se.joynes.terminalhub.ui.theme.MegaDriveBg
+import se.joynes.terminalhub.ui.theme.MegaDriveAccent
 import se.joynes.terminalhub.ui.theme.MegaDriveDim
 import se.joynes.terminalhub.ui.theme.MegaDriveOnSurface
 import se.joynes.terminalhub.ui.theme.MegaDrivePrimary
@@ -44,9 +47,12 @@ private data class KeyPickerTarget(val rowIndex: Int, val keyIndex: Int?)
 @Composable
 fun KeyBarSettingsEditor(
     rows: List<List<String>>,
-    onRowsChange: (List<List<String>>) -> Unit
+    highlightedKeyIds: Set<String> = KeyBarLayoutConfig.defaultHighlightedKeyIds,
+    onRowsChange: (List<List<String>>) -> Unit,
+    onHighlightedKeyIdsChange: (Set<String>) -> Unit = {}
 ) {
     val normalizedRows = KeyBarLayoutConfig.normalize(rows)
+    val normalizedHighlights = KeyBarLayoutConfig.normalizeHighlights(highlightedKeyIds)
     var pickerTarget by remember { mutableStateOf<KeyPickerTarget?>(null) }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -73,7 +79,17 @@ fun KeyBarSettingsEditor(
                     row.forEachIndexed { keyIndex, keyId ->
                         KeyChip(
                             label = KeyBarLayoutConfig.definition(keyId)?.label ?: keyId,
-                            onClick = { pickerTarget = KeyPickerTarget(rowIndex, keyIndex) }
+                            highlighted = keyId in normalizedHighlights,
+                            onClick = { pickerTarget = KeyPickerTarget(rowIndex, keyIndex) },
+                            onHighlightToggle = {
+                                onHighlightedKeyIdsChange(
+                                    if (keyId in normalizedHighlights) {
+                                        normalizedHighlights - keyId
+                                    } else {
+                                        normalizedHighlights + keyId
+                                    }
+                                )
+                            }
                         )
                     }
                 }
@@ -117,9 +133,13 @@ fun KeyBarSettingsEditor(
         )
         RetroButton(
             text = "RESET DEFAULT",
-            onClick = { onRowsChange(KeyBarLayoutConfig.defaultRows) },
+            onClick = {
+                onRowsChange(KeyBarLayoutConfig.defaultRows)
+                onHighlightedKeyIdsChange(KeyBarLayoutConfig.defaultHighlightedKeyIds)
+            },
             modifier = Modifier.fillMaxWidth(),
-            enabled = normalizedRows != KeyBarLayoutConfig.defaultRows
+            enabled = normalizedRows != KeyBarLayoutConfig.defaultRows ||
+                normalizedHighlights != KeyBarLayoutConfig.defaultHighlightedKeyIds
         )
     }
 
@@ -147,18 +167,44 @@ fun KeyBarSettingsEditor(
 }
 
 @Composable
-private fun KeyChip(label: String, onClick: () -> Unit) {
-    Box(
+private fun KeyChip(
+    label: String,
+    highlighted: Boolean,
+    onClick: () -> Unit,
+    onHighlightToggle: () -> Unit
+) {
+    Row(
         modifier = Modifier
             .height(38.dp)
             .widthIn(min = 48.dp)
-            .background(MegaDriveBg)
-            .border(1.dp, MegaDrivePrimary)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp),
-        contentAlignment = Alignment.Center
+            .background(if (highlighted) MegaDriveAccent.copy(alpha = 0.24f) else MegaDriveBg)
+            .border(1.dp, if (highlighted) MegaDriveAccent else MegaDrivePrimary),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label, color = MegaDrivePrimary, fontFamily = MonoFontFamily, fontSize = 11.sp)
+        Text(
+            label,
+            color = if (highlighted) MegaDriveOnSurface else MegaDrivePrimary,
+            fontFamily = MonoFontFamily,
+            fontSize = 11.sp,
+            modifier = Modifier
+                .clickable(onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 10.dp)
+        )
+        Text(
+            if (highlighted) "★" else "☆",
+            color = if (highlighted) MegaDriveAccent else MegaDriveDim,
+            fontSize = 15.sp,
+            modifier = Modifier
+                .clickable(onClick = onHighlightToggle)
+                .semantics {
+                    contentDescription = if (highlighted) {
+                        "Remove highlight from $label"
+                    } else {
+                        "Highlight $label"
+                    }
+                }
+                .padding(start = 2.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)
+        )
     }
 }
 

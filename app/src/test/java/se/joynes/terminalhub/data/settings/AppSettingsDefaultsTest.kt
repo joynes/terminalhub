@@ -23,4 +23,12 @@ class AppSettingsDefaultsTest {
         assertEquals(MAX_TEXT_INPUT_PANEL_OPACITY_SETTING, normalizeTextInputPanelOpacitySetting(2f))
         assertEquals(0.65f, normalizeTextInputPanelOpacitySetting(0.65f))
     }
+
+    @Test
+    fun `text upload and download actions are highlighted by default`() {
+        assertEquals(
+            setOf("TEXT_INPUT", "UPLOAD", "DOWNLOAD"),
+            AppSettings().keyBarHighlightedKeyIds
+        )
+    }
 }

@@ -25,7 +25,8 @@ data class AppSettings(
     val backgroundSshRecommendationHandled: Boolean = false,
     val backgroundKeepaliveProfile: BackgroundKeepaliveProfile = BackgroundKeepaliveProfile.BALANCED,
     val backgroundKeepaliveScope: BackgroundKeepaliveScope = BackgroundKeepaliveScope.ACTIVE_TAB_ONLY,
-    val keyBarRows: List<List<String>> = KeyBarLayoutConfig.defaultRows
+    val keyBarRows: List<List<String>> = KeyBarLayoutConfig.defaultRows,
+    val keyBarHighlightedKeyIds: Set<String> = KeyBarLayoutConfig.defaultHighlightedKeyIds
 )
 
 enum class BackgroundKeepaliveProfile {
@@ -65,7 +66,10 @@ class AppSettingsRepository @Inject constructor(
             backgroundKeepaliveScope = prefs.getString(KEY_BACKGROUND_KEEPALIVE_SCOPE, BackgroundKeepaliveScope.ACTIVE_TAB_ONLY.name)
                 ?.let { runCatching { BackgroundKeepaliveScope.valueOf(it) }.getOrNull() }
                 ?: BackgroundKeepaliveScope.ACTIVE_TAB_ONLY,
-            keyBarRows = KeyBarLayoutConfig.decode(prefs.getString(KEY_KEY_BAR_LAYOUT, null))
+            keyBarRows = KeyBarLayoutConfig.decode(prefs.getString(KEY_KEY_BAR_LAYOUT, null)),
+            keyBarHighlightedKeyIds = KeyBarLayoutConfig.decodeHighlights(
+                prefs.getString(KEY_KEY_BAR_HIGHLIGHTS, null)
+            )
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
@@ -110,6 +114,14 @@ class AppSettingsRepository @Inject constructor(
         update(_settings.value.copy(keyBarRows = KeyBarLayoutConfig.normalize(rows)))
     }
 
+    fun setKeyBarHighlightedKeyIds(keyIds: Set<String>) {
+        update(
+            _settings.value.copy(
+                keyBarHighlightedKeyIds = KeyBarLayoutConfig.normalizeHighlights(keyIds)
+            )
+        )
+    }
+
     private fun update(next: AppSettings) {
         _settings.value = next
         prefs.edit()
@@ -122,6 +134,10 @@ class AppSettingsRepository @Inject constructor(
             .putString(KEY_BACKGROUND_KEEPALIVE_PROFILE, next.backgroundKeepaliveProfile.name)
             .putString(KEY_BACKGROUND_KEEPALIVE_SCOPE, next.backgroundKeepaliveScope.name)
             .putString(KEY_KEY_BAR_LAYOUT, KeyBarLayoutConfig.encode(next.keyBarRows))
+            .putString(
+                KEY_KEY_BAR_HIGHLIGHTS,
+                KeyBarLayoutConfig.encodeHighlights(next.keyBarHighlightedKeyIds)
+            )
             .apply()
     }
 
@@ -135,5 +151,6 @@ class AppSettingsRepository @Inject constructor(
         private const val KEY_BACKGROUND_KEEPALIVE_PROFILE = "background_keepalive_profile"
         private const val KEY_BACKGROUND_KEEPALIVE_SCOPE = "background_keepalive_scope"
         private const val KEY_KEY_BAR_LAYOUT = "key_bar_layout"
+        private const val KEY_KEY_BAR_HIGHLIGHTS = "key_bar_highlights"
     }
 }

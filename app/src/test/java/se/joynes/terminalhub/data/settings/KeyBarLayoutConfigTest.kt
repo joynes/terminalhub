@@ -80,4 +80,23 @@ class KeyBarLayoutConfigTest {
         assertEquals(KeyBarLayoutConfig.defaultRows, KeyBarLayoutConfig.decode(""))
         assertEquals(KeyBarLayoutConfig.defaultRows, KeyBarLayoutConfig.decode("UNKNOWN"))
     }
+
+    @Test
+    fun `frequent action keys are highlighted by default`() {
+        assertEquals(
+            setOf("TEXT_INPUT", "UPLOAD", "DOWNLOAD"),
+            KeyBarLayoutConfig.decodeHighlights(null)
+        )
+    }
+
+    @Test
+    fun `highlights survive persistence including an intentionally empty selection`() {
+        val highlights = setOf("CHAR_C", "UPLOAD", "DOES_NOT_EXIST")
+
+        assertEquals(
+            setOf("UPLOAD", "CHAR_C"),
+            KeyBarLayoutConfig.decodeHighlights(KeyBarLayoutConfig.encodeHighlights(highlights))
+        )
+        assertEquals(emptySet<String>(), KeyBarLayoutConfig.decodeHighlights(""))
+    }
 }
