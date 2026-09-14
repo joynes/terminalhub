@@ -75,6 +75,9 @@ fun FloatingFileDownloadDialog(
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
     var selectedFileNames by remember(projectId) { mutableStateOf<Set<String>>(emptySet()) }
+    var sortSelection by remember(projectId) {
+        mutableStateOf(RemoteFileSortSelection(RemoteFileSort.NAME, ascending = true))
+    }
 
     val destinationPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -174,15 +177,24 @@ fun FloatingFileDownloadDialog(
                         Text("Loading remote files...", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
                     }
                     is DownloadState.Listed -> {
-                        Text(
-                            remoteDirectoryLabel(downloadState.directory),
-                            color = MegaDriveDim,
-                            fontSize = 10.sp,
-                            fontFamily = MonoFontFamily,
-                            maxLines = 2
+                        RemoteDirectoryHeader(
+                            directory = downloadState.directory,
+                            onNavigateUp = {
+                                viewModel.loadRemoteFiles(
+                                    serverId,
+                                    projectId,
+                                    parentRemoteDirectory(downloadState.directory)
+                                )
+                            }
+                        )
+                        RemoteFileSortControls(
+                            selection = sortSelection,
+                            onSelect = { property ->
+                                sortSelection = nextRemoteFileSortSelection(sortSelection, property)
+                            }
                         )
                         RemoteFileList(
-                            entries = downloadState.entries,
+                            entries = sortRemoteFileEntries(downloadState.entries, sortSelection),
                             selectedFileNames = selectedFileNames,
                             modifier = Modifier.heightIn(min = 140.dp, max = listMaxHeight),
                             onOpenDirectory = { directory ->
@@ -516,6 +528,106 @@ internal fun RemoteFileList(
         }
     }
 }
+
+internal enum class RemoteFileSort(val label: String) {
+    NAME("NAME"),
+    TYPE("TYPE"),
+    SIZE("SIZE")
+}
+
+internal data class RemoteFileSortSelection(
+    val property: RemoteFileSort,
+    val ascending: Boolean
+)
+
+@Composable
+internal fun RemoteDirectoryHeader(
+    directory: String,
+    onNavigateUp: () -> Unit
+) {
+    val canNavigateUp = directory.isNotEmpty()
+    Text(
+        text = if (canNavigateUp) "↑  ${remoteDirectoryLabel(directory)}" else remoteDirectoryLabel(directory),
+        color = if (canNavigateUp) MegaDrivePrimary else MegaDriveDim,
+        fontSize = 10.sp,
+        fontFamily = MonoFontFamily,
+        maxLines = 2,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = canNavigateUp, onClick = onNavigateUp)
+            .padding(vertical = 6.dp)
+    )
+}
+
+@Composable
+internal fun RemoteFileSortControls(
+    selection: RemoteFileSortSelection,
+    onSelect: (RemoteFileSort) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            "SORT",
+            color = MegaDriveDim,
+            fontSize = 9.sp,
+            fontFamily = MonoFontFamily
+        )
+        RemoteFileSort.entries.forEach { property ->
+            val selected = property == selection.property
+            Text(
+                text = buildString {
+                    append(property.label)
+                    if (selected) append(if (selection.ascending) " ↑" else " ↓")
+                },
+                color = if (selected) MegaDriveAccent else MegaDriveDim,
+                fontSize = 9.sp,
+                fontFamily = MonoFontFamily,
+                modifier = Modifier
+                    .background(MegaDriveBg, RoundedCornerShape(3.dp))
+                    .clickable { onSelect(property) }
+                    .padding(horizontal = 7.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
+
+internal fun nextRemoteFileSortSelection(
+    current: RemoteFileSortSelection,
+    selectedProperty: RemoteFileSort
+): RemoteFileSortSelection = if (current.property == selectedProperty) {
+    current.copy(ascending = !current.ascending)
+} else {
+    RemoteFileSortSelection(
+        property = selectedProperty,
+        ascending = selectedProperty != RemoteFileSort.SIZE
+    )
+}
+
+internal fun sortRemoteFileEntries(
+    entries: List<RemoteFileEntry>,
+    selection: RemoteFileSortSelection
+): List<RemoteFileEntry> {
+    val propertyComparator = when (selection.property) {
+        RemoteFileSort.NAME -> compareBy<RemoteFileEntry> { it.name.lowercase() }
+        RemoteFileSort.TYPE -> compareBy<RemoteFileEntry> { remoteFileType(it.name) }
+            .thenBy { it.name.lowercase() }
+        RemoteFileSort.SIZE -> compareBy<RemoteFileEntry> { it.size }
+            .thenBy { it.name.lowercase() }
+    }
+    val directedComparator = if (selection.ascending) propertyComparator else propertyComparator.reversed()
+    return entries
+        .groupBy(RemoteFileEntry::isDirectory)
+        .let { grouped ->
+            grouped[true].orEmpty().sortedWith(directedComparator) +
+                grouped[false].orEmpty().sortedWith(directedComparator)
+        }
+}
+
+private fun remoteFileType(name: String): String =
+    name.substringAfterLast('.', missingDelimiterValue = "").lowercase()
 
 internal fun toggleRemoteFileSelection(selected: Set<String>, fileName: String): Set<String> =
     if (fileName in selected) selected - fileName else selected + fileName

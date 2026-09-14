@@ -2,6 +2,7 @@ package se.joynes.terminalhub.ui.screen.download
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 
 class RemoteDirectoryNavigationTest {
 
@@ -25,5 +26,60 @@ class RemoteDirectoryNavigationTest {
     fun `breadcrumb distinguishes root and nested directory`() {
         assertEquals("PROJECT /", remoteDirectoryLabel(""))
         assertEquals("PROJECT / stems/drums", remoteDirectoryLabel("stems/drums"))
+    }
+
+    @Test
+    fun `sort keeps directories first and sorts names in either direction`() {
+        val entries = listOf(
+            RemoteFileEntry("z.txt", 1),
+            RemoteFileEntry("beats", 0, isDirectory = true),
+            RemoteFileEntry("a.txt", 2),
+            RemoteFileEntry("audio", 0, isDirectory = true)
+        )
+
+        val ascending = sortRemoteFileEntries(
+            entries,
+            RemoteFileSortSelection(RemoteFileSort.NAME, ascending = true)
+        )
+        val descending = sortRemoteFileEntries(
+            entries,
+            RemoteFileSortSelection(RemoteFileSort.NAME, ascending = false)
+        )
+
+        assertEquals(listOf("audio", "beats", "a.txt", "z.txt"), ascending.map { it.name })
+        assertEquals(listOf("beats", "audio", "z.txt", "a.txt"), descending.map { it.name })
+    }
+
+    @Test
+    fun `sorts files by size and type`() {
+        val entries = listOf(
+            RemoteFileEntry("notes.txt", 100),
+            RemoteFileEntry("cover.jpg", 300),
+            RemoteFileEntry("small.jpg", 20)
+        )
+
+        val bySize = sortRemoteFileEntries(
+            entries,
+            RemoteFileSortSelection(RemoteFileSort.SIZE, ascending = false)
+        )
+        val byType = sortRemoteFileEntries(
+            entries,
+            RemoteFileSortSelection(RemoteFileSort.TYPE, ascending = true)
+        )
+
+        assertEquals(listOf("cover.jpg", "notes.txt", "small.jpg"), bySize.map { it.name })
+        assertEquals(listOf("cover.jpg", "small.jpg", "notes.txt"), byType.map { it.name })
+    }
+
+    @Test
+    fun `new size sort starts with largest file and repeated tap reverses it`() {
+        val initial = RemoteFileSortSelection(RemoteFileSort.NAME, ascending = true)
+        val sizeDescending = nextRemoteFileSortSelection(initial, RemoteFileSort.SIZE)
+
+        assertEquals(RemoteFileSortSelection(RemoteFileSort.SIZE, ascending = false), sizeDescending)
+        assertEquals(
+            RemoteFileSortSelection(RemoteFileSort.SIZE, ascending = true),
+            nextRemoteFileSortSelection(sizeDescending, RemoteFileSort.SIZE)
+        )
     }
 }

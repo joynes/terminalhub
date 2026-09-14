@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -20,8 +21,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
+import se.joynes.terminalhub.ui.screen.download.RemoteDirectoryHeader
 import se.joynes.terminalhub.ui.screen.download.RemoteFileList
+import se.joynes.terminalhub.ui.screen.download.RemoteFileSort
+import se.joynes.terminalhub.ui.screen.download.RemoteFileSortControls
+import se.joynes.terminalhub.ui.screen.download.RemoteFileSortSelection
 import se.joynes.terminalhub.ui.screen.download.RemoteTextPreviewDialog
+import se.joynes.terminalhub.ui.screen.download.nextRemoteFileSortSelection
 import se.joynes.terminalhub.ui.screen.download.toggleRemoteFileSelection
 import se.joynes.terminalhub.ui.theme.TerminalHubTheme
 
@@ -77,6 +83,57 @@ class RemoteFileListTest {
         composeRule.runOnIdle {
             assertEquals(entry, previewed)
             assertTrue(selected.isEmpty())
+        }
+    }
+
+    @Test
+    fun nestedDirectoryHeaderNavigatesUpWithOneTap() {
+        var navigateUpCount = 0
+        composeRule.setContent {
+            TerminalHubTheme {
+                RemoteDirectoryHeader(
+                    directory = "stems/drums",
+                    onNavigateUp = { navigateUpCount++ }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("↑  PROJECT / stems/drums").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(1, navigateUpCount)
+        }
+    }
+
+    @Test
+    fun rootDirectoryHeaderDoesNotNavigateAboveProject() {
+        composeRule.setContent {
+            TerminalHubTheme {
+                RemoteDirectoryHeader(directory = "", onNavigateUp = {})
+            }
+        }
+
+        composeRule.onNodeWithText("PROJECT /").assertIsNotEnabled()
+    }
+
+    @Test
+    fun sortControlSelectsSizeDescendingAndThenReversesDirection() {
+        var selection by mutableStateOf(
+            RemoteFileSortSelection(RemoteFileSort.NAME, ascending = true)
+        )
+        composeRule.setContent {
+            TerminalHubTheme {
+                RemoteFileSortControls(selection = selection) {
+                    selection = nextRemoteFileSortSelection(selection, it)
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("SIZE").performClick()
+        composeRule.onNodeWithText("SIZE ↓").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(RemoteFileSortSelection(RemoteFileSort.SIZE, ascending = true), selection)
         }
     }
 
