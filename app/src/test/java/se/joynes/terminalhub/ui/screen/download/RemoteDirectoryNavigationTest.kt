@@ -82,4 +82,25 @@ class RemoteDirectoryNavigationTest {
             nextRemoteFileSortSelection(sizeDescending, RemoteFileSort.SIZE)
         )
     }
+
+    @Test
+    fun `sorts files by modification date in either direction`() {
+        val entries = listOf(
+            RemoteFileEntry("middle.txt", 1, modifiedAtEpochSeconds = 200),
+            RemoteFileEntry("old.txt", 1, modifiedAtEpochSeconds = 100),
+            RemoteFileEntry("new.txt", 1, modifiedAtEpochSeconds = 300)
+        )
+
+        val newestFirst = sortRemoteFileEntries(
+            entries,
+            RemoteFileSortSelection(RemoteFileSort.DATE, ascending = false)
+        )
+        val oldestFirst = sortRemoteFileEntries(
+            entries,
+            RemoteFileSortSelection(RemoteFileSort.DATE, ascending = true)
+        )
+
+        assertEquals(listOf("new.txt", "middle.txt", "old.txt"), newestFirst.map { it.name })
+        assertEquals(listOf("old.txt", "middle.txt", "new.txt"), oldestFirst.map { it.name })
+    }
 }

@@ -52,6 +52,9 @@ import se.joynes.terminalhub.ui.theme.MegaDriveDim
 import se.joynes.terminalhub.ui.theme.MegaDrivePrimary
 import se.joynes.terminalhub.ui.theme.MegaDriveSurface
 import se.joynes.terminalhub.ui.theme.MonoFontFamily
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -490,14 +493,24 @@ internal fun RemoteFileList(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    if (entry.isDirectory) "[DIR]  ${entry.name}" else entry.name,
-                    color = MegaDrivePrimary,
-                    fontSize = 11.sp,
-                    fontFamily = MonoFontFamily,
-                    maxLines = 2,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (entry.isDirectory) "[DIR]  ${entry.name}" else entry.name,
+                        color = MegaDrivePrimary,
+                        fontSize = 11.sp,
+                        fontFamily = MonoFontFamily,
+                        maxLines = 2
+                    )
+                    if (entry.modifiedAtEpochSeconds > 0L) {
+                        Text(
+                            formatRemoteModifiedTime(entry.modifiedAtEpochSeconds),
+                            color = MegaDriveDim,
+                            fontSize = 9.sp,
+                            fontFamily = MonoFontFamily,
+                            maxLines = 1
+                        )
+                    }
+                }
                 if (entry.isDirectory) {
                     Text(">", color = MegaDrivePrimary, fontSize = 11.sp, fontFamily = MonoFontFamily)
                 } else {
@@ -531,6 +544,7 @@ internal fun RemoteFileList(
 
 internal enum class RemoteFileSort(val label: String) {
     NAME("NAME"),
+    DATE("DATE"),
     TYPE("TYPE"),
     SIZE("SIZE")
 }
@@ -602,7 +616,7 @@ internal fun nextRemoteFileSortSelection(
 } else {
     RemoteFileSortSelection(
         property = selectedProperty,
-        ascending = selectedProperty != RemoteFileSort.SIZE
+        ascending = selectedProperty == RemoteFileSort.NAME || selectedProperty == RemoteFileSort.TYPE
     )
 }
 
@@ -612,6 +626,8 @@ internal fun sortRemoteFileEntries(
 ): List<RemoteFileEntry> {
     val propertyComparator = when (selection.property) {
         RemoteFileSort.NAME -> compareBy<RemoteFileEntry> { it.name.lowercase() }
+        RemoteFileSort.DATE -> compareBy<RemoteFileEntry> { it.modifiedAtEpochSeconds }
+            .thenBy { it.name.lowercase() }
         RemoteFileSort.TYPE -> compareBy<RemoteFileEntry> { remoteFileType(it.name) }
             .thenBy { it.name.lowercase() }
         RemoteFileSort.SIZE -> compareBy<RemoteFileEntry> { it.size }
@@ -628,6 +644,9 @@ internal fun sortRemoteFileEntries(
 
 private fun remoteFileType(name: String): String =
     name.substringAfterLast('.', missingDelimiterValue = "").lowercase()
+
+internal fun formatRemoteModifiedTime(epochSeconds: Long): String =
+    SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(epochSeconds * 1_000L))
 
 internal fun toggleRemoteFileSelection(selected: Set<String>, fileName: String): Set<String> =
     if (fileName in selected) selected - fileName else selected + fileName

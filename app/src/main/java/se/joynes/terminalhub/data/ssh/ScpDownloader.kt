@@ -16,7 +16,8 @@ import javax.inject.Inject
 data class RemoteFileEntry(
     val name: String,
     val size: Long,
-    val isDirectory: Boolean = false
+    val isDirectory: Boolean = false,
+    val modifiedAtEpochSeconds: Long = 0L
 )
 
 data class ScpDownloadProgress(
@@ -49,11 +50,17 @@ class ScpDownloader @Inject constructor(
                     .filterNot { it.attributes.isSymlink }
                     .mapNotNull { entry ->
                         when {
-                            entry.attributes.isDirectory -> RemoteFileEntry(entry.filename, 0L, true)
+                            entry.attributes.isDirectory -> RemoteFileEntry(
+                                name = entry.filename,
+                                size = 0L,
+                                isDirectory = true,
+                                modifiedAtEpochSeconds = entry.attributes.mtime ?: 0L
+                            )
                             entry.attributes.isRegularFile -> RemoteFileEntry(
-                                entry.filename,
-                                entry.attributes.size ?: 0L,
-                                false
+                                name = entry.filename,
+                                size = entry.attributes.size ?: 0L,
+                                isDirectory = false,
+                                modifiedAtEpochSeconds = entry.attributes.mtime ?: 0L
                             )
                             else -> null
                         }

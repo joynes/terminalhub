@@ -67,8 +67,8 @@ class SftpTransferTest {
         whenever(client.canonicalPath(".")).thenReturn("/home/alice")
         whenever(client.ls("/home/alice/terminalhub/demo/assets")).thenReturn(
             listOf(
-                entry("song.wav", size = 120),
-                entry("stems", directory = true),
+                entry("song.wav", size = 120, modifiedAtEpochSeconds = 1_700_000_200L),
+                entry("stems", directory = true, modifiedAtEpochSeconds = 1_700_000_100L),
                 entry("linked", symlink = true),
                 entry(".", directory = true),
                 entry("..", directory = true)
@@ -84,7 +84,10 @@ class SftpTransferTest {
         )
 
         assertEquals(
-            listOf(RemoteFileEntry("stems", 0, true), RemoteFileEntry("song.wav", 120, false)),
+            listOf(
+                RemoteFileEntry("stems", 0, true, 1_700_000_100L),
+                RemoteFileEntry("song.wav", 120, false, 1_700_000_200L)
+            ),
             entries
         )
         assertTrue(fixture.transport.closed)
@@ -172,7 +175,8 @@ class SftpTransferTest {
         name: String,
         size: Long = 0,
         directory: Boolean = false,
-        symlink: Boolean = false
+        symlink: Boolean = false,
+        modifiedAtEpochSeconds: Long = 0L
     ): SFTPv3DirectoryEntry = SFTPv3DirectoryEntry().also { entry ->
         entry.filename = name
         entry.attributes = SFTPv3FileAttributes().also { attributes ->
@@ -182,6 +186,7 @@ class SftpTransferTest {
                 else -> 0b1000 shl 12
             }
             attributes.size = size
+            attributes.mtime = modifiedAtEpochSeconds
         }
     }
 

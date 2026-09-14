@@ -138,6 +138,26 @@ class RemoteFileListTest {
     }
 
     @Test
+    fun sortControlOffersDateWithNewestFirstByDefault() {
+        var selection by mutableStateOf(
+            RemoteFileSortSelection(RemoteFileSort.NAME, ascending = true)
+        )
+        composeRule.setContent {
+            TerminalHubTheme {
+                RemoteFileSortControls(selection = selection) {
+                    selection = nextRemoteFileSortSelection(selection, it)
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("DATE").performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(RemoteFileSortSelection(RemoteFileSort.DATE, ascending = false), selection)
+        }
+    }
+
+    @Test
     fun longMarkdownPreviewCanScrollToTheLastSection() {
         val markdown = (1..60).joinToString("\n\n") { "## Section $it\nText for section $it" }
         composeRule.setContent {
