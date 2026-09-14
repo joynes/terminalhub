@@ -719,6 +719,12 @@ fun SessionHostScreen(
                                 onOpenServers()
                             }
                         )
+                        ReconnectAllMenuItem(
+                            onClick = {
+                                showSettingsMenu = false
+                                viewModel.reconnectAllProjects()
+                            }
+                        )
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -1322,6 +1328,21 @@ fun SessionHostScreen(
                 }
             }
     }
+}
+
+@Composable
+internal fun ReconnectAllMenuItem(onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = {
+            Text(
+                "Reconnect all",
+                color = Color.White,
+                fontFamily = MonoFontFamily,
+                fontSize = 12.sp
+            )
+        },
+        onClick = onClick
+    )
 }
 
 @Composable
