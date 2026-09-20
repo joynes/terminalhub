@@ -7,6 +7,14 @@ import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 class RemoteDirectoryNavigationTest {
 
     @Test
+    fun `download panel stops above keybar even after dragging or resizing`() {
+        assertEquals(52f, clampDownloadPanelTop(400f, 300f, 240, 8f))
+        assertEquals(0f, clampDownloadPanelTop(80f, 200f, 200, 8f))
+        assertEquals(20f, clampDownloadPanelTop(20f, 300f, 240, 8f))
+        assertEquals(0f, clampDownloadPanelTop(-50f, 300f, 240, 8f))
+    }
+
+    @Test
     fun `navigation enters nested folders and returns one level at a time`() {
         val stems = childRemoteDirectory("", "stems")
         val drums = childRemoteDirectory(stems, "drums")

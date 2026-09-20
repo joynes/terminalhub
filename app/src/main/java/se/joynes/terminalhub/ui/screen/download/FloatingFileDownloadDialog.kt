@@ -12,7 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,11 +33,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -70,13 +74,12 @@ fun FloatingFileDownloadDialog(
     val context = LocalContext.current
 
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
-    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
     val panelWidthDp = (configuration.screenWidthDp * 0.92f).dp
     val panelWidthPx = with(density) { panelWidthDp.toPx() }
-    val listMaxHeight = (configuration.screenHeightDp * 0.48f).dp
 
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
+    var panelHeightPx by remember { mutableIntStateOf(0) }
     var selectedFileNames by remember(projectId) { mutableStateOf<Set<String>>(emptySet()) }
     var sortSelection by remember(projectId) {
         mutableStateOf(RemoteFileSortSelection(RemoteFileSort.NAME, ascending = true))
@@ -127,30 +130,54 @@ fun FloatingFileDownloadDialog(
         return
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .clickable { }
     ) {
+        val availableHeightPx = constraints.maxHeight.toFloat()
+        val panelMarginPx = with(density) { 8.dp.toPx() }
+        val panelMaxHeight = (maxHeight - 8.dp).coerceAtLeast(1.dp)
+        val listMaxHeight = (maxHeight * 0.42f).coerceAtLeast(80.dp)
         Column(
             modifier = Modifier
-                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .offset {
+                    IntOffset(
+                        offsetX.roundToInt(),
+                        clampDownloadPanelTop(
+                            offsetY,
+                            availableHeightPx,
+                            panelHeightPx,
+                            panelMarginPx
+                        ).roundToInt()
+                    )
+                }
                 .width(panelWidthDp)
-                .heightIn(max = (configuration.screenHeightDp * 0.82f).dp)
+                .heightIn(max = panelMaxHeight)
+                .onSizeChanged { panelHeightPx = it.height }
                 .background(MegaDriveSurface, RoundedCornerShape(4.dp))
+                .verticalScroll(rememberScrollState())
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(32.dp)
                     .background(MegaDrivePrimary, RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                    .pointerInput(Unit) {
+                    .pointerInput(availableHeightPx, panelMarginPx) {
                         detectDragGestures { change, drag ->
                             change.consume()
                             offsetX = (offsetX + drag.x).coerceIn(0f, screenWidthPx - panelWidthPx)
-                            offsetY = (offsetY + drag.y).coerceIn(
-                                0f,
-                                screenHeightPx - with(density) { 48.dp.toPx() }
+                            val visibleTop = clampDownloadPanelTop(
+                                offsetY,
+                                availableHeightPx,
+                                panelHeightPx,
+                                panelMarginPx
+                            )
+                            offsetY = clampDownloadPanelTop(
+                                visibleTop + drag.y,
+                                availableHeightPx,
+                                panelHeightPx,
+                                panelMarginPx
                             )
                         }
                     }
@@ -398,6 +425,16 @@ fun FloatingFileDownloadDialog(
         }
     }
 }
+
+internal fun clampDownloadPanelTop(
+    requestedTopPx: Float,
+    availableHeightPx: Float,
+    panelHeightPx: Int,
+    bottomMarginPx: Float
+): Float = requestedTopPx.coerceIn(
+    0f,
+    (availableHeightPx - panelHeightPx - bottomMarginPx).coerceAtLeast(0f)
+)
 
 private fun openDownloadedFile(context: Context, download: DownloadState.Done) {
     openDownloadedFile(context, download.fileName, download.uri)
