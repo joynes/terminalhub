@@ -8,7 +8,10 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,10 +34,16 @@ import se.joynes.terminalhub.BuildConfig
 import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.domain.TerminalSessionId
 import se.joynes.terminalhub.ui.components.NeonStatusBadge
+import se.joynes.terminalhub.ui.components.PixelProgressBar
 import se.joynes.terminalhub.ui.components.RetroCard
 import se.joynes.terminalhub.ui.components.RetroTopBar
 import se.joynes.terminalhub.ui.components.TerminalHubAboutDialog
 import se.joynes.terminalhub.ui.navigation.SessionTabBar
+import se.joynes.terminalhub.ui.screen.download.DownloadState
+import se.joynes.terminalhub.ui.screen.download.DownloadedRemoteFile
+import se.joynes.terminalhub.ui.screen.download.FileDownloadViewModel
+import se.joynes.terminalhub.ui.screen.download.FloatingFileDownloadDialog
+import se.joynes.terminalhub.ui.screen.settings.KeyBarSettingsEditor
 import se.joynes.terminalhub.ui.screen.sessions.FloatingTextInputDialog
 import se.joynes.terminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.terminalhub.ui.screen.terminal.MutableModifierManager
@@ -55,7 +64,7 @@ import se.joynes.terminalhub.ui.theme.TerminalHubTheme
 /**
  * Deterministic, diagnostic-only scenes used to capture real TerminalHub UI for store assets.
  * Launch with: adb shell am start -n se.joynes.terminalhub.diag/.marketing.MarketingPreviewActivity
- * --es scene sessions|resume|prompt|files|servers
+ * --es scene sessions2|sessions10|upload-multiple|download-multiple|keybar-settings
  */
 @AndroidEntryPoint
 class MarketingPreviewActivity : ComponentActivity() {
@@ -93,10 +102,24 @@ private val demoTabs = listOf(
     )
 )
 
+private val manyDemoTabs = listOf(
+    "MOBILE", "API", "DOCS", "OPS", "WEB", "TEST", "BUILD", "DATA", "LAB", "PROD"
+).mapIndexed { index, name ->
+    ProjectTabState(
+        projectId = (index + 1).toLong(),
+        projectName = name,
+        sessionId = TerminalSessionId(name.lowercase()),
+        isConnected = true,
+        colorSeed = 40 + index * 31,
+        usesTmux = true
+    )
+}
+
 @Composable
 private fun MarketingScene(scene: String) {
     when (scene) {
         "servers" -> DemoServers()
+        "keybar-settings" -> DemoKeyBarSettings()
         "opensource" -> Box {
             DemoTerminalWorkspace("sessions")
             TerminalHubAboutDialog(
@@ -111,7 +134,12 @@ private fun MarketingScene(scene: String) {
 
 @Composable
 private fun DemoTerminalWorkspace(scene: String) {
-    var orderedTabs by remember(scene) { mutableStateOf(demoTabs) }
+    val initialTabs = when (scene) {
+        "sessions2" -> demoTabs.take(2)
+        "sessions10" -> manyDemoTabs
+        else -> demoTabs
+    }
+    var orderedTabs by remember(scene) { mutableStateOf(initialTabs) }
     val activeId = if (scene == "resume") TerminalSessionId("api") else TerminalSessionId("mobile")
     val esc = "\u001B"
     val output = when (scene) {
@@ -126,7 +154,7 @@ private fun DemoTerminalWorkspace(scene: String) {
 
             $
         """.trimIndent()
-        "files" -> """
+        "files", "upload-multiple", "download-multiple" -> """
             $ pwd
             /srv/mobile-app
 
@@ -138,10 +166,43 @@ private fun DemoTerminalWorkspace(scene: String) {
 
             $
         """.trimIndent()
+        "sessions2" -> """
+            ${esc}[36mTerminalHub / project-tabs${esc}[0m
+
+            Two projects are open across two servers.
+
+            ${esc}[32mMOBILE${esc}[0m  workstation ~/projects/mobile
+            ${esc}[35mAPI${esc}[0m     vps /srv/api
+
+            Switch tabs; each project keeps its own SSH/tmux session.
+            Your work is ready when you return.
+
+            $
+        """.trimIndent()
+        "sessions10" -> """
+            ${esc}[36mTerminalHub / project-tabs${esc}[0m
+
+            Ten projects are open across your servers.
+
+            ${esc}[32mMOBILE${esc}[0m  workstation ~/projects/mobile
+            ${esc}[35mAPI${esc}[0m     vps /srv/api
+            ${esc}[33mDOCS${esc}[0m    home-lab ~/docs
+            ${esc}[34mOPS${esc}[0m     vps /srv/operations
+            WEB     workstation ~/projects/web
+            TEST    workstation ~/projects/test
+            BUILD   workstation ~/projects/build
+            DATA    home-lab ~/data
+            LAB     home-lab ~/lab
+            PROD    vps /srv/production
+
+            Switch instantly between every live terminal session.
+
+            $
+        """.trimIndent()
         else -> """
             ${esc}[36mTerminalHub / project-tabs${esc}[0m
 
-            Four projects are open across three servers.
+            ${orderedTabs.size} projects are open across your servers.
 
             ${esc}[32mMOBILE${esc}[0m  workstation ~/projects/mobile
             ${esc}[35mAPI${esc}[0m     vps /srv/api
@@ -199,7 +260,7 @@ private fun DemoTerminalWorkspace(scene: String) {
                     fontSize = 10.sp
                 )
                 NeonStatusBadge(
-                    text = if (scene == "resume") "TMUX RESTORED" else "4 ACTIVE",
+                    text = if (scene == "resume") "TMUX RESTORED" else "${orderedTabs.size} ACTIVE",
                     color = MegaDrivePrimary
                 )
             }
@@ -241,6 +302,122 @@ private fun DemoTerminalWorkspace(scene: String) {
                 onSelectedNameChange = {},
                 onUploadsCompleted = {},
                 onDismiss = {}
+            )
+        }
+
+        if (scene == "upload-multiple") {
+            DemoMultiFileUploadPanel()
+        }
+
+        if (scene == "download-multiple") {
+            val viewModel: FileDownloadViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+            FloatingFileDownloadDialog(
+                viewModel = viewModel,
+                projectId = 1,
+                serverId = 1,
+                downloadState = DownloadState.BatchDone(
+                    listOf(
+                        DownloadedRemoteFile("README.md", 8_421, Uri.parse("content://terminalhub.demo/README.md")),
+                        DownloadedRemoteFile("architecture.png", 284_103, Uri.parse("content://terminalhub.demo/architecture.png")),
+                        DownloadedRemoteFile("release-notes.pdf", 153_920, Uri.parse("content://terminalhub.demo/release-notes.pdf"))
+                    )
+                ),
+                onDismiss = {}
+            )
+        }
+    }
+}
+
+@Composable
+private fun DemoMultiFileUploadPanel() {
+    Box(Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .offset(x = 16.dp, y = 80.dp)
+                .fillMaxWidth(0.92f)
+                .background(MegaDriveSurface, RoundedCornerShape(4.dp))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
+                    .background(MegaDrivePrimary, RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                    .padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("FILE UPLOAD", color = MegaDriveBg, fontSize = 11.sp, fontFamily = MonoFontFamily)
+                Text("✕", color = MegaDriveBg, fontSize = 13.sp, fontFamily = MonoFontFamily)
+            }
+            Column(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    "architecture.png",
+                    color = MegaDrivePrimary,
+                    fontSize = 11.sp,
+                    fontFamily = MonoFontFamily
+                )
+                PixelProgressBar(
+                    progress = 0.72f,
+                    label = "UPLOADING (2/3)...",
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    "3 files selected · README.md · architecture.png · release-notes.pdf",
+                    color = MegaDriveDim,
+                    fontSize = 10.sp,
+                    fontFamily = MonoFontFamily,
+                    maxLines = 2
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DemoKeyBarSettings() {
+    var rows by remember {
+        mutableStateOf(
+            listOf(
+                listOf("ESC", "TAB", "CTRL", "ALT", "SLASH", "PIPE", "UP", "ENTER"),
+                listOf("TEXT_INPUT", "UPLOAD", "DOWNLOAD", "LEFT", "DOWN", "RIGHT")
+            )
+        )
+    }
+    var highlighted by remember { mutableStateOf(setOf("TEXT_INPUT", "UPLOAD", "DOWNLOAD")) }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MegaDriveBg)
+            .statusBarsPadding()
+    ) {
+        RetroTopBar(title = "KEY BAR SETTINGS", onBack = null)
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                "CUSTOMIZE YOUR TERMINAL CONTROLS",
+                color = MegaDrivePrimary,
+                fontFamily = MonoFontFamily,
+                fontSize = 13.sp
+            )
+            Text(
+                "Replace, highlight and reorder the keys you use most.",
+                color = MegaDriveDim,
+                fontFamily = MonoFontFamily,
+                fontSize = 11.sp
+            )
+            KeyBarSettingsEditor(
+                rows = rows,
+                highlightedKeyIds = highlighted,
+                onRowsChange = { rows = it },
+                onHighlightedKeyIdsChange = { highlighted = it }
             )
         }
     }

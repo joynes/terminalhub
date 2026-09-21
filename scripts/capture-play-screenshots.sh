@@ -85,10 +85,10 @@ capture() {
   rm "$raw_capture"
 }
 
-capture 01 sessions persistent-project-tabs
-capture 02 resume tmux-resume
-capture 03 prompt multiline-project-input
-capture 04 files file-upload
-capture 05 opensource open-source-about
+capture 01 sessions2 session-two-tabs
+capture 02 sessions10 session-ten-tabs
+capture 03 upload-multiple multiple-file-upload
+capture 04 download-multiple multiple-file-download
+capture 05 keybar-settings keybar-settings
 
 echo "Captured Play screenshots in $OUTPUT_DIR"
