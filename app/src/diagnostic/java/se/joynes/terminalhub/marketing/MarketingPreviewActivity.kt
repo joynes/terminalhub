@@ -393,7 +393,21 @@ private fun DemoKeyBarSettings() {
             .background(MegaDriveBg)
             .statusBarsPadding()
     ) {
-        RetroTopBar(title = "KEY BAR SETTINGS", onBack = null)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(64.dp)
+                .background(MegaDriveSurface)
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "> KEY BAR SETTINGS",
+                color = MegaDrivePrimary,
+                fontFamily = MonoFontFamily,
+                fontSize = 14.sp
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
