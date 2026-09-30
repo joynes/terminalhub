@@ -7,6 +7,19 @@ import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 class RemoteDirectoryNavigationTest {
 
     @Test
+    fun `reuses last download directory only while write permission remains`() {
+        val remembered = "content://downloads/tree/primary%3ADownload%2FTerminalHub"
+
+        assertEquals(
+            remembered,
+            usableRememberedDownloadDirectory(remembered, setOf(remembered))
+        )
+        assertEquals(null, usableRememberedDownloadDirectory(remembered, emptySet()))
+        assertEquals(null, usableRememberedDownloadDirectory("", setOf("")))
+        assertEquals(null, usableRememberedDownloadDirectory(null, setOf(remembered)))
+    }
+
+    @Test
     fun `download panel stops above keybar even after dragging or resizing`() {
         assertEquals(52f, clampDownloadPanelTop(400f, 300f, 240, 8f))
         assertEquals(0f, clampDownloadPanelTop(80f, 200f, 200, 8f))

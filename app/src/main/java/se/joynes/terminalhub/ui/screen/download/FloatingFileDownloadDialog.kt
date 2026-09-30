@@ -72,6 +72,7 @@ fun FloatingFileDownloadDialog(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val context = LocalContext.current
+    val destinationDirectoryStore = remember(context) { RemoteDownloadDirectoryStore(context) }
 
     val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
     val panelWidthDp = (configuration.screenWidthDp * 0.92f).dp
@@ -91,12 +92,13 @@ fun FloatingFileDownloadDialog(
         val state = downloadState as? DownloadState.Listed
         val selected = selectedFileNames.toList()
         if (directoryUri != null && state != null && selected.isNotEmpty()) {
-            runCatching {
+            val permissionPersisted = runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     directoryUri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
-            }
+            }.isSuccess
+            if (permissionPersisted) destinationDirectoryStore.save(directoryUri)
             viewModel.startDownloads(
                 serverId = serverId,
                 projectId = projectId,
@@ -276,7 +278,11 @@ fun FloatingFileDownloadDialog(
                                     "DOWNLOAD SELECTED (${selectedFileNames.size})"
                                 },
                                 onClick = {
-                                    if (selectedFileNames.isNotEmpty()) destinationPicker.launch(null)
+                                    if (selectedFileNames.isNotEmpty()) {
+                                        destinationPicker.launch(
+                                            destinationDirectoryStore.lastPersistedDirectory()
+                                        )
+                                    }
                                 },
                                 enabled = selectedFileNames.isNotEmpty(),
                                 modifier = Modifier.fillMaxWidth()
