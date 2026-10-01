@@ -206,7 +206,8 @@ public final class TerminalBuffer {
         while (TerminalUrlFinder.find(candidate) != null && lastRow < maxRow && joinedRows < 8) {
             int nextRow = lastRow + 1;
             String nextToken = firstToken(rowText(nextRow));
-            if (nextToken.isEmpty() || !isUrlContinuation(nextToken) ||
+            if (!candidateEndsAtRowBoundary(candidate, lastRow) ||
+                nextToken.isEmpty() || !isUrlContinuation(nextToken) ||
                 !looksLikeHardWrappedBoundary(lastRow, candidate)) {
                 break;
             }
@@ -217,6 +218,16 @@ public final class TerminalBuffer {
         }
 
         return candidate;
+    }
+
+    /**
+     * A hard-wrapped URL can only continue on the next row when its current fragment is the
+     * final token on this row. Without this check, sentence punctuation after an already complete
+     * URL could make the first word of the following prose look like part of the URL.
+     */
+    private boolean candidateEndsAtRowBoundary(String candidate, int row) {
+        String rowLastToken = lastToken(rowText(row));
+        return !rowLastToken.isEmpty() && candidate.endsWith(rowLastToken);
     }
 
     private boolean looksLikeHardWrappedBoundary(int previousRow, String textBeforeBoundary) {

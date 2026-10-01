@@ -105,4 +105,22 @@ public class ScreenBufferTest extends TerminalTestCase {
 			mTerminal.getScreen().getUrlCandidateAtLocation(4, 0)
 		);
 	}
+
+	public void testGetUrlCandidateStopsBeforeProseAfterLink() {
+		withTerminalSized(64, 4).enterString(
+			"TerminalHub-hemsidan (https://joynes.github.io/\r\n" +
+			"  terminalhub/). Den lyfter nu snabb växling\r\n" +
+			"  mellan beständiga SSH-flikar"
+		);
+
+		String expected = "https://joynes.github.io/terminalhub/";
+		assertEquals(
+			expected,
+			TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(32, 0))
+		);
+		assertEquals(
+			expected,
+			TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(5, 1))
+		);
+	}
 }
