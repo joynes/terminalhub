@@ -1,6 +1,6 @@
 # TerminalHub full product and support context
 
-Documentation snapshot: 2026-08-29
+Documentation snapshot: 2026-10-01
 Canonical page: https://joynes.github.io/terminalhub/
 Repository: https://github.com/joynes/terminalhub
 
@@ -37,7 +37,7 @@ Terminal and mobile interaction:
 
 Files and Android integration:
 - Single or multi-file upload with automatic picker/start, queued progress, remote-path copy/insertion, and Android Share-to-TerminalHub.
-- Top-level regular-file listing and remote download for SSH projects, Android destination picker, progress, and Open with filename-aware MIME type.
+- Browse SSH project subfolders, sort files by name, size or date, and download one or several selected files from the current folder with progress. Open completed files in compatible Android apps. Preview recognized text and Markdown files up to 512 KB directly in TerminalHub.
 
 Configuration and diagnostics:
 - Fast resume, keepalive enablement, four timing profiles, active/all-session scope, and background/recovery status.
@@ -179,20 +179,20 @@ Upload sequence:
 
 Android Share can also send a file into TerminalHub, which opens the active project's upload flow.
 
-Supported remote-download workflow:
+Supported remote-file workflow:
 1. Open a connected SSH project and tap the Download key.
-2. TerminalHub lists top-level regular files, including hidden files, in the remote project folder.
-3. Select a file and choose the Android destination through Create Document.
-4. TerminalHub downloads it over SCP and shows progress.
-5. After completion, Open launches Android's chooser with a filename-aware MIME type.
+2. Browse subfolders and sort entries by name, size or date. Preview supported text or Markdown files directly in the app.
+3. Select one or several files in the current remote folder. Choose an Android file destination for one file or a destination folder for several files.
+4. TerminalHub downloads selected files over SCP and shows progress.
+5. After completion, Open launches a compatible Android app with a filename-aware MIME type.
 
-Remote download is file-only and top-level. It is not recursive directory browsing and is unavailable for local projects.
+Remote download is available for SSH projects, not local projects. Folder navigation is supported, but recursive folder download is not.
 
 ## Settings and local data
 
 Defaults:
 - Fast resume: enabled.
-- Execute multiline text input on Send: disabled; sending does not append Enter by default.
+- Execute multiline text input on Send: enabled by default; turn it off to send text without appending Enter.
 - SSH keepalive: enabled.
 - Keepalive profile: Balanced.
 - Keepalive scope: Active tab only.
@@ -235,7 +235,7 @@ TerminalHub does not control model billing, authentication, permissions, sandbox
   reliable persistence fallback.
 - Does not bundle an AI model or terminal agent.
 - Not affiliated with or endorsed by Termux.
-- Remote download lists top-level regular files only; it is not a recursive remote file manager.
+- Remote browsing supports subfolders, but recursive folder download is not supported.
 - Local-device projects use a plain local shell without tmux and are not the primary positioning.
 - Terminal behavior depends partly on remote TERM support, network quality, Android version, device, and input method.
 

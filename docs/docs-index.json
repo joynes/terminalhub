@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "product": "TerminalHub: SSH Project Tabs",
-  "snapshot_date": "2026-08-29",
+  "snapshot_date": "2026-10-01",
   "canonical_url": "https://joynes.github.io/terminalhub/",
   "repository": "https://github.com/joynes/terminalhub",
   "package": "se.joynes.terminalhub",
@@ -15,6 +15,9 @@
     "ai_included": false,
     "file_upload_supported": true,
     "remote_download_documented_as_supported": true,
+    "remote_folder_navigation": true,
+    "multi_file_download": true,
+    "remote_text_preview": true,
     "terminal_links_open_on_android": true,
     "host_key_pinning": true,
     "termux_affiliation": false
@@ -41,7 +44,7 @@
     {"id": "projects", "url": "https://joynes.github.io/terminalhub/#projects", "keywords": ["git", "clone", "folder", "script", "command", "placeholder"]},
     {"id": "sessions", "url": "https://joynes.github.io/terminalhub/#sessions", "keywords": ["tabs", "restore", "reconnect", "tmux", "persistence"]},
     {"id": "terminal", "url": "https://joynes.github.io/terminalhub/#terminal", "keywords": ["keyboard", "key bar", "ctrl", "alt", "multiline", "search", "scroll", "URL", "link", "browser", "open"]},
-    {"id": "files", "url": "https://joynes.github.io/terminalhub/#files", "keywords": ["file", "multi-file upload", "remote download", "open downloaded file", "android picker", "share intent", "scp"]},
+    {"id": "files", "url": "https://joynes.github.io/terminalhub/#files", "keywords": ["file", "multi-file upload", "multi-file download", "remote folder", "sort", "Markdown preview", "text preview", "open downloaded file", "android picker", "share intent", "scp"]},
     {"id": "configuration", "url": "https://joynes.github.io/terminalhub/#configuration", "keywords": ["settings", "keepalive", "biometric", "export", "import", "logs", "data"]},
     {"id": "ai-workflows", "url": "https://joynes.github.io/terminalhub/#ai-workflows", "keywords": ["codex", "claude", "gemini", "agent", "parallel sessions"]},
     {"id": "troubleshooting", "url": "https://joynes.github.io/terminalhub/#troubleshooting", "keywords": ["error", "connection failed", "restore", "clone", "upload", "rendering"]},

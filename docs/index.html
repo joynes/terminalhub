@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Complete TerminalHub documentation: persistent SSH project tabs, tmux recovery, terminal controls, uploads, remote downloads, mobile link opening, security, architecture, and agent guidance.">
+  <meta name="description" content="TerminalHub is a fast, open-source Android SSH workspace with persistent project tabs, tmux recovery, clickable terminal links, multi-file transfers, and remote file previews.">
   <meta name="theme-color" content="#080912">
   <link rel="canonical" href="https://joynes.github.io/terminalhub/">
   <link rel="icon" href="assets/icon.png">
@@ -66,8 +66,9 @@
       <section class="hero doc-section" id="overview" data-search-title="Overview">
         <div class="hero-copy">
           <p class="eyebrow">OPEN-SOURCE ANDROID SSH WORKSPACE</p>
-          <h1>Start server projects from your phone. Keep every project in a persistent tab.</h1>
-          <p class="lead">TerminalHub organizes SSH-based projects across one or more servers. The Android app remembers your tab workspace; tmux keeps the actual remote processes alive.</p>
+          <h1>Switch between SSH projects fast. Pick up where you left off.</h1>
+          <p class="lead">TerminalHub keeps many terminal projects in one Android workspace. Switch tabs in a tap, reopen them after restarting the app, and use tmux to resume work running on your own server.</p>
+          <p>Upload and download multiple files, preview remote Markdown and text, and tap links in terminal output to open them on your phone. Free, ad-free, and open source.</p>
           <div class="actions">
             <a class="button primary" href="#quick-start">Set up your first project</a>
             <a class="button" href="https://play.google.com/store/apps/details?id=se.joynes.terminalhub&amp;utm_source=github_pages&amp;utm_medium=referral&amp;utm_campaign=project_tabs_launch_2026">Install from Google Play</a>
@@ -80,16 +81,21 @@
             <div><dt>License</dt><dd>GPL-3.0</dd></div>
           </dl>
         </div>
-        <img class="hero-shot" src="assets/screenshots/01-persistent-project-tabs.png" alt="TerminalHub showing four persistent project tabs connected to three servers">
+        <figure class="hero-video">
+          <div class="video-frame">
+            <iframe src="https://www.youtube-nocookie.com/embed/whcyU2lCHUc" title="TerminalHub presentation and real app demo on YouTube" loading="eager" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+          </div>
+          <figcaption>See TerminalHub in action. <a href="https://www.youtube.com/watch?v=whcyU2lCHUc">Watch on YouTube</a>.</figcaption>
+        </figure>
       </section>
 
       <section class="doc-section" id="feature-inventory" data-search-title="Complete feature inventory">
         <p class="eyebrow">CURRENT USER-VISIBLE CAPABILITIES</p>
         <h2>Complete feature inventory</h2>
-        <p>This inventory is derived from the current source tree and the full Git history—not only from the marketing description. “Shipped” means the capability is implemented and reachable in the current production UI. Release-specific device behavior can still vary.</p>
+        <p>This inventory is derived from the current public source tree and Git history—not only from marketing copy. “Implemented” means the feature is in the source; Google Play availability depends on the installed release. Device behavior can vary.</p>
         <div class="inventory-grid">
           <article class="inventory-card">
-            <h3>Workspace and tabs <span class="status shipped">Shipped</span></h3>
+            <h3>Workspace and tabs <span class="status shipped">Implemented</span></h3>
             <ul>
               <li>Open projects from one or many servers in a shared tab bar.</li>
               <li>Persist open tabs, their order, active project and per-project tab colors.</li>
@@ -103,7 +109,7 @@
             </ul>
           </article>
           <article class="inventory-card">
-            <h3>Servers and SSH <span class="status shipped">Shipped</span></h3>
+            <h3>Servers and SSH <span class="status shipped">Implemented</span></h3>
             <ul>
               <li>Multiple saved server profiles with name, host, port, username and projects folder.</li>
               <li>Password and private-key authentication.</li>
@@ -115,7 +121,7 @@
             </ul>
           </article>
           <article class="inventory-card">
-            <h3>Project automation <span class="status shipped">Shipped</span></h3>
+            <h3>Project automation <span class="status shipped">Implemented</span></h3>
             <ul>
               <li>SSH-server or local-device project target.</li>
               <li>Choose a server independently for every project.</li>
@@ -128,7 +134,7 @@
             </ul>
           </article>
           <article class="inventory-card">
-            <h3>Terminal and mobile input <span class="status shipped">Shipped</span></h3>
+            <h3>Terminal and mobile input <span class="status shipped">Implemented</span></h3>
             <ul>
               <li>Adapted Termux terminal emulator/view with ANSI/VT behavior and scrollback.</li>
               <li>Software and hardware keyboards, clipboard paste and touch focus.</li>
@@ -141,7 +147,7 @@
             </ul>
           </article>
           <article class="inventory-card">
-            <h3>Links and Android browser <span class="status shipped">Shipped</span></h3>
+            <h3>Links and Android browser <span class="status shipped">Implemented</span></h3>
             <ul>
               <li>Tap <code>http://</code>, <code>https://</code> and <code>www.</code> links in terminal output.</li>
               <li>Open links in the phone's default browser or compatible Android app.</li>
@@ -151,19 +157,20 @@
             </ul>
           </article>
           <article class="inventory-card">
-            <h3>Files and Android sharing <span class="status shipped">Shipped</span></h3>
+            <h3>Files and Android sharing <span class="status shipped">Implemented</span></h3>
             <ul>
               <li>Upload one or multiple Android-selected files to the active remote project.</li>
               <li>Auto-open the picker, auto-start transfers and show per-file progress.</li>
               <li>Share a file from another Android app directly into the active TerminalHub project.</li>
               <li>Copy or insert the uploaded remote path into the project's multiline input.</li>
-              <li>List top-level regular files—including hidden files—in the remote project folder.</li>
-              <li>Download a selected remote file using Android's destination picker with progress.</li>
-              <li>Open a completed download in a compatible Android app using filename-aware MIME types.</li>
+              <li>Browse project subfolders and sort remote files by name, size or date.</li>
+              <li>Select and download several files into a chosen Android folder with progress, or download one file using Android's destination picker.</li>
+              <li>Open completed downloads in compatible Android apps using filename-aware MIME types.</li>
+              <li>Preview supported remote text and Markdown files in the app, up to 512 KB.</li>
             </ul>
           </article>
           <article class="inventory-card">
-            <h3>Configuration and observability <span class="status shipped">Shipped</span></h3>
+            <h3>Configuration and observability <span class="status shipped">Implemented</span></h3>
             <ul>
               <li>Fast-resume behavior and live background/recovery status display.</li>
               <li>YAML export of servers, currently open server-linked project profiles and key-bar layout; credentials are excluded.</li>
@@ -189,7 +196,7 @@
         </div>
         <details><summary>Git-history evidence for the corrected file and link features</summary>
           <ul>
-            <li><strong>Remote download:</strong> introduced in <code>aee9339</code>, repaired in <code>8bebc88</code> and <code>4cab703</code>, and extended to open completed downloads in <code>81de921</code>.</li>
+            <li><strong>Remote download:</strong> introduced in <code>aee9339</code>, extended to open completed files in <code>81de921</code>, and expanded with previews, multi-file selection, folder navigation and sorting in later commits.</li>
             <li><strong>Open terminal links:</strong> repaired in <code>8bebc88</code>, made available from selected URL text in <code>38bdef6</code>, and made compatible with tmux mouse mode in <code>b7116da</code>.</li>
             <li><strong>Multi-file upload and Android sharing:</strong> added in <code>206509b</code> and <code>b8d5391</code>, with remote-path copy/insertion in <code>61cafee</code>.</li>
           </ul>
@@ -404,15 +411,14 @@ tmux -V</code></pre></details>
             <li>For a single file, copy the remote path or let TerminalHub insert it into multiline input.</li>
           </ol>
           <p>You can also use Android's Share action in another app and choose TerminalHub. The shared file is prepared for upload into the currently active project tab.</p>
-          <h3>Download to Android</h3>
+          <h3>Browse, preview and download remote files</h3>
           <ol>
             <li>Open a connected SSH project and tap the download key (down-arrow in the default key bar).</li>
-            <li>TerminalHub lists regular files in the project's top-level remote folder, including hidden files.</li>
-            <li>Tap a file and choose its Android destination and name.</li>
-            <li>Wait for SCP progress to complete.</li>
-            <li>Tap <em>Open</em> to launch the downloaded file in a compatible Android app.</li>
+            <li>Browse subfolders and sort by name, size or date. Tap <em>Preview</em> to read a supported text or Markdown file directly in TerminalHub.</li>
+            <li>Select one or more files. For several files, choose an Android destination folder; for one file, choose its destination and name.</li>
+            <li>Wait for transfer progress to complete, then tap <em>Open</em> to launch a downloaded file in a compatible Android app.</li>
           </ol>
-          <div class="callout"><strong>Current download scope</strong><p>Remote download is available for SSH projects. The browser lists files—not subdirectories—in the top level of the active project folder. Opening after download depends on an installed Android app that supports the detected file type.</p></div>
+          <div class="callout"><strong>Current scope</strong><p>Remote browsing and downloads require an SSH project. You can navigate subfolders, but downloads select files from the current folder rather than entire folder trees. Previews support recognized text formats up to 512 KB. Opening downloaded files depends on a compatible Android app.</p></div>
         </div>
         <figure><img src="assets/screenshots/04-file-upload.png" alt="TerminalHub file upload progress at 72 percent"><figcaption>Real Android emulator capture: upload progress in the active tab.</figcaption></figure>
       </section>
@@ -489,7 +495,7 @@ Custom command: codex</code></pre>
           <li><strong>It does not supply servers.</strong> You configure machines and credentials you control.</li>
           <li><strong>It does not include AI.</strong> AI terminal tools are optional server-side programs.</li>
           <li><strong>It is not affiliated with Termux.</strong> It adapts open-source Termux terminal components under their licenses.</li>
-          <li><strong>Remote download is currently top-level and file-only.</strong> It lists regular files in the active project folder; it is not a recursive remote file manager.</li>
+          <li><strong>Remote downloads select files, not folder trees.</strong> Browse subfolders, then select files in the current folder; recursive folder download is not supported.</li>
           <li><strong>Local projects have a narrower model.</strong> The local target uses a plain Android-side shell and does not provide tmux persistence.</li>
           <li><strong>Interactive full-screen terminal programs vary.</strong> Behavior depends on the remote shell, TERM capabilities, network quality and Android input method.</li>
         </ul>
@@ -596,7 +602,7 @@ cd terminalhub
             <tr><th>AI dependency</th><td>None; terminal AI tools are optional server-side use cases</td></tr>
           </tbody>
         </table></div>
-        <p class="updated">Documentation snapshot: 2026-08-29 · <a href="https://github.com/joynes/terminalhub/edit/main/docs/index.html">Edit this page on GitHub</a></p>
+        <p class="updated">Documentation snapshot: 2026-10-01 · <a href="https://github.com/joynes/terminalhub/edit/main/docs/index.html">Edit this page on GitHub</a></p>
       </section>
     </main>
   </div>

@@ -48,11 +48,11 @@ least one machine that the phone can reach over SSH.
   ongoing notification, and can be stopped from the notification or Settings.
 - **Start new work from the phone.** Create a remote project folder or clone a Git
   repository without first opening a laptop.
-- **Upload files in context.** Send Android files directly into the active remote
-  project.
-- **Download and open remote files.** Browse regular files in the active project's
-  top-level folder, save one through Android's document picker, and open it in a
-  compatible mobile app.
+- **Upload files in context.** Send one or several Android files into the active
+  remote project, with transfer progress and paths you can paste into a command.
+- **Browse, preview, and download remote files.** Navigate project subfolders,
+  sort entries, preview supported text or Markdown in the app, and download
+  selected files to Android. Open completed downloads in compatible apps.
 - **Open terminal links on the phone.** Tap HTTP(S) and `www.` links in terminal
   output, including wrapped links and links shown inside tmux mouse-mode apps, to
   open them with Android's browser or a compatible app.
