@@ -45,6 +45,14 @@ class KeyBarLayoutConfigTest {
     }
 
     @Test
+    fun `microphone action is configurable and survives persistence`() {
+        val rows = listOf(listOf("VOICE_INPUT", "TEXT_INPUT"))
+
+        assertEquals("MICROPHONE", KeyBarLayoutConfig.definition("VOICE_INPUT")?.label)
+        assertEquals(rows, KeyBarLayoutConfig.decode(KeyBarLayoutConfig.encode(rows)))
+    }
+
+    @Test
     fun `keys and rows can be added removed and reordered`() {
         val withRow = KeyBarLayoutConfig.addRow(KeyBarLayoutConfig.defaultRows)
         val withKey = KeyBarLayoutConfig.addKey(withRow, 2, "ENTER")

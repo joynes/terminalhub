@@ -6,6 +6,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class TerminalTextInputTest {
+
+    @Test
+    fun `voice recognition chooses first non blank result`() {
+        assertEquals("spoken command", preferredRecognizedSpeech(listOf("  ", " spoken command ", "other")))
+        assertEquals(null, preferredRecognizedSpeech(listOf("", "  ")))
+        assertEquals(null, preferredRecognizedSpeech(null))
+    }
+
     @Test
     fun sendOnlyPastesCommandWithoutTerminalEnter() {
         assertEquals(

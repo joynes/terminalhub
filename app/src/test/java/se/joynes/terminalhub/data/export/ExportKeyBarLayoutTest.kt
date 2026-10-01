@@ -11,12 +11,12 @@ class ExportKeyBarLayoutTest {
         val yaml = """
             version: 2
             settings:
-              keyBarLayout: "CTRL,CHAR_C|ENTER,UP"
+              keyBarLayout: "CTRL,CHAR_C|ENTER,UP,VOICE_INPUT"
             servers: []
         """.trimIndent()
 
         assertEquals(
-            listOf(listOf("CTRL", "CHAR_C"), listOf("ENTER", "UP")),
+            listOf(listOf("CTRL", "CHAR_C"), listOf("ENTER", "UP", "VOICE_INPUT")),
             extractKeyBarLayoutFromYaml(yaml)
         )
     }

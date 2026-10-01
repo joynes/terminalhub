@@ -37,6 +37,7 @@ fun SpecialKeyBar(
     highlightIntensity: Float = DEFAULT_KEY_BAR_HIGHLIGHT_INTENSITY,
     onPaste: () -> Unit = {},
     onTextInput: () -> Unit = {},
+    onVoiceInput: () -> Unit = {},
     onFileUpload: () -> Unit = {},
     onFileDownload: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {},
@@ -94,6 +95,7 @@ fun SpecialKeyBar(
             "PAGE_DOWN" -> { modifierManager.clearTransients(); onKey("\u001B[6~") }
             "KEYBOARD" -> onKeyboardToggle()
             "TEXT_INPUT" -> onTextInput()
+            "VOICE_INPUT" -> onVoiceInput()
             "UPLOAD" -> onFileUpload()
             "DOWNLOAD" -> onFileDownload()
             "PASTE" -> onPaste()
@@ -217,7 +219,7 @@ private fun TermKey(
     }
 }
 
-private val LARGE_GLYPH_KEYS = setOf("TAB", "ENTER", "SHIFT", "UP", "DOWN", "LEFT", "RIGHT", "KEYBOARD", "TEXT_INPUT", "UPLOAD", "DOWNLOAD")
+private val LARGE_GLYPH_KEYS = setOf("TAB", "ENTER", "SHIFT", "UP", "DOWN", "LEFT", "RIGHT", "KEYBOARD", "TEXT_INPUT", "VOICE_INPUT", "UPLOAD", "DOWNLOAD")
 
 internal fun applyKeyBarModifiers(
     normal: String,
@@ -255,6 +257,7 @@ private fun compactLabel(keyId: String): String = when (keyId) {
     "PAGE_DOWN" -> "PG↓"
     "KEYBOARD" -> "⌨"
     "TEXT_INPUT" -> "✎"
+    "VOICE_INPUT" -> "🎙"
     "UPLOAD" -> "+"
     "DOWNLOAD" -> "⇩"
     else -> KeyBarLayoutConfig.definition(keyId)?.label ?: keyId

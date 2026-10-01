@@ -1,9 +1,13 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
 import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.speech.RecognizerIntent
 import android.view.WindowInsets as AndroidWindowInsets
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
@@ -20,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -139,6 +144,10 @@ fun SessionHostScreen(
     var deleteProjectOnClose by remember(pendingTabClose?.projectId) { mutableStateOf(false) }
     val textInputVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     val textInputDraftByProject = remember { mutableStateMapOf<Long, TextFieldValue>() }
+    var pendingVoiceInputProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pendingVoiceInputDraft by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue())
+    }
     val fileUploadVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     val fileUploadSelectedUriByProject = remember { mutableStateMapOf<Long, Uri?>() }
     val fileUploadSelectedNameByProject = remember { mutableStateMapOf<Long, String>() }
@@ -332,6 +341,26 @@ fun SessionHostScreen(
     val activeFileUploadSelectedUri = activeProjectId?.let { fileUploadSelectedUriByProject[it] }
     val activeFileUploadSelectedName = activeProjectId?.let { fileUploadSelectedNameByProject[it].orEmpty() }.orEmpty()
     val activeFileDownloadVisible = activeProjectId?.let { fileDownloadVisibleByProject[it] == true } ?: false
+    val voiceInputLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val projectId = pendingVoiceInputProjectId
+        pendingVoiceInputProjectId = null
+        val recognizedText = if (result.resultCode == Activity.RESULT_OK) {
+            preferredRecognizedSpeech(
+                result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            )
+        } else {
+            null
+        }
+        if (projectId != null && recognizedText != null) {
+            val draft = textInputDraftByProject[projectId] ?: pendingVoiceInputDraft
+            textInputDraftByProject[projectId] = insertTextAtCursor(draft, recognizedText)
+            fileUploadVisibleByProject[projectId] = false
+            fileDownloadVisibleByProject[projectId] = false
+            textInputVisibleByProject[projectId] = true
+        }
+    }
     val textInputHistory by remember(activeProjectId) {
         activeProjectId?.let { viewModel.textInputHistory(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
     }.collectAsState(initial = emptyList())
@@ -382,6 +411,28 @@ fun SessionHostScreen(
         } else {
             context.getSystemService(InputMethodManager::class.java)
                 ?.hideSoftInputFromWindow(tv.windowToken, 0)
+        }
+    }
+
+    fun launchVoiceInput(projectId: Long) {
+        hideKeyboard()
+        keyboardVisible = false
+        pendingVoiceInputProjectId = projectId
+        pendingVoiceInputDraft = textInputDraftByProject[projectId] ?: TextFieldValue()
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak text for TerminalHub")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        }
+        try {
+            voiceInputLauncher.launch(intent)
+        } catch (_: ActivityNotFoundException) {
+            pendingVoiceInputProjectId = null
+            Toast.makeText(
+                context,
+                "No speech recognition service is installed",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -1280,6 +1331,9 @@ fun SessionHostScreen(
                                     fileDownloadVisibleByProject[projectId] = false
                                     textInputVisibleByProject[projectId] = true
                                 }
+                            },
+                            onVoiceInput = {
+                                activeProjectId?.let(::launchVoiceInput)
                             },
                             onFileUpload = {
                                 activeProjectId?.let { projectId ->

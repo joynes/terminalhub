@@ -74,6 +74,7 @@ object KeyBarLayoutConfig {
                 KeyBarKeyDefinition("PAGE_DOWN", "PGDN", "Navigation"),
                 KeyBarKeyDefinition("KEYBOARD", "KEYBOARD", "Actions"),
                 KeyBarKeyDefinition("TEXT_INPUT", "TEXT", "Actions"),
+                KeyBarKeyDefinition("VOICE_INPUT", "MICROPHONE", "Actions"),
                 KeyBarKeyDefinition("UPLOAD", "UPLOAD", "Actions"),
                 KeyBarKeyDefinition("DOWNLOAD", "DOWNLOAD", "Actions"),
                 KeyBarKeyDefinition("PASTE", "PASTE", "Actions")

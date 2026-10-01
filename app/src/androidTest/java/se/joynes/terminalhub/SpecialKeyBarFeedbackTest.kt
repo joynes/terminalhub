@@ -6,9 +6,11 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.down
 import androidx.compose.ui.test.up
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -68,5 +70,23 @@ class SpecialKeyBarFeedbackTest {
         composeRule.onNodeWithText("C").assert(
             SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "Ready")
         )
+    }
+
+    @Test
+    fun microphoneKeyInvokesVoiceInput() {
+        var launches = 0
+        composeRule.setContent {
+            TerminalHubTheme {
+                SpecialKeyBar(
+                    modifierManager = MutableModifierManager(),
+                    rows = listOf(listOf("VOICE_INPUT")),
+                    onKey = {},
+                    onVoiceInput = { launches++ }
+                )
+            }
+        }
+
+        composeRule.onNodeWithText("🎙").performClick()
+        composeRule.runOnIdle { assertEquals(1, launches) }
     }
 }

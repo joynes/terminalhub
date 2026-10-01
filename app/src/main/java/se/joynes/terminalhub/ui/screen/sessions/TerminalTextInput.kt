@@ -46,4 +46,7 @@ internal fun insertTextAtCursor(value: TextFieldValue, insertedText: String): Te
     return TextFieldValue(updated, TextRange(cursor))
 }
 
+internal fun preferredRecognizedSpeech(results: List<String>?): String? =
+    results?.firstOrNull { it.isNotBlank() }?.trim()
+
 internal fun uploadedFileNamesText(fileNames: List<String>): String = fileNames.joinToString(" ")
