@@ -49,4 +49,7 @@ internal fun insertTextAtCursor(value: TextFieldValue, insertedText: String): Te
 internal fun preferredRecognizedSpeech(results: List<String>?): String? =
     results?.firstOrNull { it.isNotBlank() }?.trim()
 
+internal fun voiceInputDraftAfterResult(draft: TextFieldValue, recognizedText: String?): TextFieldValue =
+    if (recognizedText == null) draft else insertTextAtCursor(draft, recognizedText)
+
 internal fun uploadedFileNamesText(fileNames: List<String>): String = fileNames.joinToString(" ")

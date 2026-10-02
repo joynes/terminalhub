@@ -65,8 +65,6 @@ fun FloatingTextInputDialog(
     val effectivePanelOpacity = normalizeTextInputPanelOpacity(panelOpacity ?: localPanelOpacity)
     val focusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
-
     fun send() {
         if (text.text.isNotEmpty()) {
             onSaveHistory(text.text)
@@ -288,6 +286,9 @@ fun FloatingTextInputDialog(
                     .focusRequester(focusRequester)
                     .semantics { contentDescription = "Terminal text input" }
             )
+            // BoxWithConstraints subcomposes its editor. Request focus only after that
+            // composition has attached the focus target, including after dictation returns.
+            LaunchedEffect(Unit) { focusRequester.requestFocus() }
         }
     }
 }

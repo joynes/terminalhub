@@ -145,6 +145,7 @@ fun SessionHostScreen(
     val textInputVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     val textInputDraftByProject = remember { mutableStateMapOf<Long, TextFieldValue>() }
     var pendingVoiceInputProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pendingVoiceInputWasVisible by rememberSaveable { mutableStateOf(false) }
     var pendingVoiceInputDraft by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue())
     }
@@ -345,7 +346,6 @@ fun SessionHostScreen(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val projectId = pendingVoiceInputProjectId
-        pendingVoiceInputProjectId = null
         val recognizedText = if (result.resultCode == Activity.RESULT_OK) {
             preferredRecognizedSpeech(
                 result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
@@ -353,13 +353,13 @@ fun SessionHostScreen(
         } else {
             null
         }
-        if (projectId != null && recognizedText != null) {
-            val draft = textInputDraftByProject[projectId] ?: pendingVoiceInputDraft
-            textInputDraftByProject[projectId] = insertTextAtCursor(draft, recognizedText)
+        if (projectId != null) {
+            textInputDraftByProject[projectId] = voiceInputDraftAfterResult(pendingVoiceInputDraft, recognizedText)
             fileUploadVisibleByProject[projectId] = false
             fileDownloadVisibleByProject[projectId] = false
-            textInputVisibleByProject[projectId] = true
+            textInputVisibleByProject[projectId] = pendingVoiceInputWasVisible || recognizedText != null
         }
+        pendingVoiceInputProjectId = null
     }
     val textInputHistory by remember(activeProjectId) {
         activeProjectId?.let { viewModel.textInputHistory(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
@@ -415,10 +415,15 @@ fun SessionHostScreen(
     }
 
     fun launchVoiceInput(projectId: Long) {
-        hideKeyboard()
-        keyboardVisible = false
+        if (pendingVoiceInputProjectId != null) return
         pendingVoiceInputProjectId = projectId
         pendingVoiceInputDraft = textInputDraftByProject[projectId] ?: TextFieldValue()
+        pendingVoiceInputWasVisible = textInputVisibleByProject[projectId] == true
+        // Dispose the focused editor before dictation. A live IME connection can send a stale
+        // composing value when returning from the recognizer, overwriting the inserted result.
+        textInputVisibleByProject[projectId] = false
+        hideKeyboard()
+        keyboardVisible = false
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak text for TerminalHub")
@@ -427,6 +432,7 @@ fun SessionHostScreen(
         try {
             voiceInputLauncher.launch(intent)
         } catch (_: ActivityNotFoundException) {
+            textInputVisibleByProject[projectId] = pendingVoiceInputWasVisible
             pendingVoiceInputProjectId = null
             Toast.makeText(
                 context,
