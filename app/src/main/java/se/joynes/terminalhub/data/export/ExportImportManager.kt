@@ -55,12 +55,14 @@ class ExportImportManager @Inject constructor(
         projectsForServer: suspend (Server) -> List<Project>
     ): String {
         val sb = StringBuilder()
+        val pinnedActions = db.pinnedActionDao().all()
         sb.appendLine("version: 2")
         sb.appendLine("settings:")
         sb.appendLine("  keyBarLayout: ${ys(KeyBarLayoutConfig.encode(settingsRepository.settings.value.keyBarRows))}")
         sb.appendLine("  keyBarHighlights: ${ys(KeyBarLayoutConfig.encodeHighlights(settingsRepository.settings.value.keyBarHighlightedKeyIds))}")
         sb.appendLine("  keyBarHighlightIntensity: ${settingsRepository.settings.value.keyBarHighlightIntensity}")
         sb.appendLine("  textInputPanelOpacity: ${settingsRepository.settings.value.textInputPanelOpacity}")
+        sb.appendLine("  globalPinnedActions: ${ys(encodePinnedActions(pinnedActions.filter { it.scope == "GLOBAL" }))}")
         sb.appendLine("servers:")
         for (server in servers) {
             val projects = projectsForServer(server)
@@ -83,6 +85,7 @@ class ExportImportManager @Inject constructor(
                     sb.appendLine("    aiCommand: ${ys(project.aiCommand)}")
                     sb.appendLine("    colorSeed: ${project.colorSeed}")
                     sb.appendLine("    gitUrl: ${ys(project.gitUrl)}")
+                    sb.appendLine("    pinnedActions: ${ys(encodePinnedActions(pinnedActions.filter { it.scope == "PROJECT" && it.projectId == project.id }))}")
                 }
             }
         }
@@ -109,6 +112,13 @@ class ExportImportManager @Inject constructor(
             ?: error("Cannot read file")
 
         val servers = parseYaml(text)
+        // Validate every pin before the existing replace-configuration operation starts.
+        val globalPins = decodePinnedActions(extractSettingsValue(text, "globalPinnedActions"))
+        servers.forEach { server ->
+            parseProjectsBlock(server["__projects__"] ?: "").forEach { project ->
+                decodePinnedActions(project["pinnedActions"], 0L)
+            }
+        }
         // Older backups may omit individual settings. Keep each current value in that case
         // instead of silently resetting it during import.
         val keyBarRows = extractKeyBarLayoutFromYaml(text) ?: settingsRepository.settings.value.keyBarRows
@@ -128,6 +138,8 @@ class ExportImportManager @Inject constructor(
 
         db.withTransaction {
             textInputHistoryDao.clearAll()
+            db.pinnedActionDao().clearAll()
+            globalPins.forEach { db.pinnedActionDao().save(it) }
             projectRepo.clearAll()
             serverRepo.clearAll()
 
@@ -159,7 +171,10 @@ class ExportImportManager @Inject constructor(
                         colorSeed = projectMap["colorSeed"]?.toIntOrNull() ?: 0,
                         gitUrl = projectMap["gitUrl"] ?: ""
                     )
-                    projectRepo.save(project)
+                    val projectId = projectRepo.save(project)
+                    decodePinnedActions(projectMap["pinnedActions"], projectId).forEach {
+                        db.pinnedActionDao().save(it)
+                    }
                     projectsImported++
                 }
             }
@@ -305,13 +320,27 @@ private fun extractSettingsValue(text: String, key: String): String? {
     return null
 }
 
-private fun decodeYamlScalar(value: String): String {
+internal fun decodeYamlScalar(value: String): String {
     if (value.startsWith("\"") && value.endsWith("\"") && value.length >= 2) {
-        return value.substring(1, value.length - 1)
-            .replace("\\n", "\n")
-            .replace("\\t", "\t")
-            .replace("\\\"", "\"")
-            .replace("\\\\", "\\")
+        // Decode once, left to right: chained replacements corrupt literal \\n and nested JSON.
+        val body = value.substring(1, value.length - 1)
+        return buildString {
+            var index = 0
+            while (index < body.length) {
+                val char = body[index++]
+                if (char != '\\' || index == body.length) {
+                    append(char)
+                } else {
+                    when (val escaped = body[index++]) {
+                        'n' -> append('\n')
+                        'r' -> append('\r')
+                        't' -> append('\t')
+                        '"', '\\' -> append(escaped)
+                        else -> { append('\\'); append(escaped) }
+                    }
+                }
+            }
+        }
     }
     return value
 }

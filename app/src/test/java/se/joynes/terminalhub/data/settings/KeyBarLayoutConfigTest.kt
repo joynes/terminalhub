@@ -7,6 +7,15 @@ import org.junit.Test
 class KeyBarLayoutConfigTest {
 
     @Test
+    fun `fresh install has pinned launcher replacing digit two and custom layout stays intact`() {
+        val row = KeyBarLayoutConfig.decode(null).first()
+        assertEquals("PINNED_ACTIONS", row[6])
+        assertEquals(false, "DIGIT_2" in row)
+        val custom = listOf(listOf("DIGIT_2", "PINNED_ACTIONS", "ENTER"))
+        assertEquals(custom, KeyBarLayoutConfig.decode(KeyBarLayoutConfig.encode(custom)))
+    }
+
+    @Test
     fun `fresh install shows microphone beside text input without changing custom layouts`() {
         val defaultRow = KeyBarLayoutConfig.decode(null).first { "TEXT_INPUT" in it }
         assertEquals("VOICE_INPUT", defaultRow[defaultRow.indexOf("TEXT_INPUT") + 1])

@@ -17,7 +17,9 @@ class TerminalViewClientImpl(
     private val modifierManager: MutableModifierManager,
     val onSendToSsh: (ByteArray) -> Unit,
     private val onTerminalTap: () -> Unit,
-    private val onSearch: (String) -> Unit = {}
+    private val onSearch: (String) -> Unit = {},
+    private val recordInput: (TerminalSession?, String) -> Unit = { _, _ -> },
+    private val recordPaste: (TerminalSession?, String) -> Unit = { _, _ -> }
 ) : TerminalViewClient {
 
     // ── Modifier state ────────────────────────────────────────────────────────
@@ -37,6 +39,7 @@ class TerminalViewClientImpl(
             else -> String(Character.toChars(codePoint)).toByteArray(Charsets.UTF_8)
         }
         modifierManager.clearTransients()
+        if (session != null) onUserInput(session, bytes.toString(Charsets.UTF_8))
         session?.write(bytes, 0, bytes.size) ?: onSendToSsh(bytes)
         return true
     }
@@ -47,11 +50,14 @@ class TerminalViewClientImpl(
         val seq = specialKeySequence(keyCode) ?: return false
         val bytes = seq.toByteArray(Charsets.UTF_8)
         modifierManager.clearTransients()
+        if (currentSession != null) onUserInput(currentSession, seq)
         currentSession?.write(bytes, 0, bytes.size) ?: onSendToSsh(bytes)
         return true
     }
 
     override fun onKeyUp(keyCode: Int, e: KeyEvent?) = false
+    override fun onUserInput(session: TerminalSession?, text: String) = recordInput(session, text)
+    override fun onUserPaste(session: TerminalSession?, text: String) = recordPaste(session, text)
     override fun onLongPress(event: MotionEvent?) = false
 
     // ── Touch ─────────────────────────────────────────────────────────────────

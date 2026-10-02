@@ -75,6 +75,7 @@ object KeyBarLayoutConfig {
                 KeyBarKeyDefinition("KEYBOARD", "KEYBOARD", "Actions"),
                 KeyBarKeyDefinition("TEXT_INPUT", "TEXT", "Actions"),
                 KeyBarKeyDefinition("VOICE_INPUT", "MICROPHONE", "Actions"),
+                KeyBarKeyDefinition("PINNED_ACTIONS", "PINNED ACTIONS", "Actions"),
                 KeyBarKeyDefinition("UPLOAD", "UPLOAD", "Actions"),
                 KeyBarKeyDefinition("DOWNLOAD", "DOWNLOAD", "Actions"),
                 KeyBarKeyDefinition("PASTE", "PASTE", "Actions")
@@ -91,7 +92,7 @@ object KeyBarLayoutConfig {
     private val definitionsById = availableKeys.associateBy { it.id }
 
     val defaultRows: List<List<String>> = listOf(
-        listOf("ESC", "TAB", "COLON", "SLASH", "AT", "DIGIT_1", "DIGIT_2", "DIGIT_3", "DOWNLOAD", "UP", "ENTER"),
+        listOf("ESC", "TAB", "COLON", "SLASH", "AT", "DIGIT_1", "PINNED_ACTIONS", "DIGIT_3", "DOWNLOAD", "UP", "ENTER"),
         listOf("CTRL", "ALT", "SHIFT", "KEYBOARD", "TEXT_INPUT", "VOICE_INPUT", "UPLOAD", "LEFT", "DOWN", "RIGHT")
     )
 

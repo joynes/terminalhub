@@ -58,7 +58,8 @@ class TerminalSessionManager @Inject constructor(
     private val sshManager: SshManager,
     private val logger: AppLogger,
     private val runtimeRepository: AppRuntimeRepository,
-    private val backgroundSshModeController: BackgroundSshModeController
+    private val backgroundSshModeController: BackgroundSshModeController,
+    private val inputActions: se.joynes.terminalhub.data.repository.InputActionsRepository
 ) {
     private val prefs = context.getSharedPreferences("session_manager", Context.MODE_PRIVATE)
     private val _sessions = MutableStateFlow<List<TerminalSessionMeta>>(emptyList())
@@ -121,7 +122,7 @@ class TerminalSessionManager @Inject constructor(
         if (entries.containsKey(sessionId)) return
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-        val terminalClient = TerminalSessionClientImpl(context) { changedSession ->
+        val terminalClient = TerminalSessionClientImpl(context, onUserPaste = ::recordUserPaste) { changedSession ->
             _screenUpdates.tryEmit(changedSession)
         }
         val terminalSession = TerminalSession.createRemoteSession(5000, terminalClient, object : TerminalInputListener {
@@ -184,7 +185,7 @@ class TerminalSessionManager @Inject constructor(
         if (entries.values.any { it.meta.projectId == projectId }) return
         val sessionId = "local-${projectId}-${UUID.randomUUID()}"
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val terminalClient = TerminalSessionClientImpl(context) { changedSession ->
+        val terminalClient = TerminalSessionClientImpl(context, onUserPaste = ::recordUserPaste) { changedSession ->
             _screenUpdates.tryEmit(changedSession)
         }
 
@@ -249,6 +250,7 @@ class TerminalSessionManager @Inject constructor(
         selectReplacementIfActive: Boolean = true
     ) {
         val entry = entries.remove(id.value) ?: return
+        inputActions.recorder.forget(entry.meta.projectId)
         val closedProjectName = entry.meta.projectName
         val closedMeta = entry.meta.copy(isConnected = false)
         _closedSessions.value = (_closedSessions.value + closedMeta).takeLast(50)
@@ -315,7 +317,19 @@ class TerminalSessionManager @Inject constructor(
     fun sendBytesToActive(bytes: ByteArray) {
         val id = _activeId.value?.value ?: return
         val entry = entries[id] ?: return
+        inputActions.recorder.input(entry.meta.projectId, bytes.toString(Charsets.UTF_8))
         sendBytes(entry, bytes)
+    }
+
+    /** UI-only observer; transport writes and terminal-generated replies must not call this. */
+    fun recordUserInput(session: TerminalSession?, text: String) {
+        val entry = entries.values.firstOrNull { it.terminalSession === session } ?: return
+        inputActions.recorder.input(entry.meta.projectId, text)
+    }
+
+    fun recordUserPaste(session: TerminalSession?, text: String) {
+        val entry = entries.values.firstOrNull { it.terminalSession === session } ?: return
+        inputActions.recorder.paste(entry.meta.projectId, text)
     }
 
     /** Send bytes to the session that originally received input, even if another tab is selected. */
@@ -333,9 +347,9 @@ class TerminalSessionManager @Inject constructor(
      * Paste into the active terminal using its current DECSET 2004 state. Interactive programs
      * such as Codex then receive one bracketed paste event instead of a burst of typed keys.
      */
-    fun pasteTextToActive(text: String): TerminalSessionId? {
+    fun pasteTextToActive(text: String, completedText: String? = null): TerminalSessionId? {
         val id = _activeId.value ?: return null
-        return pasteTextToSession(id, text)
+        return pasteTextToSession(id, text, completedText)
     }
 
     /** Paste dictation into its original project even if the active tab changed. */
@@ -344,8 +358,10 @@ class TerminalSessionManager @Inject constructor(
         return pasteTextToSession(id, text)
     }
 
-    private fun pasteTextToSession(id: TerminalSessionId, text: String): TerminalSessionId? {
+    private fun pasteTextToSession(id: TerminalSessionId, text: String, completedText: String? = null): TerminalSessionId? {
         val entry = entries[id.value] ?: return null
+        if (completedText != null) inputActions.recorder.complete(entry.meta.projectId, completedText)
+        else inputActions.recorder.paste(entry.meta.projectId, text)
         val emulator = entry.terminalSession.emulator
         if (emulator != null) {
             emulator.paste(text)

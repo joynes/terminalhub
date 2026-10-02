@@ -10,6 +10,7 @@ import com.termux.terminal.TerminalSessionClient
 
 class TerminalSessionClientImpl(
     private val context: Context,
+    private val onUserPaste: (TerminalSession?, String) -> Unit = { _, _ -> },
     private val onScreenUpdate: ((TerminalSession) -> Unit)? = null
 ) : TerminalSessionClient {
     override fun onTextChanged(changedSession: TerminalSession) {
@@ -26,6 +27,7 @@ class TerminalSessionClientImpl(
         val clipData = clipboard.primaryClip ?: return
         val text = clipData.getItemAt(0)?.coerceToText(context)
         if (!TextUtils.isEmpty(text)) {
+            onUserPaste(session, text.toString())
             session?.getEmulator()?.paste(text.toString())
         }
     }

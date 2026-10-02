@@ -16,6 +16,7 @@ import se.joynes.terminalhub.data.db.MIGRATION_5_6
 import se.joynes.terminalhub.data.db.MIGRATION_6_7
 import se.joynes.terminalhub.data.db.MIGRATION_7_8
 import se.joynes.terminalhub.data.db.MIGRATION_8_9
+import se.joynes.terminalhub.data.db.MIGRATION_9_10
 import se.joynes.terminalhub.data.db.dao.*
 import javax.inject.Singleton
 
@@ -27,7 +28,7 @@ object DatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(context, AppDatabase::class.java, "terminalhub.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
             .build()
 
     @Provides fun provideServerDao(db: AppDatabase): ServerDao = db.serverDao()
@@ -35,4 +36,5 @@ object DatabaseModule {
     @Provides fun provideSessionLogDao(db: AppDatabase): SessionLogDao = db.sessionLogDao()
     @Provides fun provideAppLogDao(db: AppDatabase): AppLogDao = db.appLogDao()
     @Provides fun provideTextInputHistoryDao(db: AppDatabase): TextInputHistoryDao = db.textInputHistoryDao()
+    @Provides fun providePinnedActionDao(db: AppDatabase): PinnedActionDao = db.pinnedActionDao()
 }

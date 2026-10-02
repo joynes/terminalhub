@@ -55,6 +55,7 @@ fun FloatingTextInputDialog(
     onDismiss: () -> Unit,
     history: List<String> = emptyList(),
     onSaveHistory: (String) -> Unit = {},
+    onOpenHistory: (() -> Unit)? = null,
     bottomAvoidanceDp: Dp = 0.dp,
     panelOpacity: Float? = null,
     onPanelOpacityChange: ((Float) -> Unit)? = null
@@ -198,7 +199,9 @@ fun FloatingTextInputDialog(
                             color = MegaDriveBg,
                             fontSize = 10.sp,
                             fontFamily = MonoFontFamily,
-                            modifier = Modifier.clickable { showHistory = !showHistory }
+                            modifier = Modifier.clickable {
+                                if (onOpenHistory != null) onOpenHistory() else showHistory = !showHistory
+                            }
                         )
                     }
                     Text(

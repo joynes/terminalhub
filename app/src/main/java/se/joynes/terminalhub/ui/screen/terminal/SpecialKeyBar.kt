@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,6 +39,7 @@ fun SpecialKeyBar(
     onPaste: () -> Unit = {},
     onTextInput: () -> Unit = {},
     onVoiceInput: () -> Unit = {},
+    onPinnedActions: () -> Unit = {},
     onFileUpload: () -> Unit = {},
     onFileDownload: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {},
@@ -96,6 +98,7 @@ fun SpecialKeyBar(
             "KEYBOARD" -> onKeyboardToggle()
             "TEXT_INPUT" -> onTextInput()
             "VOICE_INPUT" -> onVoiceInput()
+            "PINNED_ACTIONS" -> onPinnedActions()
             "UPLOAD" -> onFileUpload()
             "DOWNLOAD" -> onFileDownload()
             "PASTE" -> onPaste()
@@ -137,7 +140,9 @@ fun SpecialKeyBar(
                     }
                     TermKey(
                         label = compactLabel(keyId),
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.weight(1f).semantics {
+                            if (keyId == "PINNED_ACTIONS") contentDescription = "Pinned actions"
+                        },
                         active = active,
                         highlighted = keyId in normalizedHighlights,
                         highlightIntensity = normalizedHighlightIntensity,
@@ -219,7 +224,7 @@ private fun TermKey(
     }
 }
 
-private val LARGE_GLYPH_KEYS = setOf("TAB", "ENTER", "SHIFT", "UP", "DOWN", "LEFT", "RIGHT", "KEYBOARD", "TEXT_INPUT", "VOICE_INPUT", "UPLOAD", "DOWNLOAD")
+private val LARGE_GLYPH_KEYS = setOf("TAB", "ENTER", "SHIFT", "UP", "DOWN", "LEFT", "RIGHT", "KEYBOARD", "TEXT_INPUT", "VOICE_INPUT", "PINNED_ACTIONS", "UPLOAD", "DOWNLOAD")
 
 internal fun applyKeyBarModifiers(
     normal: String,
@@ -258,6 +263,7 @@ private fun compactLabel(keyId: String): String = when (keyId) {
     "KEYBOARD" -> "⌨"
     "TEXT_INPUT" -> "✎"
     "VOICE_INPUT" -> "🎙"
+    "PINNED_ACTIONS" -> "★"
     "UPLOAD" -> "+"
     "DOWNLOAD" -> "⇩"
     else -> KeyBarLayoutConfig.definition(keyId)?.label ?: keyId

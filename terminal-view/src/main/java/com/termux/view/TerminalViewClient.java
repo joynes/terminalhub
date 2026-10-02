@@ -16,6 +16,10 @@ import com.termux.terminal.TerminalSession;
  */
 public interface TerminalViewClient {
 
+    /** User ingress only, not terminal output or protocol replies. */
+    default void onUserInput(TerminalSession session, String text) {}
+    default void onUserPaste(TerminalSession session, String text) {}
+
     /**
      * Callback function on scale events according to {@link ScaleGestureDetector#getScaleFactor()}.
      */

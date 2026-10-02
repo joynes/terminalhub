@@ -64,7 +64,7 @@ class SessionTabOrderTest {
             sshManager = sshManager,
             engine = engine,
             sessionManager = sessionManager,
-            textInputHistoryDao = textInputHistoryDao,
+            inputActions = se.joynes.terminalhub.data.repository.InputActionsRepository(textInputHistoryDao, db.pinnedActionDao()),
             settingsRepository = settingsRepository,
             runtimeRepository = runtimeRepository,
             knownHosts = knownHosts,

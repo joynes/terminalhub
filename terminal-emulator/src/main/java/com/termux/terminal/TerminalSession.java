@@ -210,14 +210,13 @@ public final class TerminalSession extends TerminalOutput {
     /** Write data to the shell process. */
     @Override
     public void write(byte[] data, int offset, int count) {
-        Logger.logDebug(mClient, LOG_TAG, "write " + describeBytes(data, offset, count));
+        // User input may contain passwords or tokens. Never log payload bytes, even as hex.
         if (mInputListener != null && mInputListener.onTerminalInput(data, offset, count)) return;
         if (!mRemoteSession && mShellPid > 0) mTerminalToProcessIOQueue.write(data, offset, count);
     }
 
     public void appendRemoteOutput(byte[] data, int offset, int count) {
         if (!mRemoteSession || count <= 0) return;
-        Logger.logDebug(mClient, LOG_TAG, "appendRemoteOutput " + describeBytes(data, offset, count));
         if (!mProcessToTerminalIOQueue.write(data, offset, count)) return;
         if (mEmulator != null) mMainThreadHandler.sendEmptyMessage(MSG_NEW_INPUT);
     }
@@ -389,21 +388,6 @@ public final class TerminalSession extends TerminalOutput {
             System.exit(1);
         }
         return result;
-    }
-
-    private static String describeBytes(byte[] data, int offset, int count) {
-        int safeCount = Math.max(0, Math.min(count, data.length - offset));
-        int shown = Math.min(safeCount, 24);
-        StringBuilder sb = new StringBuilder();
-        sb.append("count=").append(safeCount).append(" hex=");
-        for (int i = 0; i < shown; i++) {
-            if (i > 0) sb.append(' ');
-            int value = data[offset + i] & 0xff;
-            if (value < 0x10) sb.append('0');
-            sb.append(Integer.toHexString(value));
-        }
-        if (safeCount > shown) sb.append("...");
-        return sb.toString();
     }
 
     @SuppressLint("HandlerLeak")

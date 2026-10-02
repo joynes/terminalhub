@@ -27,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -365,6 +366,14 @@ fun SessionHostScreen(
         }
         pendingVoiceInputProjectId = null
     }
+    var showPinnedActions by remember { mutableStateOf(false) }
+    var pinnedInitiallyRecent by remember { mutableStateOf(false) }
+    val recentInput by remember(activeProjectId) {
+        activeProjectId?.let { viewModel.recentInput(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(initial = emptyList())
+    val pinnedActions by remember(activeProjectId) {
+        activeProjectId?.let { viewModel.pinnedActions(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
+    }.collectAsState(initial = emptyList())
     val textInputHistory by remember(activeProjectId) {
         activeProjectId?.let { viewModel.textInputHistory(it) } ?: kotlinx.coroutines.flow.flowOf(emptyList())
     }.collectAsState(initial = emptyList())
@@ -448,6 +457,37 @@ fun SessionHostScreen(
 
     fun sendTextInputToTerminal(text: String) {
         viewModel.sendTextInputToActive(text, executeTextInputOnSend)
+    }
+
+    if (showPinnedActions && activeProjectId != null) {
+        key(activeProjectId) {
+            PinnedActionsSheet(
+                projectId = activeProjectId,
+                pins = pinnedActions,
+                history = recentInput,
+                initiallyRecent = pinnedInitiallyRecent,
+                onDismiss = { showPinnedActions = false },
+                onPrepare = { text ->
+                    showPinnedActions = false
+                    textInputDraftByProject[activeProjectId] = TextFieldValue(text, TextRange(text.length))
+                    fileUploadVisibleByProject[activeProjectId] = false
+                    fileDownloadVisibleByProject[activeProjectId] = false
+                    textInputVisibleByProject[activeProjectId] = true
+                },
+                onSend = { action ->
+                    if (viewModel.sendTextInputToActive(action.text, action.sendEnter)) {
+                        showPinnedActions = false
+                        viewModel.usePinnedAction(action.id)
+                        Toast.makeText(context, "Sending ${action.name}", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Connect a terminal first", Toast.LENGTH_SHORT).show()
+                    }
+                },
+                onSave = { viewModel.savePinnedAction(it) },
+                onDeletePin = { viewModel.deletePinnedAction(it) },
+                onDeleteHistory = { viewModel.deleteHistory(it) }
+            )
+        }
     }
 
     fun syncRemotePty(tv: TerminalView, force: Boolean = false) {
@@ -976,6 +1016,8 @@ fun SessionHostScreen(
                                     TerminalViewClientImpl(
                                         modifierManager = modifierManager,
                                         onSendToSsh = { bytes -> viewModel.sendBytesToActive(bytes) },
+                                        recordInput = viewModel.sessionManager::recordUserInput,
+                                        recordPaste = viewModel.sessionManager::recordUserPaste,
                                         onTerminalTap = {
                                             keyboardVisible = true
                                             showKeyboard()
@@ -1212,8 +1254,9 @@ fun SessionHostScreen(
                                     showKeyboard()
                                 },
                                 history = textInputHistory,
-                                onSaveHistory = { text ->
-                                    viewModel.saveTextInput(textInputProjectId, text)
+                                onOpenHistory = {
+                                    pinnedInitiallyRecent = true
+                                    showPinnedActions = true
                                 },
                                 bottomAvoidanceDp = bottomBarReservedHeight,
                                 panelOpacity = textInputPanelOpacity,
@@ -1316,7 +1359,6 @@ fun SessionHostScreen(
                                         keyStr == "\r" -> {
                                             val draft = textInputDraftByProject[activeProjectId] ?: TextFieldValue()
                                             if (draft.text.isNotEmpty()) {
-                                                viewModel.saveTextInput(activeProjectId, draft.text)
                                                 textInputDraftByProject[activeProjectId] = TextFieldValue()
                                                 textInputVisibleByProject[activeProjectId] = false
                                                 sendTextInputToTerminal(draft.text)
@@ -1333,7 +1375,11 @@ fun SessionHostScreen(
                             },
                             onPaste = {
                                 val text = clipboardManager.getText()?.text ?: return@SpecialKeyBar
-                                viewModel.sendBytesToActive(text.toByteArray(Charsets.UTF_8))
+                                viewModel.pasteTextToActive(text)
+                            },
+                            onPinnedActions = {
+                                pinnedInitiallyRecent = false
+                                showPinnedActions = true
                             },
                             onTextInput = {
                                 activeProjectId?.let { projectId ->

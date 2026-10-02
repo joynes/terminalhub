@@ -100,3 +100,16 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("ALTER TABLE projects_new RENAME TO projects")
     }
 }
+
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS pinned_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL, text TEXT NOT NULL, scope TEXT NOT NULL,
+                projectId INTEGER, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL,
+                usageCount INTEGER NOT NULL, lastUsedAt INTEGER, sendEnter INTEGER NOT NULL
+            )
+        """.trimIndent())
+    }
+}

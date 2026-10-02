@@ -15,8 +15,6 @@ import kotlinx.coroutines.withTimeoutOrNull
 import com.termux.terminal.TerminalSession
 import java.io.File
 import se.joynes.terminalhub.BuildConfig
-import se.joynes.terminalhub.data.db.dao.TextInputHistoryDao
-import se.joynes.terminalhub.data.db.entity.TextInputHistoryEntity
 import se.joynes.terminalhub.data.logging.AppLogger
 import se.joynes.terminalhub.data.logging.LogLevel
 import se.joynes.terminalhub.data.model.LOCAL_PROJECT_SERVER_ID
@@ -165,7 +163,7 @@ class SessionHostViewModel @Inject constructor(
     private val sshManager: SshManager,
     private val engine: ScriptTemplateEngine,
     val sessionManager: TerminalSessionManager,
-    private val textInputHistoryDao: TextInputHistoryDao,
+    private val inputActions: se.joynes.terminalhub.data.repository.InputActionsRepository,
     private val settingsRepository: AppSettingsRepository,
     private val runtimeRepository: AppRuntimeRepository,
     private val knownHosts: KnownHostRepository,
@@ -970,9 +968,9 @@ class SessionHostViewModel @Inject constructor(
      * start the delay before Enter. ViewModel scope keeps the submission alive across IME-driven
      * recomposition or configuration changes.
      */
-    fun sendTextInputToActive(text: String, executeImmediately: Boolean) {
+    fun sendTextInputToActive(text: String, executeImmediately: Boolean): Boolean {
         val submission = terminalTextInputSubmission(text, executeImmediately)
-        val targetSessionId = sessionManager.pasteTextToActive(submission.pasteText) ?: return
+        val targetSessionId = sessionManager.pasteTextToActive(submission.pasteText, completedText = text) ?: return false
         if (submission.sendEnter) {
             viewModelScope.launch {
                 sessionManager.awaitPendingWrites(targetSessionId)
@@ -983,20 +981,22 @@ class SessionHostViewModel @Inject constructor(
                 )
             }
         }
+        return true
     }
     fun resizeActivePty(cols: Int, rows: Int) = sessionManager.resizeActivePty(cols, rows)
 
-    /** Returns the last 10 text-input history entries for a given project. */
+    /** Local user-input history; never derived from terminal output. */
     fun textInputHistory(projectId: Long): Flow<List<String>> =
-        textInputHistoryDao.getRecentForProject(projectId)
+        inputActions.history(projectId)
             .map { list -> list.map { it.text } }
 
-    fun saveTextInput(projectId: Long, text: String) {
-        viewModelScope.launch {
-            textInputHistoryDao.insert(TextInputHistoryEntity(projectId = projectId, text = text))
-            textInputHistoryDao.pruneOldest(projectId)
-        }
-    }
+    fun recentInput(projectId: Long) = inputActions.history(projectId)
+    fun pinnedActions(projectId: Long) = inputActions.pins(projectId)
+    fun savePinnedAction(action: se.joynes.terminalhub.data.db.entity.PinnedActionEntity) =
+        viewModelScope.launch { inputActions.savePin(action) }
+    fun deletePinnedAction(id: Long) = viewModelScope.launch { inputActions.deletePin(id) }
+    fun deleteHistory(id: Long) = viewModelScope.launch { inputActions.deleteHistory(id) }
+    fun usePinnedAction(id: Long) = viewModelScope.launch { inputActions.markUsed(id) }
 
     fun setPreferFastResume(enabled: Boolean) = settingsRepository.setPreferFastResume(enabled)
 
