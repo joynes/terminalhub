@@ -73,13 +73,12 @@ class SpecialKeyBarFeedbackTest {
     }
 
     @Test
-    fun microphoneKeyInvokesVoiceInput() {
+    fun defaultMicrophoneKeyInvokesVoiceInput() {
         var launches = 0
         composeRule.setContent {
             TerminalHubTheme {
                 SpecialKeyBar(
                     modifierManager = MutableModifierManager(),
-                    rows = listOf(listOf("VOICE_INPUT")),
                     onKey = {},
                     onVoiceInput = { launches++ }
                 )

@@ -959,6 +959,9 @@ class SessionHostViewModel @Inject constructor(
 
     fun pasteTextToActive(text: String): TerminalSessionId? = sessionManager.pasteTextToActive(text)
 
+    fun pasteVoiceInputToProject(projectId: Long, text: String): TerminalSessionId? =
+        sessionManager.pasteTextToProject(projectId, text)
+
     fun sendBytesToSession(id: TerminalSessionId, bytes: ByteArray) =
         sessionManager.sendBytesToSession(id, bytes)
 

@@ -52,4 +52,20 @@ internal fun preferredRecognizedSpeech(results: List<String>?): String? =
 internal fun voiceInputDraftAfterResult(draft: TextFieldValue, recognizedText: String?): TextFieldValue =
     if (recognizedText == null) draft else insertTextAtCursor(draft, recognizedText)
 
+internal data class VoiceInputResult(
+    val draft: TextFieldValue,
+    val editorVisible: Boolean,
+    val terminalPaste: String?
+)
+
+internal fun voiceInputResult(
+    draft: TextFieldValue,
+    editorWasVisible: Boolean,
+    recognizedText: String?
+): VoiceInputResult = if (editorWasVisible) {
+    VoiceInputResult(voiceInputDraftAfterResult(draft, recognizedText), true, null)
+} else {
+    VoiceInputResult(draft, false, recognizedText)
+}
+
 internal fun uploadedFileNamesText(fileNames: List<String>): String = fileNames.joinToString(" ")

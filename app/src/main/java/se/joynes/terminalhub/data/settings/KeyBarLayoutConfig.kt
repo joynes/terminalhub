@@ -92,7 +92,7 @@ object KeyBarLayoutConfig {
 
     val defaultRows: List<List<String>> = listOf(
         listOf("ESC", "TAB", "COLON", "SLASH", "AT", "DIGIT_1", "DIGIT_2", "DIGIT_3", "DOWNLOAD", "UP", "ENTER"),
-        listOf("CTRL", "ALT", "SHIFT", "KEYBOARD", "TEXT_INPUT", "UPLOAD", "LEFT", "DOWN", "RIGHT")
+        listOf("CTRL", "ALT", "SHIFT", "KEYBOARD", "TEXT_INPUT", "VOICE_INPUT", "UPLOAD", "LEFT", "DOWN", "RIGHT")
     )
 
     val defaultHighlightedKeyIds: Set<String> = linkedSetOf("TEXT_INPUT", "UPLOAD", "DOWNLOAD")

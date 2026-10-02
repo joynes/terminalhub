@@ -354,10 +354,14 @@ fun SessionHostScreen(
             null
         }
         if (projectId != null) {
-            textInputDraftByProject[projectId] = voiceInputDraftAfterResult(pendingVoiceInputDraft, recognizedText)
-            fileUploadVisibleByProject[projectId] = false
-            fileDownloadVisibleByProject[projectId] = false
-            textInputVisibleByProject[projectId] = pendingVoiceInputWasVisible || recognizedText != null
+            val inputResult = voiceInputResult(pendingVoiceInputDraft, pendingVoiceInputWasVisible, recognizedText)
+            textInputDraftByProject[projectId] = inputResult.draft
+            textInputVisibleByProject[projectId] = inputResult.editorVisible
+            inputResult.terminalPaste?.let { text ->
+                if (viewModel.pasteVoiceInputToProject(projectId, text) == null) {
+                    Toast.makeText(context, "Session is no longer available", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
         pendingVoiceInputProjectId = null
     }

@@ -335,6 +335,16 @@ class TerminalSessionManager @Inject constructor(
      */
     fun pasteTextToActive(text: String): TerminalSessionId? {
         val id = _activeId.value ?: return null
+        return pasteTextToSession(id, text)
+    }
+
+    /** Paste dictation into its original project even if the active tab changed. */
+    fun pasteTextToProject(projectId: Long, text: String): TerminalSessionId? {
+        val id = entries.values.firstOrNull { it.meta.projectId == projectId }?.meta?.id ?: return null
+        return pasteTextToSession(id, text)
+    }
+
+    private fun pasteTextToSession(id: TerminalSessionId, text: String): TerminalSessionId? {
         val entry = entries[id.value] ?: return null
         val emulator = entry.terminalSession.emulator
         if (emulator != null) {

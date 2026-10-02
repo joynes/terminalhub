@@ -8,6 +8,35 @@ import org.junit.Test
 class TextInputDraftStateTest {
 
     @Test
+    fun `closed editor routes dictation to terminal without opening editor or changing saved draft`() {
+        val savedDraft = TextFieldValue("unfinished note", TextRange(4))
+        val result = voiceInputResult(savedDraft, false, "spoken text")
+        assertEquals(savedDraft, result.draft)
+        assertEquals(false, result.editorVisible)
+        assertEquals("spoken text", result.terminalPaste)
+    }
+
+    @Test
+    fun `open editor inserts dictation at selection and sends nothing to terminal`() {
+        val result = voiceInputResult(TextFieldValue("old text", TextRange(0, 3)), true, "new")
+        assertEquals("new text", result.draft.text)
+        assertEquals(TextRange(3), result.draft.selection)
+        assertEquals(true, result.editorVisible)
+        assertEquals(null, result.terminalPaste)
+    }
+
+    @Test
+    fun `cancelled dictation preserves original destination and sends nothing`() {
+        val savedDraft = TextFieldValue("keep", TextRange(1))
+        for (wasVisible in listOf(false, true)) {
+            val result = voiceInputResult(savedDraft, wasVisible, null)
+            assertEquals(savedDraft, result.draft)
+            assertEquals(wasVisible, result.editorVisible)
+            assertEquals(null, result.terminalPaste)
+        }
+    }
+
+    @Test
     fun `repeated dictation preserves text and ignores stale keyboard update during recording`() {
         val first = voiceInputDraftAfterResult(TextFieldValue(), "first")
         val positioned = first.copy(text = "first end", selection = TextRange(5))

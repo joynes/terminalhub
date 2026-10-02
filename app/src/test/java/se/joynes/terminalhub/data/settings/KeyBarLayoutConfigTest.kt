@@ -7,6 +7,14 @@ import org.junit.Test
 class KeyBarLayoutConfigTest {
 
     @Test
+    fun `fresh install shows microphone beside text input without changing custom layouts`() {
+        val defaultRow = KeyBarLayoutConfig.decode(null).first { "TEXT_INPUT" in it }
+        assertEquals("VOICE_INPUT", defaultRow[defaultRow.indexOf("TEXT_INPUT") + 1])
+        val custom = "CTRL,CHAR_C|ENTER,UP"
+        assertEquals(listOf(listOf("CTRL", "CHAR_C"), listOf("ENTER", "UP")), KeyBarLayoutConfig.decode(custom))
+    }
+
+    @Test
     fun `default layout survives persistence round trip`() {
         val encoded = KeyBarLayoutConfig.encode(KeyBarLayoutConfig.defaultRows)
 
