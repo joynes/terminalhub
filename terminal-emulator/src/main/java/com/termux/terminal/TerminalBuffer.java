@@ -180,30 +180,33 @@ public final class TerminalBuffer {
      * is not enough to reconstruct what the user sees as one link.
      */
     public String getUrlCandidateAtLocation(int x, int y) {
-        String candidate = getWrappedWordAtLocation(x, y);
-        if (candidate.isEmpty()) return candidate;
-
         int minRow = -getActiveTranscriptRows();
         int maxRow = mScreenRows - 1;
+        if (x < 0 || x >= mColumns || y < minRow || y > maxRow) return "";
+        String candidate = getPhysicalWordAtLocation(x, y);
+        if (candidate.isEmpty()) return candidate;
+
+        // Work on physical token boundaries, not the whole soft-wrapped paragraph. Renderers
+        // may pad a row and indent its continuation even when the terminal wrap flag is set.
         int firstRow = y;
-        while (firstRow > minRow && getLineWrap(firstRow - 1)) firstRow--;
         int lastRow = y;
-        while (lastRow < maxRow && getLineWrap(lastRow)) lastRow++;
 
         // If the tap was on a continuation row, walk backwards until the URL scheme is found.
         int joinedRows = 0;
-        while (TerminalUrlFinder.find(candidate) == null && firstRow > minRow && joinedRows < 8) {
+        while (TerminalUrlFinder.find(candidate) == null && firstRow > minRow &&
+            (joinedRows < 8 || getLineWrap(firstRow - 1))) {
+            if (!candidate.startsWith(firstToken(rowText(firstRow)))) break;
             int previousRow = firstRow - 1;
             String previousToken = lastToken(rowText(previousRow));
             if (previousToken.isEmpty() || !looksLikeHardWrappedBoundary(previousRow, previousToken)) break;
             candidate = previousToken + candidate;
             firstRow = previousRow;
-            while (firstRow > minRow && getLineWrap(firstRow - 1)) firstRow--;
-            joinedRows++;
+            if (!getLineWrap(previousRow)) joinedRows++;
         }
 
         // Continue forward while the preceding row ends where a renderer would wrap a long URL.
-        while (TerminalUrlFinder.find(candidate) != null && lastRow < maxRow && joinedRows < 8) {
+        while ((TerminalUrlFinder.find(candidate) != null || isUrlPrefix(candidate)) && lastRow < maxRow &&
+            (joinedRows < 8 || getLineWrap(lastRow))) {
             int nextRow = lastRow + 1;
             String nextToken = firstToken(rowText(nextRow));
             if (!candidateEndsAtRowBoundary(candidate, lastRow) ||
@@ -212,12 +215,37 @@ public final class TerminalBuffer {
                 break;
             }
             candidate += nextToken;
+            if (!getLineWrap(lastRow)) joinedRows++;
             lastRow = nextRow;
-            while (lastRow < maxRow && getLineWrap(lastRow)) lastRow++;
-            joinedRows++;
         }
 
         return candidate;
+    }
+
+    private String getPhysicalWordAtLocation(int x, int y) {
+        String cell = getSelectedText(x, y, x, y, false, false);
+        if (cell.isEmpty() || Character.isWhitespace(cell.charAt(0))) return "";
+        String text = rowText(y);
+        int offset = getSelectedText(0, y, x, y, false, false).length() - cell.length();
+        if (offset < 0 || offset >= text.length()) return "";
+        int start = offset;
+        while (start > 0 && !Character.isWhitespace(text.charAt(start - 1))) start--;
+        int end = offset + 1;
+        while (end < text.length() && !Character.isWhitespace(text.charAt(end))) end++;
+        return text.substring(start, end);
+    }
+
+    private static boolean isUrlPrefix(String text) {
+        String lower = text.toLowerCase(java.util.Locale.ROOT);
+        for (String scheme : new String[]{"https://", "http://", "www."}) {
+            for (int length = 1; length <= scheme.length(); length++) {
+                String prefix = scheme.substring(0, length);
+                int start = lower.length() - length;
+                if (lower.endsWith(prefix) && (start == 0 ||
+                    !Character.isLetterOrDigit(lower.charAt(start - 1)))) return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -232,7 +260,11 @@ public final class TerminalBuffer {
 
     private boolean looksLikeHardWrappedBoundary(int previousRow, String textBeforeBoundary) {
         int lastColumn = lastNonWhitespaceColumn(previousRow);
-        boolean nearRightEdge = lastColumn >= mColumns - 6;
+        String nextRowText = previousRow + 1 < mScreenRows ? rowText(previousRow + 1) : "";
+        boolean nearRightEdge = getLineWrap(previousRow)
+            ? lastColumn == mColumns - 1 && !nextRowText.isEmpty() &&
+                !Character.isWhitespace(nextRowText.charAt(0))
+            : lastColumn >= mColumns - 6;
         boolean explicitContinuation = textBeforeBoundary.endsWith(".") ||
             textBeforeBoundary.endsWith("/") || textBeforeBoundary.endsWith("-") ||
             textBeforeBoundary.endsWith("?") || textBeforeBoundary.endsWith("&") ||

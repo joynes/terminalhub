@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import se.joynes.terminalhub.data.db.entity.PinnedActionEntity
 import se.joynes.terminalhub.data.db.entity.TextInputHistoryEntity
+import se.joynes.terminalhub.data.model.pinnedActionName
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -41,7 +42,7 @@ fun PinnedActionsSheet(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilterChip(selected = !recent, onClick = { recent = false }, label = { Text("★ Pinned") })
                 FilterChip(selected = recent, onClick = { recent = true }, label = { Text("Recent") })
-                TextButton(onClick = { editing = PinnedActionEntity(name = "", text = "", projectId = projectId) }) { Text("New") }
+                TextButton(onClick = { editing = PinnedActionEntity(name = "", text = "", scope = "GLOBAL") }) { Text("New") }
             }
             Text(
                 if (recent) "Tap to edit. Hold to pin, copy or delete. History is local to this device and may contain sensitive input."
@@ -91,7 +92,7 @@ fun PinnedActionsSheet(
                     Text(textInputHistoryPreview(entry.text), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     TextButton(onClick = {
                         selectedHistory = null
-                        editing = PinnedActionEntity(name = "", text = entry.text, projectId = projectId)
+                        editing = PinnedActionEntity(name = "", text = entry.text, scope = "GLOBAL")
                     }) { Text("Pin") }
                     TextButton(onClick = { clipboard.setText(AnnotatedString(entry.text)); selectedHistory = null }) { Text("Copy") }
                     TextButton(onClick = { selectedHistory = null; onPrepare(entry.text) }) { Text("Edit in Text Input") }
@@ -126,7 +127,8 @@ fun PinnedActionsSheet(
                 title = { Text(if (initial.id == 0L) "Pin action" else "Edit action") },
                 text = {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item { OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true) }
+                        item { OutlinedTextField(name, { name = it }, label = { Text("Name (optional)") },
+                            placeholder = { Text(pinnedActionName("", text), maxLines = 1, overflow = TextOverflow.Ellipsis) }, singleLine = true) }
                         item { OutlinedTextField(text, { text = it }, label = { Text("Input") }, minLines = 2, maxLines = 5) }
                         item {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -144,8 +146,8 @@ fun PinnedActionsSheet(
                     }
                 },
                 confirmButton = {
-                    TextButton(enabled = name.isNotBlank() && text.isNotBlank(), onClick = {
-                        onSave(initial.copy(name = name, text = text, scope = if (global) "GLOBAL" else "PROJECT", projectId = if (global) null else projectId, sendEnter = sendEnter))
+                    TextButton(enabled = text.isNotBlank(), onClick = {
+                        onSave(initial.copy(name = pinnedActionName(name, text), text = text, scope = if (global) "GLOBAL" else "PROJECT", projectId = if (global) null else projectId, sendEnter = sendEnter))
                         editing = null
                         recent = false
                     }) { Text("Save") }

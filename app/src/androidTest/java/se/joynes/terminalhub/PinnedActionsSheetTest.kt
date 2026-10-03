@@ -36,13 +36,13 @@ class PinnedActionsSheetTest {
         rule.onNodeWithText("Recent").performClick()
         rule.onNodeWithText("git status").performTouchInput { longClick() }
         rule.onNodeWithText("Pin", useUnmergedTree = true).performClick()
-        rule.onNodeWithText("Name").performTextInput("Status")
+        rule.onNodeWithText("Name (optional)").performTextInput("Status")
         rule.onNodeWithText("Save").performClick()
         rule.onNodeWithText("Status").performClick()
         rule.runOnIdle {
             assertEquals("git status", sent?.text)
-            assertEquals("PROJECT", sent?.scope)
-            assertEquals(1L, sent?.projectId)
+            assertEquals("GLOBAL", sent?.scope)
+            assertNull(sent?.projectId)
             assertEquals(true, sent?.sendEnter)
         }
     }
@@ -61,7 +61,7 @@ class PinnedActionsSheetTest {
         rule.runOnIdle { assertEquals("hello", prepared) }
         rule.onNodeWithText("Draft").performTouchInput { longClick() }
         rule.onNodeWithText("Edit action").performClick()
-        rule.onNodeWithText("Name").performTextReplacement("Renamed")
+        rule.onNodeWithText("Name (optional)").performTextReplacement("Renamed")
         rule.onNodeWithText("Project", useUnmergedTree = true).performClick()
         rule.onNodeWithText("Save").performClick()
         rule.runOnIdle { assertEquals(1L, pins.single().projectId); assertEquals("PROJECT", pins.single().scope) }
@@ -83,5 +83,43 @@ class PinnedActionsSheetTest {
         rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("input 25"))
         rule.onNodeWithText("input 25").performClick()
         rule.runOnIdle { assertEquals("input 25", prepared) }
+    }
+
+    @Test fun unnamedHistoryPinUsesInputAsNameAndDefaultsToGlobal() {
+        var saved: PinnedActionEntity? = null
+        rule.setContent {
+            TerminalHubTheme {
+                PinnedActionsSheet(1, emptyList(), listOf(TextInputHistoryEntity(id = 1, projectId = 1, text = "git status")),
+                    initiallyRecent = true, onDismiss = {}, onPrepare = {}, onSend = {}, onSave = { saved = it }, onDeletePin = {}, onDeleteHistory = {})
+            }
+        }
+        rule.onNodeWithText("git status").performTouchInput { longClick() }
+        rule.onNodeWithText("Pin", useUnmergedTree = true).performClick()
+        rule.onNodeWithText("Save").performClick()
+        rule.runOnIdle {
+            assertEquals("git status", saved?.name)
+            assertEquals("GLOBAL", saved?.scope)
+            assertNull(saved?.projectId)
+        }
+    }
+
+    @Test fun newActionCanBeSavedWithoutNameButNotWithoutInput() {
+        var saved: PinnedActionEntity? = null
+        rule.setContent {
+            TerminalHubTheme {
+                PinnedActionsSheet(1, emptyList(), emptyList(), onDismiss = {}, onPrepare = {}, onSend = {},
+                    onSave = { saved = it }, onDeletePin = {}, onDeleteHistory = {})
+            }
+        }
+        rule.onNodeWithText("New").performClick()
+        rule.onNodeWithText("Save").assertIsNotEnabled()
+        rule.onNodeWithText("Input").performTextInput("run tests\nthen report")
+        rule.onNodeWithText("Save").performClick()
+        rule.runOnIdle {
+            assertEquals("run tests", saved?.name)
+            assertEquals("run tests\nthen report", saved?.text)
+            assertEquals("GLOBAL", saved?.scope)
+            assertNull(saved?.projectId)
+        }
     }
 }

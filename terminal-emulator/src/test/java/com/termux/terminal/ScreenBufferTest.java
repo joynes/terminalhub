@@ -123,4 +123,36 @@ public class ScreenBufferTest extends TerminalTestCase {
 			TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(5, 1))
 		);
 	}
+
+	public void testUrlAcrossPaddedSoftWrappedRowsWithFollowingProse() {
+		String first = "  inne i Music (https://joynes.github.io/";
+		withTerminalSized(48, 5).enterString(
+			first + " ".repeat(48 - first.length()) +
+			"  joynes.se/#music). Den separata AI-sektionen är borttagen."
+		);
+		assertEquals("https://joynes.github.io/joynes.se/#music",
+			TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(20, 0)));
+		assertEquals("https://joynes.github.io/joynes.se/#music",
+			TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(5, 1)));
+		assertNull(TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(27, 1)));
+	}
+
+	public void testUrlSchemeAndPathCanSoftWrapAtAnyColumn() {
+		String url = "https://example.com/a/very/long/path?value=123";
+		for (int padding = 0; padding < 16; padding++) {
+			withTerminalSized(16, 6).enterString(" ".repeat(padding) + url + " done");
+			for (int index = 0; index < url.length(); index++) {
+				int cell = padding + index;
+				assertEquals("padding=" + padding + " index=" + index, url,
+					TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(cell % 16, cell / 16)));
+			}
+		}
+	}
+
+	public void testNativeWrappedUrlLongerThanEightRows() {
+		String url = "https://example.com/" + "segment/".repeat(18) + "#music";
+		withTerminalSized(16, 16).enterString(url);
+		assertEquals(url, TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(3, 0)));
+		assertEquals(url, TerminalUrlFinder.find(mTerminal.getScreen().getUrlCandidateAtLocation(3, 9)));
+	}
 }

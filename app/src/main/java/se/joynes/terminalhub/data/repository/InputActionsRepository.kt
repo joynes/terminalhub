@@ -39,10 +39,10 @@ class InputActionsRepository @Inject constructor(
     suspend fun deletePin(id: Long) = pins.delete(id)
     suspend fun markUsed(id: Long) = pins.markUsed(id, System.currentTimeMillis())
     suspend fun savePin(action: PinnedActionEntity) {
-        require(action.name.isNotBlank() && action.text.isNotBlank())
+        require(action.text.isNotBlank())
         require(action.scope == "GLOBAL" || (action.scope == "PROJECT" && action.projectId != null))
         pins.save(action.copy(
-            name = action.name.trim(),
+            name = se.joynes.terminalhub.data.model.pinnedActionName(action.name, action.text),
             projectId = if (action.scope == "GLOBAL") null else action.projectId,
             updatedAt = System.currentTimeMillis()
         ))

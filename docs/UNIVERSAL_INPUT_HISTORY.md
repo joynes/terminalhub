@@ -8,7 +8,10 @@ The **Recent** tab and Text Input's **HISTORY** button show this project's recen
 input. Tap an entry to edit it. Hold it to Pin, Copy, Edit or Delete. Initially 20
 entries are shown; Show more reveals older entries, up to 100 per project.
 
-When pinning, enter a name and choose Project or Global. With **Send immediately
+When pinning, Global is selected by default; choose Project for a project-only action.
+The name is optional: an empty name uses the first nonblank input line, shortened
+to 40 characters when needed. Existing pins keep their name and scope.
+With **Send immediately
 with Enter** enabled, tapping the action pastes its content and sends Enter
 separately after the existing write synchronization and delay. With it disabled,
 the action opens an editable Text Input draft. Hold an action to edit its name,
