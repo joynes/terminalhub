@@ -12,6 +12,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import se.joynes.terminalhub.data.db.AppDatabase
 import se.joynes.terminalhub.data.db.MIGRATION_9_10
+import se.joynes.terminalhub.data.db.MIGRATION_10_11
 import se.joynes.terminalhub.data.db.entity.*
 import se.joynes.terminalhub.data.export.decodePinnedActions
 import se.joynes.terminalhub.data.export.encodePinnedActions
@@ -62,7 +63,7 @@ class InputActionsStorageTest {
 
     @Test fun migrationFrom9PreservesExistingProjectAndHistory() = runBlocking {
         val name = "pins-migration-${System.nanoTime()}.db"
-        fun open() = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_9_10).build()
+        fun open() = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_9_10, MIGRATION_10_11).build()
         try {
             open().let { db ->
                 db.openHelper.writableDatabase.execSQL("INSERT INTO projects (id,serverId,targetType,name,useTmux,customScript,aiCommand,colorSeed,createdAt,gitUrl,lastOpenedAt) VALUES (7,1,'ssh','kept',1,'cd project','',0,123,'',0)")
@@ -71,6 +72,7 @@ class InputActionsStorageTest {
             }
             SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
                 it.execSQL("DROP TABLE pinned_actions")
+                it.execSQL("DROP TABLE project_notes")
                 it.version = 9
             }
             open().let { db ->

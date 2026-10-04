@@ -76,6 +76,7 @@ object KeyBarLayoutConfig {
                 KeyBarKeyDefinition("TEXT_INPUT", "TEXT", "Actions"),
                 KeyBarKeyDefinition("VOICE_INPUT", "MICROPHONE", "Actions"),
                 KeyBarKeyDefinition("PINNED_ACTIONS", "PINNED ACTIONS", "Actions"),
+                KeyBarKeyDefinition("PROJECT_NOTES", "PROJECT NOTES", "Actions"),
                 KeyBarKeyDefinition("UPLOAD", "UPLOAD", "Actions"),
                 KeyBarKeyDefinition("DOWNLOAD", "DOWNLOAD", "Actions"),
                 KeyBarKeyDefinition("PASTE", "PASTE", "Actions")
@@ -92,7 +93,7 @@ object KeyBarLayoutConfig {
     private val definitionsById = availableKeys.associateBy { it.id }
 
     val defaultRows: List<List<String>> = listOf(
-        listOf("ESC", "TAB", "COLON", "SLASH", "AT", "DIGIT_1", "PINNED_ACTIONS", "DIGIT_3", "DOWNLOAD", "UP", "ENTER"),
+        listOf("ESC", "TAB", "COLON", "SLASH", "AT", "DIGIT_1", "PINNED_ACTIONS", "PROJECT_NOTES", "DOWNLOAD", "UP", "ENTER"),
         listOf("CTRL", "ALT", "SHIFT", "KEYBOARD", "TEXT_INPUT", "VOICE_INPUT", "UPLOAD", "LEFT", "DOWN", "RIGHT")
     )
 
@@ -113,7 +114,10 @@ object KeyBarLayoutConfig {
 
     fun decode(encoded: String?): List<List<String>> {
         if (encoded.isNullOrBlank()) return defaultRows
-        return normalize(encoded.split('|').map { row -> row.split(',').filter(String::isNotBlank) })
+        val decoded = normalize(encoded.split('|').map { row -> row.split(',').filter(String::isNotBlank) })
+        // Upgrade only the exact previous factory layout; never alter a custom keybar.
+        val previousDefault = defaultRows.map { row -> row.map { if (it == "PROJECT_NOTES") "DIGIT_3" else it } }
+        return if (decoded == previousDefault) defaultRows else decoded
     }
 
     fun normalizeHighlights(keyIds: Set<String>): Set<String> = availableKeys

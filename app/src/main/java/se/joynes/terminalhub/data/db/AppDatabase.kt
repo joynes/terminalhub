@@ -12,9 +12,10 @@ import se.joynes.terminalhub.data.db.entity.*
         SessionLogEntity::class,
         AppLogEntity::class,
         TextInputHistoryEntity::class,
-        PinnedActionEntity::class
+        PinnedActionEntity::class,
+        ProjectNoteEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -24,4 +25,5 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun appLogDao(): AppLogDao
     abstract fun textInputHistoryDao(): TextInputHistoryDao
     abstract fun pinnedActionDao(): PinnedActionDao
+    abstract fun projectNoteDao(): ProjectNoteDao
 }

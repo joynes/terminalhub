@@ -161,6 +161,10 @@ fun SessionHostScreen(
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
     val exportImportViewModel: ExportImportViewModel = hiltViewModel()
+    val notesViewModel: ProjectNotesViewModel = hiltViewModel()
+    var showProjectNotes by rememberSaveable { mutableStateOf(false) }
+    var showExportOptions by remember { mutableStateOf(false) }
+    var includeLocalNotes by remember { mutableStateOf(false) }
     val exportImportState by exportImportViewModel.state.collectAsState()
 
     LaunchedEffect(Unit) {
@@ -277,7 +281,8 @@ fun SessionHostScreen(
             exportImportViewModel.export(
                 context,
                 it,
-                activeProjectIds = projectTabs.map { tab -> tab.projectId }.toSet()
+                activeProjectIds = projectTabs.map { tab -> tab.projectId }.toSet(),
+                includeLocalNotes = includeLocalNotes
             )
         }
     }
@@ -285,6 +290,26 @@ fun SessionHostScreen(
     val importLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri -> uri?.let { exportImportViewModel.import(context, it) } }
+
+    if (showExportOptions) AlertDialog(
+        onDismissRequest = { showExportOptions = false },
+        title = { Text("Export configuration") },
+        text = {
+            Column {
+                Text("SSH notes stay on your server and are not included. Restore the same server and project path to recover them.")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = includeLocalNotes, onCheckedChange = { includeLocalNotes = it })
+                    Text("Include local project notes")
+                }
+                Text("Local notes cannot survive uninstall without a backup. If included, private note text is readable in this file.")
+            }
+        },
+        confirmButton = { TextButton(onClick = {
+            showExportOptions = false
+            exportLauncher.launch("terminalhub_backup.yaml")
+        }) { Text("EXPORT") } },
+        dismissButton = { TextButton(onClick = { showExportOptions = false }) { Text("CANCEL") } }
+    )
 
     LaunchedEffect(exportImportState) {
         when (val s = exportImportState) {
@@ -339,6 +364,19 @@ fun SessionHostScreen(
             activeTab.sessionId != null
     )
     val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
+    val activeNoteState by remember(activeProjectId) {
+        activeProjectId?.let(notesViewModel.notes::observe)
+            ?: kotlinx.coroutines.flow.flowOf(se.joynes.terminalhub.data.notes.ProjectNoteState())
+    }.collectAsState(initial = se.joynes.terminalhub.data.notes.ProjectNoteState())
+    LaunchedEffect(activeProjectId, activeTab?.isConnected, showProjectNotes) {
+        activeProjectId?.let(notesViewModel::open)
+    }
+    var previouslyConnectedNoteProjects by remember { mutableStateOf(emptySet<Long>()) }
+    LaunchedEffect(projectTabs.map { it.projectId to it.isConnected }) {
+        val connected = projectTabs.filter { it.isConnected }.map { it.projectId }.toSet()
+        (connected - previouslyConnectedNoteProjects).forEach(notesViewModel::open)
+        previouslyConnectedNoteProjects = connected
+    }
     val activeTextInputDraft = activeProjectId?.let { textInputDraftByProject[it] } ?: TextFieldValue()
     val activeFileUploadVisible = activeProjectId?.let { fileUploadVisibleByProject[it] == true } ?: false
     val activeFileUploadSelectedUri = activeProjectId?.let { fileUploadSelectedUriByProject[it] }
@@ -590,13 +628,14 @@ fun SessionHostScreen(
                 keyboardVisible = true
                 tv?.requestFocus()
             } else if (event == Lifecycle.Event.ON_STOP) {
+                notesViewModel.flush()
                 keyboardVisible = false
                 hideKeyboard()
                 tv?.clearFocus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose { notesViewModel.flush(); lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     if (showSessionHistory) {
@@ -868,7 +907,8 @@ fun SessionHostScreen(
                             },
                             onClick = {
                                 showSettingsMenu = false
-                                exportLauncher.launch("terminalhub_backup.yaml")
+                                includeLocalNotes = false
+                                showExportOptions = true
                             }
                         )
                         DropdownMenuItem(
@@ -1230,6 +1270,20 @@ fun SessionHostScreen(
                             }
                         }
 
+                        if (showProjectNotes && activeProjectId != null) {
+                            key(activeProjectId) {
+                                ProjectNotesPanel(
+                                    projectName = activeTab?.projectName.orEmpty(),
+                                    state = activeNoteState,
+                                    onEdit = { notesViewModel.notes.edit(activeProjectId, it) },
+                                    onClear = { notesViewModel.notes.edit(activeProjectId, "", clear = true) },
+                                    onRetry = { notesViewModel.notes.retry(activeProjectId) },
+                                    onResolve = { notesViewModel.notes.resolve(activeProjectId, it) },
+                                    onClose = { showProjectNotes = false; notesViewModel.flush() },
+                                    modifier = Modifier.align(Alignment.BottomCenter)
+                                )
+                            }
+                        }
                         if (activeTextInputVisible && activeProjectId != null) {
                             val textInputProjectId = activeProjectId
                             FloatingTextInputDialog(
@@ -1384,7 +1438,17 @@ fun SessionHostScreen(
                                 pinnedInitiallyRecent = false
                                 showPinnedActions = true
                             },
+                            onProjectNotes = {
+                                showProjectNotes = !showProjectNotes
+                                if (showProjectNotes) activeProjectId?.let { projectId ->
+                                    textInputVisibleByProject[projectId] = false
+                                    fileUploadVisibleByProject[projectId] = false
+                                    fileDownloadVisibleByProject[projectId] = false
+                                    notesViewModel.open(projectId)
+                                } else notesViewModel.flush()
+                            },
                             onTextInput = {
+                                showProjectNotes = false
                                 activeProjectId?.let { projectId ->
                                     fileUploadVisibleByProject[projectId] = false
                                     fileDownloadVisibleByProject[projectId] = false
@@ -1395,6 +1459,7 @@ fun SessionHostScreen(
                                 activeProjectId?.let(::launchVoiceInput)
                             },
                             onFileUpload = {
+                                showProjectNotes = false
                                 activeProjectId?.let { projectId ->
                                     textInputVisibleByProject[projectId] = false
                                     fileDownloadVisibleByProject[projectId] = false
@@ -1405,6 +1470,7 @@ fun SessionHostScreen(
                                 }
                             },
                             onFileDownload = {
+                                showProjectNotes = false
                                 activeProjectId?.let { projectId ->
                                     textInputVisibleByProject[projectId] = false
                                     fileUploadVisibleByProject[projectId] = false

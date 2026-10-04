@@ -5,6 +5,13 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class KeyBarLayoutConfigTest {
+    @Test fun `notes replaces only the old factory digit three without changing custom rows`() {
+        val previousDefault = KeyBarLayoutConfig.defaultRows.map { row -> row.map { if (it == "PROJECT_NOTES") "DIGIT_3" else it } }
+        assertEquals(KeyBarLayoutConfig.defaultRows, KeyBarLayoutConfig.decode(KeyBarLayoutConfig.encode(previousDefault)))
+        val custom = listOf(listOf("DIGIT_3", "PROJECT_NOTES", "CHAR_C"))
+        assertEquals(custom, KeyBarLayoutConfig.decode(KeyBarLayoutConfig.encode(custom)))
+        assertEquals("PROJECT NOTES", KeyBarLayoutConfig.definition("PROJECT_NOTES")?.label)
+    }
 
     @Test
     fun `fresh install has pinned launcher replacing digit two and custom layout stays intact`() {

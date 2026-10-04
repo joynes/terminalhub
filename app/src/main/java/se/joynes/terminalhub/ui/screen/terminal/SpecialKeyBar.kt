@@ -40,6 +40,7 @@ fun SpecialKeyBar(
     onTextInput: () -> Unit = {},
     onVoiceInput: () -> Unit = {},
     onPinnedActions: () -> Unit = {},
+    onProjectNotes: () -> Unit = {},
     onFileUpload: () -> Unit = {},
     onFileDownload: () -> Unit = {},
     onKeyboardToggle: () -> Unit = {},
@@ -99,6 +100,7 @@ fun SpecialKeyBar(
             "TEXT_INPUT" -> onTextInput()
             "VOICE_INPUT" -> onVoiceInput()
             "PINNED_ACTIONS" -> onPinnedActions()
+            "PROJECT_NOTES" -> onProjectNotes()
             "UPLOAD" -> onFileUpload()
             "DOWNLOAD" -> onFileDownload()
             "PASTE" -> onPaste()
@@ -142,6 +144,7 @@ fun SpecialKeyBar(
                         label = compactLabel(keyId),
                         modifier = Modifier.weight(1f).semantics {
                             if (keyId == "PINNED_ACTIONS") contentDescription = "Pinned actions"
+                            if (keyId == "PROJECT_NOTES") contentDescription = "Project notes"
                         },
                         active = active,
                         highlighted = keyId in normalizedHighlights,
@@ -264,6 +267,7 @@ private fun compactLabel(keyId: String): String = when (keyId) {
     "TEXT_INPUT" -> "✎"
     "VOICE_INPUT" -> "🎙"
     "PINNED_ACTIONS" -> "★"
+    "PROJECT_NOTES" -> "NOTE"
     "UPLOAD" -> "+"
     "DOWNLOAD" -> "⇩"
     else -> KeyBarLayoutConfig.definition(keyId)?.label ?: keyId

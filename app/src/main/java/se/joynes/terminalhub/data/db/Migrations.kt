@@ -101,6 +101,19 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS project_notes (
+                projectId INTEGER PRIMARY KEY NOT NULL, text TEXT NOT NULL,
+                localUpdatedAt INTEGER NOT NULL, dirty INTEGER NOT NULL,
+                remoteKey TEXT, lastSyncedRemoteMtime INTEGER,
+                lastSyncedContentHash TEXT, syncError TEXT, pendingDelete INTEGER NOT NULL
+            )
+        """.trimIndent())
+    }
+}
+
 val MIGRATION_9_10 = object : Migration(9, 10) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("""

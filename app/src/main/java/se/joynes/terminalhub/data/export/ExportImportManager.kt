@@ -10,6 +10,14 @@ import se.joynes.terminalhub.data.db.AppDatabase
 import se.joynes.terminalhub.data.db.dao.TextInputHistoryDao
 import se.joynes.terminalhub.data.db.entity.ServerEntity
 import se.joynes.terminalhub.data.model.Project
+import se.joynes.terminalhub.data.model.ProjectTargetType
+import se.joynes.terminalhub.data.model.LOCAL_PROJECT_SERVER_ID
+import se.joynes.terminalhub.data.model.projectNameValidationError
+import se.joynes.terminalhub.data.db.entity.ProjectNoteEntity
+import se.joynes.terminalhub.data.notes.ProjectNotesRepository
+import se.joynes.terminalhub.data.notes.MAX_NOTE_BYTES
+import org.json.JSONArray
+import org.json.JSONObject
 import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
 import se.joynes.terminalhub.data.security.SecurePrefsManager
@@ -35,13 +43,16 @@ class ExportImportManager @Inject constructor(
     private val securePrefsManager: SecurePrefsManager,
     private val settingsRepository: AppSettingsRepository,
     private val runtimeRepository: AppRuntimeRepository,
-    private val sessionManager: TerminalSessionManager
+    private val sessionManager: TerminalSessionManager,
+    private val notesRepository: ProjectNotesRepository
 ) {
     // ── Serialization ───────────────────────────────────────────────────────
 
-    suspend fun exportYaml(context: Context, uri: Uri, activeProjectIds: Set<Long>? = null) {
+    suspend fun exportYaml(context: Context, uri: Uri, activeProjectIds: Set<Long>? = null, includeLocalNotes: Boolean = false) {
+        notesRepository.flush()
         val servers = serverRepo.getAll().first()
-        val yaml = buildYaml(servers) { server ->
+        val locals = projectRepo.getAll().first().filter { it.isLocal && (activeProjectIds == null || it.id in activeProjectIds) }
+        val yaml = buildYaml(servers, locals, includeLocalNotes) { server ->
             val projects = projectRepo.getByServer(server.id).first()
             activeProjectIds?.let { ids -> projects.filter { it.id in ids } } ?: projects
         }
@@ -52,6 +63,8 @@ class ExportImportManager @Inject constructor(
 
     private suspend fun buildYaml(
         servers: List<Server>,
+        localProjects: List<Project>,
+        includeLocalNotes: Boolean,
         projectsForServer: suspend (Server) -> List<Project>
     ): String {
         val sb = StringBuilder()
@@ -63,6 +76,16 @@ class ExportImportManager @Inject constructor(
         sb.appendLine("  keyBarHighlightIntensity: ${settingsRepository.settings.value.keyBarHighlightIntensity}")
         sb.appendLine("  textInputPanelOpacity: ${settingsRepository.settings.value.textInputPanelOpacity}")
         sb.appendLine("  globalPinnedActions: ${ys(encodePinnedActions(pinnedActions.filter { it.scope == "GLOBAL" }))}")
+        val locals = JSONArray()
+        for (project in localProjects) {
+            val item = JSONObject().put("name", project.name).put("customScript", project.customScript)
+                .put("aiCommand", project.aiCommand).put("colorSeed", project.colorSeed)
+                .put("gitUrl", project.gitUrl).put("useTmux", project.useTmux)
+                .put("pinnedActions", encodePinnedActions(pinnedActions.filter { it.scope == "PROJECT" && it.projectId == project.id }))
+            if (includeLocalNotes) db.projectNoteDao().get(project.id)?.let { item.put("note", it.text) }
+            locals.put(item)
+        }
+        sb.appendLine("  localProjects: ${ys(locals.toString())}")
         sb.appendLine("servers:")
         for (server in servers) {
             val projects = projectsForServer(server)
@@ -112,6 +135,13 @@ class ExportImportManager @Inject constructor(
             ?: error("Cannot read file")
 
         val servers = parseYaml(text)
+        val localProjects = JSONArray(extractSettingsValue(text, "localProjects") ?: "[]")
+        for (index in 0 until localProjects.length()) {
+            val local = localProjects.getJSONObject(index)
+            require(projectNameValidationError(local.getString("name")) == null) { "Invalid local project name" }
+            require(local.optString("note").toByteArray(Charsets.UTF_8).size <= MAX_NOTE_BYTES) { "Note exceeds 256 KB" }
+            decodePinnedActions(local.optString("pinnedActions", "[]"), 0L)
+        }
         // Validate every pin before the existing replace-configuration operation starts.
         val globalPins = decodePinnedActions(extractSettingsValue(text, "globalPinnedActions"))
         servers.forEach { server ->
@@ -133,12 +163,14 @@ class ExportImportManager @Inject constructor(
 
         // Consent belongs to this device and is never imported, even from an edited backup.
         settingsRepository.setInputHistoryEnabled(false)
+        notesRepository.resetForImport()
         sessionManager.clearForConfigImport()
         runtimeRepository.clearSessionState()
         securePrefsManager.clearAll()
         appContext.getSharedPreferences("session_host", Context.MODE_PRIVATE).edit().clear().apply()
 
         db.withTransaction {
+            db.projectNoteDao().clearAll()
             textInputHistoryDao.clearAll()
             db.pinnedActionDao().clearAll()
             globalPins.forEach { db.pinnedActionDao().save(it) }
@@ -179,6 +211,16 @@ class ExportImportManager @Inject constructor(
                     }
                     projectsImported++
                 }
+            }
+            for (index in 0 until localProjects.length()) {
+                val item = localProjects.getJSONObject(index)
+                val id = projectRepo.save(Project(serverId = LOCAL_PROJECT_SERVER_ID, targetType = ProjectTargetType.LOCAL,
+                    name = item.getString("name"), customScript = item.optString("customScript", "cd {{PROJECT_PATH}}"),
+                    aiCommand = item.optString("aiCommand"), colorSeed = item.optInt("colorSeed"),
+                    gitUrl = item.optString("gitUrl"), useTmux = item.optBoolean("useTmux", true)))
+                if (item.has("note")) db.projectNoteDao().save(ProjectNoteEntity(id, item.getString("note"), System.currentTimeMillis()))
+                decodePinnedActions(item.optString("pinnedActions", "[]"), id).forEach { db.pinnedActionDao().save(it) }
+                projectsImported++
             }
         }
         settingsRepository.setKeyBarRows(keyBarRows)
