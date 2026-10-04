@@ -55,6 +55,7 @@ import se.joynes.terminalhub.data.runtime.BackgroundSshMode
 import se.joynes.terminalhub.ui.components.RetroButton
 import se.joynes.terminalhub.ui.components.RetroCard
 import se.joynes.terminalhub.ui.components.RetroTopBar
+import se.joynes.terminalhub.ui.components.InputHistorySettings
 import se.joynes.terminalhub.ui.theme.MegaDriveBg
 import se.joynes.terminalhub.ui.theme.MegaDriveDim
 import se.joynes.terminalhub.ui.theme.MegaDriveGreen
@@ -299,6 +300,12 @@ fun SettingsScreen(
                             status = if (settings.executeTextInputOnSend) "Execute immediately" else "Send text only",
                             checked = settings.executeTextInputOnSend,
                             onCheckedChange = viewModel::setExecuteTextInputOnSend
+                        )
+                        SettingsSeparator()
+                        InputHistorySettings(
+                            enabled = settings.inputHistoryEnabled,
+                            onEnabledChange = viewModel::setInputHistoryEnabled,
+                            onDeleteHistory = { viewModel.deleteInputHistory() }
                         )
                         SettingsSeparator()
                         SettingsSubheading(

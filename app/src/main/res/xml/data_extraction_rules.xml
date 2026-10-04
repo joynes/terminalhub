@@ -5,12 +5,14 @@
 -->
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="sharedpref" path="input_history_consent.xml" />
         <!-- Do not automatically upload the database containing user input history. -->
         <exclude domain="database" path="." />
         <!-- SSH passwords and private keys remain device-local. -->
         <exclude domain="sharedpref" path="ssh_secure_prefs.xml" />
     </cloud-backup>
     <device-transfer>
+        <exclude domain="sharedpref" path="input_history_consent.xml" />
         <exclude domain="database" path="." />
         <exclude domain="sharedpref" path="ssh_secure_prefs.xml" />
     </device-transfer>

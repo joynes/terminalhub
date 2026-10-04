@@ -25,7 +25,7 @@ class TerminalInputIngressTest {
             val context = ApplicationProvider.getApplicationContext<Context>()
             val saved = mutableListOf<String>()
             val writes = StringBuilder()
-            val recorder = TerminalInputHistoryRecorder { _, text -> saved += text }
+            val recorder = TerminalInputHistoryRecorder(enabled = { true }) { _, text -> saved += text }
             val session = TerminalSession.createRemoteSession(100, TerminalSessionClientImpl(context), object : TerminalInputListener {
                 override fun onTerminalInput(data: ByteArray, offset: Int, count: Int): Boolean {
                     writes.append(String(data, offset, count, Charsets.UTF_8))

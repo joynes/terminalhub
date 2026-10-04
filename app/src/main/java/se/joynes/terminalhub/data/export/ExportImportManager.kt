@@ -131,6 +131,8 @@ class ExportImportManager @Inject constructor(
         var serversImported = 0
         var projectsImported = 0
 
+        // Consent belongs to this device and is never imported, even from an edited backup.
+        settingsRepository.setInputHistoryEnabled(false)
         sessionManager.clearForConfigImport()
         runtimeRepository.clearSessionState()
         securePrefsManager.clearAll()

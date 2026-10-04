@@ -25,7 +25,7 @@ class PinnedActionsSheetTest {
             TerminalHubTheme {
                 SpecialKeyBar(MutableModifierManager(), onKey = { error("Star must not send terminal bytes") }, onPinnedActions = { visible = true })
                 if (visible) PinnedActionsSheet(
-                    projectId = 1, pins = pins,
+                    projectId = 1, pins = pins, historyEnabled = true,
                     history = listOf(TextInputHistoryEntity(id = 1, projectId = 1, text = "git status")),
                     onDismiss = { visible = false }, onPrepare = {}, onSend = { sent = it },
                     onSave = { pins = listOf(it.copy(id = 1)) }, onDeletePin = {}, onDeleteHistory = {}
@@ -75,7 +75,7 @@ class PinnedActionsSheetTest {
         rule.setContent {
             TerminalHubTheme {
                 PinnedActionsSheet(1, emptyList(), (1..25).map { TextInputHistoryEntity(id = it.toLong(), projectId = 1, text = "input $it") },
-                    initiallyRecent = true, onDismiss = {}, onPrepare = { prepared = it }, onSend = {}, onSave = {}, onDeletePin = {}, onDeleteHistory = {})
+                    initiallyRecent = true, historyEnabled = true, onDismiss = {}, onPrepare = { prepared = it }, onSend = {}, onSave = {}, onDeletePin = {}, onDeleteHistory = {})
             }
         }
         rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Show more"))
@@ -90,7 +90,7 @@ class PinnedActionsSheetTest {
         rule.setContent {
             TerminalHubTheme {
                 PinnedActionsSheet(1, emptyList(), listOf(TextInputHistoryEntity(id = 1, projectId = 1, text = "git status")),
-                    initiallyRecent = true, onDismiss = {}, onPrepare = {}, onSend = {}, onSave = { saved = it }, onDeletePin = {}, onDeleteHistory = {})
+                    initiallyRecent = true, historyEnabled = true, onDismiss = {}, onPrepare = {}, onSend = {}, onSave = { saved = it }, onDeletePin = {}, onDeleteHistory = {})
             }
         }
         rule.onNodeWithText("git status").performTouchInput { longClick() }

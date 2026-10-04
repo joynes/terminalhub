@@ -227,6 +227,8 @@ class SessionHostViewModel @Inject constructor(
         settingsRepository.settings
             .map { it.executeTextInputOnSend }
             .stateIn(viewModelScope, SharingStarted.Eagerly, settingsRepository.settings.value.executeTextInputOnSend)
+    val inputHistoryEnabled = settingsRepository.settings.map { it.inputHistoryEnabled }
+    fun enableInputHistory() = inputActions.setHistoryEnabled(true)
     val textInputPanelOpacity: StateFlow<Float> =
         settingsRepository.settings
             .map { it.textInputPanelOpacity }

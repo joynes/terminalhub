@@ -1,11 +1,15 @@
 package se.joynes.terminalhub.domain
 
 /** Approximate user-input drafts, never terminal output. Cursor editing is deliberately not emulated. */
-class TerminalInputHistoryRecorder(private val save: (Long, String) -> Unit) {
+class TerminalInputHistoryRecorder(
+    private val enabled: () -> Boolean = { false },
+    private val save: (Long, String) -> Unit
+) {
     private val drafts = mutableMapOf<Long, StringBuilder>()
 
     @Synchronized
     fun input(projectId: Long, text: String) {
+        if (!enabled()) { clearAllDrafts(); return }
         // Key events deliver complete escape sequences. Ignore navigation/function/Alt keys.
         if (text.startsWith('\u001b')) return
         val draft = drafts.getOrPut(projectId) { StringBuilder() }
@@ -29,15 +33,23 @@ class TerminalInputHistoryRecorder(private val save: (Long, String) -> Unit) {
     /** Paste is one semantic operation: embedded newlines are not simulated Enter keystrokes. */
     @Synchronized
     fun paste(projectId: Long, text: String) {
+        if (!enabled()) { clearAllDrafts(); return }
         drafts.getOrPut(projectId) { StringBuilder() }.append(text)
     }
 
     @Synchronized
     fun complete(projectId: Long, text: String) {
+        if (!enabled()) { clearAllDrafts(); return }
         drafts.remove(projectId)
         if (text.isNotBlank()) save(projectId, text)
     }
 
     @Synchronized
     fun forget(projectId: Long) { drafts.remove(projectId) }
+
+    @Synchronized
+    fun clearAllDrafts() { drafts.clear() }
+
+    @Synchronized
+    internal fun retainedDraftCount(): Int = drafts.size
 }

@@ -20,6 +20,17 @@ class AppSettingsPersistenceTest {
     @After
     fun clearSettings() {
         context.getSharedPreferences("app_settings", Context.MODE_PRIVATE).edit().clear().commit()
+        context.getSharedPreferences("input_history_consent", Context.MODE_PRIVATE).edit().clear().commit()
+    }
+
+    @Test
+    fun historyDefaultsOffAndOptInSurvivesProcessRecreationOnThisDevice() {
+        val repository = AppSettingsRepository(context)
+        assertEquals(false, repository.settings.value.inputHistoryEnabled)
+        repository.setInputHistoryEnabled(true)
+        assertEquals(true, AppSettingsRepository(context).settings.value.inputHistoryEnabled)
+        repository.setInputHistoryEnabled(false)
+        assertEquals(false, AppSettingsRepository(context).settings.value.inputHistoryEnabled)
     }
 
     @Test

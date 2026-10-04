@@ -27,13 +27,16 @@ fun PinnedActionsSheet(
     onSend: (PinnedActionEntity) -> Unit,
     onSave: (PinnedActionEntity) -> Unit,
     onDeletePin: (Long) -> Unit,
-    onDeleteHistory: (Long) -> Unit
+    onDeleteHistory: (Long) -> Unit,
+    historyEnabled: Boolean = false,
+    onEnableHistory: () -> Unit = {}
 ) {
     var recent by remember { mutableStateOf(initiallyRecent) }
     var visibleCount by remember { mutableIntStateOf(20) }
     var selectedHistory by remember { mutableStateOf<TextInputHistoryEntity?>(null) }
     var selectedPin by remember { mutableStateOf<PinnedActionEntity?>(null) }
     var editing by remember { mutableStateOf<PinnedActionEntity?>(null) }
+    var confirmHistoryEnable by remember { mutableStateOf(false) }
     val clipboard = LocalClipboardManager.current
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -45,12 +48,18 @@ fun PinnedActionsSheet(
                 TextButton(onClick = { editing = PinnedActionEntity(name = "", text = "", scope = "GLOBAL") }) { Text("New") }
             }
             Text(
-                if (recent) "Tap to edit. Hold to pin, copy or delete. History is local to this device and may contain sensitive input."
+                if (recent && !historyEnabled) "TerminalHub does not currently save terminal input."
+                else if (recent) "Tap to edit. Hold to pin, copy or delete. History is local to this device and may contain sensitive input."
                 else "Tap to send or prepare. Hold to edit or delete.",
                 style = MaterialTheme.typography.bodySmall
             )
             LazyColumn(Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 480.dp).padding(vertical = 8.dp)) {
-                if (recent) {
+                if (recent && !historyEnabled) {
+                    item {
+                        Text("Recent input history is off.", Modifier.padding(16.dp))
+                        TextButton(onClick = { confirmHistoryEnable = true }) { Text("ENABLE HISTORY") }
+                    }
+                } else if (recent) {
                     if (history.isEmpty()) item { Text("No recent input for this project yet.", Modifier.padding(16.dp)) }
                     items(history.take(visibleCount), key = { it.id }) { entry ->
                         ListItem(
@@ -83,6 +92,10 @@ fun PinnedActionsSheet(
         }
     }
 
+    if (confirmHistoryEnable) se.joynes.terminalhub.ui.components.InputHistoryEnableDialog(
+        onDismiss = { confirmHistoryEnable = false },
+        onEnable = { confirmHistoryEnable = false; onEnableHistory() }
+    )
     selectedHistory?.let { entry ->
         AlertDialog(
             onDismissRequest = { selectedHistory = null },

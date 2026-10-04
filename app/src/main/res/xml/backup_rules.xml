@@ -8,6 +8,7 @@
 <full-backup-content>
     <!-- Input history can contain secrets. Use explicit configuration export for servers/pins. -->
     <exclude domain="database" path="." />
+    <exclude domain="sharedpref" path="input_history_consent.xml" />
     <!-- SSH passwords and private keys remain device-local. -->
     <exclude domain="sharedpref" path="ssh_secure_prefs.xml" />
 </full-backup-content>

@@ -83,7 +83,7 @@ class SessionHostOnboardingTest {
                 sshManager = sshManager,
                 engine = engine,
                 sessionManager = sessionManager,
-                inputActions = se.joynes.terminalhub.data.repository.InputActionsRepository(textInputHistoryDao, db.pinnedActionDao()),
+                inputActions = se.joynes.terminalhub.data.repository.InputActionsRepository(textInputHistoryDao, db.pinnedActionDao(), settingsRepository),
                 settingsRepository = settingsRepository,
                 runtimeRepository = runtimeRepository,
                 knownHosts = knownHosts,

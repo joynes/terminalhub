@@ -19,6 +19,18 @@ content, scope or behavior, prepare it, or delete it. Nothing is tool-specific.
 
 ## What is recorded
 
+History recording is globally **off by default**, including after updating from an
+older version that recorded input automatically. Enable **Save terminal input
+history** in Settings → Terminal input, or use **ENABLE HISTORY** in ★ → Recent.
+Both show the same confirmation explaining that terminal input may contain secrets.
+Cancelling leaves recording off. Consent applies to all projects on this device.
+
+With recording off, no history drafts are collected in memory and no new history
+is queued for storage. Switching off clears unfinished drafts and pending writes.
+Previously saved entries remain. **Delete saved input history** in Settings removes
+all recorded history after confirmation while retaining pinned actions. Pins can
+still be created manually, edited and executed with recording off.
+
 Only user input is observed, before transport. Direct keyboard/keybar characters
 build a project draft; Enter records it, backspace removes the last Unicode code
 point, and Ctrl+C discards it. Semantic paste (including direct dictation) keeps
@@ -41,6 +53,8 @@ Explicit configuration export includes global pins and pins belonging to exporte
 projects. Import assigns their project references to the newly imported projects;
 it replaces existing pins along with the rest of the imported configuration.
 Old backups without pins restore none. Input history is never included in exports.
+Configuration import always turns history recording off. Consent is also excluded
+from Android backup and device transfer, so another device requires its own opt-in.
 Protect exported files: pinned commands may contain secrets.
 
 The database is excluded from Android automatic cloud backup and device transfer

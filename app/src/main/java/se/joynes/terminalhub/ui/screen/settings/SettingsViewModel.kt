@@ -2,6 +2,8 @@ package se.joynes.terminalhub.ui.screen.settings
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.launch
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
@@ -20,11 +22,18 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val settingsRepository: AppSettingsRepository,
     private val runtimeRepository: AppRuntimeRepository,
-    private val backgroundSshModeController: BackgroundSshModeController
+    private val backgroundSshModeController: BackgroundSshModeController,
+    private val inputActions: se.joynes.terminalhub.data.repository.InputActionsRepository
 ) : ViewModel() {
     val settings = settingsRepository.settings
     val runtimeState = runtimeRepository.state
     val backgroundSshMode = backgroundSshModeController.mode
+
+    fun setInputHistoryEnabled(enabled: Boolean) = inputActions.setHistoryEnabled(enabled)
+    fun deleteInputHistory() = viewModelScope.launch {
+        inputActions.clearHistory()
+        android.widget.Toast.makeText(context, "Saved input history deleted", android.widget.Toast.LENGTH_SHORT).show()
+    }
 
     fun startBackgroundSsh(notificationPermissionGranted: Boolean): BackgroundSshStartResult {
         settingsRepository.setBackgroundSshRecommendationHandled()

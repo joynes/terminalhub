@@ -125,6 +125,7 @@ fun SessionHostScreen(
     val closedSessions by viewModel.sessionManager.closedSessions.collectAsState()
     val preferFastResume by viewModel.preferFastResume.collectAsState()
     val executeTextInputOnSend by viewModel.executeTextInputOnSend.collectAsState()
+    val inputHistoryEnabled by viewModel.inputHistoryEnabled.collectAsState(initial = false)
     val textInputPanelOpacity by viewModel.textInputPanelOpacity.collectAsState()
     val keyBarRows by viewModel.keyBarRows.collectAsState()
     val keyBarHighlightedKeyIds by viewModel.keyBarHighlightedKeyIds.collectAsState()
@@ -464,6 +465,8 @@ fun SessionHostScreen(
             PinnedActionsSheet(
                 projectId = activeProjectId,
                 pins = pinnedActions,
+                historyEnabled = inputHistoryEnabled,
+                onEnableHistory = viewModel::enableInputHistory,
                 history = recentInput,
                 initiallyRecent = pinnedInitiallyRecent,
                 onDismiss = { showPinnedActions = false },

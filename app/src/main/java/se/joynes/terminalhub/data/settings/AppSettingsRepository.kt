@@ -23,6 +23,7 @@ internal fun normalizeKeyBarHighlightIntensity(value: Float): Float =
     value.coerceIn(MIN_KEY_BAR_HIGHLIGHT_INTENSITY, MAX_KEY_BAR_HIGHLIGHT_INTENSITY)
 
 data class AppSettings(
+    val inputHistoryEnabled: Boolean = false,
     val preferFastResume: Boolean = true,
     val executeTextInputOnSend: Boolean = DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND,
     val textInputPanelOpacity: Float = DEFAULT_TEXT_INPUT_PANEL_OPACITY,
@@ -53,9 +54,12 @@ class AppSettingsRepository @Inject constructor(
     @ApplicationContext context: Context
 ) {
     private val prefs = context.getSharedPreferences("app_settings", Context.MODE_PRIVATE)
+    private val historyConsentPrefs = context.getSharedPreferences("input_history_consent", Context.MODE_PRIVATE)
+    private val historyDisabledListeners = java.util.concurrent.CopyOnWriteArrayList<() -> Unit>()
 
     private val _settings = MutableStateFlow(
         AppSettings(
+            inputHistoryEnabled = historyConsentPrefs.getBoolean(KEY_INPUT_HISTORY_ENABLED, false),
             preferFastResume = prefs.getBoolean(KEY_FAST_RESUME, true),
             executeTextInputOnSend = prefs.getBoolean(
                 KEY_EXECUTE_TEXT_INPUT_ON_SEND,
@@ -83,6 +87,16 @@ class AppSettingsRepository @Inject constructor(
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    fun setInputHistoryEnabled(enabled: Boolean) {
+        update(_settings.value.copy(inputHistoryEnabled = enabled))
+        // Synchronous notification: a rapid off/on toggle must still discard existing drafts.
+        if (!enabled) historyDisabledListeners.forEach { it() }
+    }
+
+    internal fun onInputHistoryDisabled(listener: () -> Unit) {
+        historyDisabledListeners.add(listener)
+    }
 
     fun setPreferFastResume(enabled: Boolean) {
         update(_settings.value.copy(preferFastResume = enabled))
@@ -142,6 +156,7 @@ class AppSettingsRepository @Inject constructor(
 
     private fun update(next: AppSettings) {
         _settings.value = next
+        historyConsentPrefs.edit().putBoolean(KEY_INPUT_HISTORY_ENABLED, next.inputHistoryEnabled).apply()
         prefs.edit()
             .putBoolean(KEY_FAST_RESUME, next.preferFastResume)
             .putBoolean(KEY_EXECUTE_TEXT_INPUT_ON_SEND, next.executeTextInputOnSend)
@@ -161,6 +176,7 @@ class AppSettingsRepository @Inject constructor(
     }
 
     companion object {
+        private const val KEY_INPUT_HISTORY_ENABLED = "input_history_enabled"
         private const val KEY_FAST_RESUME = "prefer_fast_resume"
         private const val KEY_EXECUTE_TEXT_INPUT_ON_SEND = "execute_text_input_on_send"
         private const val KEY_TEXT_INPUT_PANEL_OPACITY = "text_input_panel_opacity"
