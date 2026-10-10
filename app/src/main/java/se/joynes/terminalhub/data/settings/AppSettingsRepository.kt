@@ -29,6 +29,7 @@ data class AppSettings(
     val textInputPanelOpacity: Float = DEFAULT_TEXT_INPUT_PANEL_OPACITY,
     val sshKeepaliveEnabled: Boolean = true,
     val keepSshActiveInBackground: Boolean = false,
+    val automaticallyStartBackgroundSsh: Boolean = false,
     val backgroundSshRecommendationHandled: Boolean = false,
     val backgroundKeepaliveProfile: BackgroundKeepaliveProfile = BackgroundKeepaliveProfile.BALANCED,
     val backgroundKeepaliveScope: BackgroundKeepaliveScope = BackgroundKeepaliveScope.ACTIVE_TAB_ONLY,
@@ -70,6 +71,7 @@ class AppSettingsRepository @Inject constructor(
             ),
             sshKeepaliveEnabled = prefs.getBoolean(KEY_SSH_KEEPALIVE, true),
             keepSshActiveInBackground = prefs.getBoolean(KEY_KEEP_SSH_ACTIVE_IN_BACKGROUND, false),
+            automaticallyStartBackgroundSsh = prefs.getBoolean(KEY_AUTO_BACKGROUND_SSH, false),
             backgroundSshRecommendationHandled = prefs.getBoolean(KEY_BACKGROUND_SSH_RECOMMENDATION_HANDLED, false),
             backgroundKeepaliveProfile = prefs.getString(KEY_BACKGROUND_KEEPALIVE_PROFILE, BackgroundKeepaliveProfile.BALANCED.name)
                 ?.let { runCatching { BackgroundKeepaliveProfile.valueOf(it) }.getOrNull() }
@@ -119,7 +121,12 @@ class AppSettingsRepository @Inject constructor(
     }
 
     fun setKeepSshActiveInBackground(enabled: Boolean) {
-        update(_settings.value.copy(keepSshActiveInBackground = enabled))
+        update(_settings.value.copy(keepSshActiveInBackground = enabled,
+            automaticallyStartBackgroundSsh = enabled && _settings.value.automaticallyStartBackgroundSsh))
+    }
+
+    fun setAutomaticallyStartBackgroundSsh(enabled: Boolean) {
+        update(_settings.value.copy(automaticallyStartBackgroundSsh = enabled))
     }
 
     fun setBackgroundSshRecommendationHandled(handled: Boolean = true) {
@@ -163,6 +170,7 @@ class AppSettingsRepository @Inject constructor(
             .putFloat(KEY_TEXT_INPUT_PANEL_OPACITY, next.textInputPanelOpacity)
             .putBoolean(KEY_SSH_KEEPALIVE, next.sshKeepaliveEnabled)
             .putBoolean(KEY_KEEP_SSH_ACTIVE_IN_BACKGROUND, next.keepSshActiveInBackground)
+            .putBoolean(KEY_AUTO_BACKGROUND_SSH, next.automaticallyStartBackgroundSsh)
             .putBoolean(KEY_BACKGROUND_SSH_RECOMMENDATION_HANDLED, next.backgroundSshRecommendationHandled)
             .putString(KEY_BACKGROUND_KEEPALIVE_PROFILE, next.backgroundKeepaliveProfile.name)
             .putString(KEY_BACKGROUND_KEEPALIVE_SCOPE, next.backgroundKeepaliveScope.name)
@@ -182,6 +190,7 @@ class AppSettingsRepository @Inject constructor(
         private const val KEY_TEXT_INPUT_PANEL_OPACITY = "text_input_panel_opacity"
         private const val KEY_SSH_KEEPALIVE = "ssh_keepalive_enabled"
         private const val KEY_KEEP_SSH_ACTIVE_IN_BACKGROUND = "keep_ssh_active_in_background"
+        private const val KEY_AUTO_BACKGROUND_SSH = "automatically_start_background_ssh"
         private const val KEY_BACKGROUND_SSH_RECOMMENDATION_HANDLED = "background_ssh_recommendation_handled"
         private const val KEY_BACKGROUND_KEEPALIVE_PROFILE = "background_keepalive_profile"
         private const val KEY_BACKGROUND_KEEPALIVE_SCOPE = "background_keepalive_scope"

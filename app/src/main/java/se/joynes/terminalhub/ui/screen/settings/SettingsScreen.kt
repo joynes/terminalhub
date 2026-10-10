@@ -231,6 +231,14 @@ fun SettingsScreen(
                         )
                         SettingsSeparator()
                         SettingsToggleRow(
+                            title = "Start background SSH automatically",
+                            description = "Start when you open the app with an SSH connection, without asking again. Requires notification permission. Stopping background SSH turns this off too.",
+                            status = if (settings.automaticallyStartBackgroundSsh) "Automatic" else "Ask before restarting",
+                            checked = settings.automaticallyStartBackgroundSsh,
+                            onCheckedChange = viewModel::setAutomaticallyStartBackgroundSsh
+                        )
+                        SettingsSeparator()
+                        SettingsToggleRow(
                             title = "Fast resume",
                             description = "Makes the terminal ready faster when you return to the app.",
                             status = if (settings.preferFastResume) "Enabled" else "Disabled",

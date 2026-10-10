@@ -14,6 +14,17 @@ import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
 
 @RunWith(AndroidJUnit4::class)
 class AppSettingsPersistenceTest {
+    @Test fun automaticBackgroundSshDefaultsOffPersistsAndExplicitStopRevokesIt() {
+        val settings = AppSettingsRepository(context)
+        assertEquals(false, settings.settings.value.automaticallyStartBackgroundSsh)
+        settings.setKeepSshActiveInBackground(true)
+        settings.setAutomaticallyStartBackgroundSsh(true)
+        val recreated = AppSettingsRepository(context)
+        assertEquals(true, recreated.settings.value.automaticallyStartBackgroundSsh)
+        assertEquals(true, recreated.settings.value.keepSshActiveInBackground)
+        recreated.setKeepSshActiveInBackground(false)
+        assertEquals(false, AppSettingsRepository(context).settings.value.automaticallyStartBackgroundSsh)
+    }
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     @Before

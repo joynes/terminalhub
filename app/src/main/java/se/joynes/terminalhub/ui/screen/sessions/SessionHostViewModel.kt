@@ -133,6 +133,12 @@ internal fun shouldShowBackgroundSshRestartReminder(
     connectedRemoteSessionCount > 0 &&
     !dismissedForThisScreen
 
+internal fun shouldAutomaticallyStartBackgroundSsh(
+    optedIn: Boolean, enabled: Boolean, visible: Boolean, permissionGranted: Boolean,
+    serviceRunning: Boolean, mode: BackgroundSshMode, connectedRemoteCount: Int
+): Boolean = optedIn && enabled && visible && permissionGranted && !serviceRunning &&
+    mode == BackgroundSshMode.OFF && connectedRemoteCount > 0
+
 internal fun shouldSwitchToReplacementSession(
     autoSwitch: Boolean,
     replacementSessionId: TerminalSessionId?,
@@ -254,6 +260,8 @@ class SessionHostViewModel @Inject constructor(
                 settingsRepository.settings.value.keyBarHighlightIntensity
             )
     val runtimeState = runtimeRepository.state
+    val autoBackgroundSshSettings = settingsRepository.settings
+    val autoBackgroundSshMode = backgroundSshModeController.mode
     val showBackgroundSshRecommendation: StateFlow<Boolean> = combine(
         settingsRepository.settings,
         sessionManager.sessions,
@@ -284,7 +292,7 @@ class SessionHostViewModel @Inject constructor(
             foregroundServiceRunning = runtime.foregroundServiceRunning,
             mode = mode,
             connectedRemoteSessionCount = connectedRemoteCount,
-            dismissedForThisScreen = dismissed
+            dismissedForThisScreen = dismissed || settings.automaticallyStartBackgroundSsh
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val connectingJobs = mutableMapOf<Long, Job>()
@@ -593,7 +601,7 @@ class SessionHostViewModel @Inject constructor(
         backgroundSshRestartReminderDismissed.value = true
     }
 
-    fun startRecommendedBackgroundSsh(notificationPermissionGranted: Boolean) {
+    fun startRecommendedBackgroundSsh(notificationPermissionGranted: Boolean, rememberAutomaticStart: Boolean = false, automaticAttempt: Boolean = false) {
         backgroundSshRestartReminderDismissed.value = false
         settingsRepository.setBackgroundSshRecommendationHandled()
         val transition = backgroundSshModeController.dispatch(
@@ -614,14 +622,16 @@ class SessionHostViewModel @Inject constructor(
                     runCatching {
                         BackgroundSshService.requestStart(context)
                     }.onSuccess {
-                        _uiMessages.tryEmit("Background SSH started")
+                        if (rememberAutomaticStart) settingsRepository.setAutomaticallyStartBackgroundSsh(true)
+                        if (!automaticAttempt) _uiMessages.tryEmit("Background SSH started")
                     }.onFailure {
-                        settingsRepository.setKeepSshActiveInBackground(false)
+                        if (!automaticAttempt) settingsRepository.setKeepSshActiveInBackground(false)
                         backgroundSshModeController.dispatch(BackgroundSshEvent.ServiceStopped)
                         _uiMessages.tryEmit("Could not start background SSH")
                     }
                 } else {
-                    _uiMessages.tryEmit("Background SSH is already active")
+                    if (rememberAutomaticStart) settingsRepository.setAutomaticallyStartBackgroundSsh(true)
+                    if (!automaticAttempt) _uiMessages.tryEmit("Background SSH is already active")
                 }
             }
             transition.command != BackgroundSshCommand.START_SERVICE -> {
@@ -630,6 +640,17 @@ class SessionHostViewModel @Inject constructor(
             }
             else -> _uiMessages.tryEmit("Could not start background SSH")
         }
+    }
+
+    fun tryAutomaticallyStartBackgroundSsh(permissionGranted: Boolean): Boolean {
+        val settings = settingsRepository.settings.value
+        val runtime = runtimeRepository.state.value
+        if (!shouldAutomaticallyStartBackgroundSsh(settings.automaticallyStartBackgroundSsh,
+                settings.keepSshActiveInBackground, runtime.appInForeground, permissionGranted,
+                runtime.foregroundServiceRunning, backgroundSshModeController.mode.value,
+                sessionManager.sessions.value.count { it.isConnected && it.projectId in runtime.remoteProjectIds })) return false
+        startRecommendedBackgroundSsh(permissionGranted, automaticAttempt = true)
+        return true
     }
 
     private fun activateLocalProject(project: Project, autoSwitch: Boolean) {

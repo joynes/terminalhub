@@ -138,6 +138,7 @@ fun SessionHostScreen(
     val imeBottomPx = WindowInsets.ime.getBottom(density)
 
     var keyboardVisible by remember { mutableStateOf(false) }
+    var rememberAutomaticBackgroundSsh by rememberSaveable { mutableStateOf(false) }
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
@@ -176,7 +177,8 @@ fun SessionHostScreen(
     val backgroundNotificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
-        viewModel.startRecommendedBackgroundSsh(notificationPermissionGranted = granted)
+        viewModel.startRecommendedBackgroundSsh(notificationPermissionGranted = granted,
+            rememberAutomaticStart = rememberAutomaticBackgroundSsh)
     }
 
     fun acceptBackgroundSshRecommendation() {
@@ -186,7 +188,8 @@ fun SessionHostScreen(
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
         if (notificationGranted) {
-            viewModel.startRecommendedBackgroundSsh(notificationPermissionGranted = true)
+            viewModel.startRecommendedBackgroundSsh(notificationPermissionGranted = true,
+                rememberAutomaticStart = rememberAutomaticBackgroundSsh)
         } else {
             backgroundNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -247,6 +250,7 @@ fun SessionHostScreen(
             onDismissRequest = viewModel::dismissBackgroundSshRecommendation,
             title = { Text("KEEP SSH CONNECTED WHEN SWITCHING APPS?") },
             text = {
+                Column {
                 Text(
                     "Recommended if you regularly switch to other apps. TerminalHub can keep active SSH " +
                         "connections alive with an ongoing notification, reducing reconnects when you return. " +
@@ -254,6 +258,8 @@ fun SessionHostScreen(
                         "It may use battery and mobile data, and Android or the network can still interrupt it. " +
                         "tmux remains the reliable fallback. You can turn this off at any time in Settings."
                 )
+                BackgroundSshAutomaticStartChoice(rememberAutomaticBackgroundSsh) { rememberAutomaticBackgroundSsh = it }
+                }
             },
             confirmButton = {
                 TextButton(onClick = ::acceptBackgroundSshRecommendation) { Text("KEEP ALIVE") }
@@ -270,7 +276,9 @@ fun SessionHostScreen(
     ) {
         BackgroundSshRestartReminderDialog(
             onStart = ::acceptBackgroundSshRecommendation,
-            onNotNow = viewModel::dismissBackgroundSshRestartReminder
+            onNotNow = viewModel::dismissBackgroundSshRestartReminder,
+            automaticStart = rememberAutomaticBackgroundSsh,
+            onAutomaticStartChange = { rememberAutomaticBackgroundSsh = it }
         )
     }
 
@@ -607,6 +615,22 @@ fun SessionHostScreen(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            // One attempt per visible visit, not an endless loop after a service failure.
+            var attempted = false
+            kotlinx.coroutines.flow.combine(viewModel.autoBackgroundSshSettings, viewModel.runtimeState,
+                viewModel.autoBackgroundSshMode, viewModel.sessionManager.sessions) { _, _, _, _ -> Unit }
+                .collect {
+                    if (!attempted) {
+                        val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        attempted = viewModel.tryAutomaticallyStartBackgroundSsh(granted)
+                    }
+                }
+        }
+    }
 
     LaunchedEffect(viewModel, lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
@@ -1527,17 +1551,22 @@ internal fun ReconnectAllMenuItem(onClick: () -> Unit) {
 @Composable
 internal fun BackgroundSshRestartReminderDialog(
     onStart: () -> Unit,
-    onNotNow: () -> Unit
+    onNotNow: () -> Unit,
+    automaticStart: Boolean = false,
+    onAutomaticStartChange: (Boolean) -> Unit = {}
 ) {
     AlertDialog(
         onDismissRequest = onNotNow,
         title = { Text("BACKGROUND SSH IS OFF") },
         text = {
+            Column {
             Text(
                 "You previously enabled background SSH, but its Android service is not running. " +
                     "SSH tabs may disconnect when you switch apps. Start it again to show the " +
                     "required active notification and keep connections alive."
             )
+            BackgroundSshAutomaticStartChoice(automaticStart, onAutomaticStartChange)
+            }
         },
         confirmButton = {
             TextButton(onClick = onStart) { Text("START BACKGROUND SSH") }
@@ -1546,6 +1575,14 @@ internal fun BackgroundSshRestartReminderDialog(
             TextButton(onClick = onNotNow) { Text("NOT NOW") }
         }
     )
+}
+
+@Composable
+internal fun BackgroundSshAutomaticStartChoice(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
+        Text("Start automatically when I open the app — don't ask again")
+    }
 }
 
 internal fun textInputDraftAfterChange(

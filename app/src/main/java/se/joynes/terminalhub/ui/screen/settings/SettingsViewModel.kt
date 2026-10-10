@@ -28,6 +28,13 @@ class SettingsViewModel @Inject constructor(
     val settings = settingsRepository.settings
     val runtimeState = runtimeRepository.state
     val backgroundSshMode = backgroundSshModeController.mode
+    fun setAutomaticallyStartBackgroundSsh(enabled: Boolean) {
+        if (enabled && !settingsRepository.settings.value.keepSshActiveInBackground) {
+            android.widget.Toast.makeText(context, "Start background SSH first to approve its notification", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        settingsRepository.setAutomaticallyStartBackgroundSsh(enabled)
+    }
 
     fun setInputHistoryEnabled(enabled: Boolean) = inputActions.setHistoryEnabled(enabled)
     fun deleteInputHistory() = viewModelScope.launch {

@@ -53,9 +53,15 @@ The first start should explain:
 - Android or the network can still terminate a connection; and
 - tmux keeps remote work alive so TerminalHub can reconnect safely.
 
-Only start the foreground service immediately after a visible user action while
-the app is in the foreground. Do not start it from app launch, tab restoration,
-background receivers, boot completion, or automatic reconnect code.
+Updated 2026-10-10 at the user's request: the first start still requires explicit
+approval. An additional opt-in, **Start automatically when I open the app — don't
+ask again**, authorizes future starts while the activity is RESUMED and an SSH tab
+is connected. It defaults off, requires notification permission, and remains
+controllable in Settings. Explicit Stop revokes automatic start. No start from a
+hidden app, boot receiver, or background reconnect is allowed. Failure is attempted
+at most once per visible visit, retaining the choice without a restart loop.
+Android foreground-start eligibility is not a guarantee of Google Play review
+approval; keep the declared service purpose and ongoing notification accurate.
 
 ### Persistent notification
 
