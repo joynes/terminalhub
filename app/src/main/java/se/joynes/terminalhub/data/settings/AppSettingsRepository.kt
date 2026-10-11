@@ -23,6 +23,7 @@ internal fun normalizeKeyBarHighlightIntensity(value: Float): Float =
     value.coerceIn(MIN_KEY_BAR_HIGHLIGHT_INTENSITY, MAX_KEY_BAR_HIGHLIGHT_INTENSITY)
 
 data class AppSettings(
+    val terminalScroll: TerminalScrollSettings = TerminalScrollSettings(),
     val inputHistoryEnabled: Boolean = false,
     val preferFastResume: Boolean = true,
     val executeTextInputOnSend: Boolean = DEFAULT_EXECUTE_TEXT_INPUT_ON_SEND,
@@ -60,6 +61,7 @@ class AppSettingsRepository @Inject constructor(
 
     private val _settings = MutableStateFlow(
         AppSettings(
+            terminalScroll = TerminalScrollSettings.decode(prefs.getString("terminal_scroll", null)) ?: TerminalScrollSettings(),
             inputHistoryEnabled = historyConsentPrefs.getBoolean(KEY_INPUT_HISTORY_ENABLED, false),
             preferFastResume = prefs.getBoolean(KEY_FAST_RESUME, true),
             executeTextInputOnSend = prefs.getBoolean(
@@ -103,6 +105,8 @@ class AppSettingsRepository @Inject constructor(
     fun setPreferFastResume(enabled: Boolean) {
         update(_settings.value.copy(preferFastResume = enabled))
     }
+
+    fun setTerminalScroll(settings: TerminalScrollSettings) = update(_settings.value.copy(terminalScroll = settings.normalized()))
 
     fun setExecuteTextInputOnSend(enabled: Boolean) {
         update(_settings.value.copy(executeTextInputOnSend = enabled))
@@ -165,6 +169,7 @@ class AppSettingsRepository @Inject constructor(
         _settings.value = next
         historyConsentPrefs.edit().putBoolean(KEY_INPUT_HISTORY_ENABLED, next.inputHistoryEnabled).apply()
         prefs.edit()
+            .putString("terminal_scroll", next.terminalScroll.encode())
             .putBoolean(KEY_FAST_RESUME, next.preferFastResume)
             .putBoolean(KEY_EXECUTE_TEXT_INPUT_ON_SEND, next.executeTextInputOnSend)
             .putFloat(KEY_TEXT_INPUT_PANEL_OPACITY, next.textInputPanelOpacity)

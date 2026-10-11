@@ -75,6 +75,7 @@ class ExportImportManager @Inject constructor(
         sb.appendLine("  keyBarHighlights: ${ys(KeyBarLayoutConfig.encodeHighlights(settingsRepository.settings.value.keyBarHighlightedKeyIds))}")
         sb.appendLine("  keyBarHighlightIntensity: ${settingsRepository.settings.value.keyBarHighlightIntensity}")
         sb.appendLine("  textInputPanelOpacity: ${settingsRepository.settings.value.textInputPanelOpacity}")
+        sb.appendLine("  terminalScroll: ${ys(settingsRepository.settings.value.terminalScroll.encode())}")
         sb.appendLine("  globalPinnedActions: ${ys(encodePinnedActions(pinnedActions.filter { it.scope == "GLOBAL" }))}")
         val locals = JSONArray()
         for (project in localProjects) {
@@ -135,6 +136,7 @@ class ExportImportManager @Inject constructor(
             ?: error("Cannot read file")
 
         val servers = parseYaml(text)
+        val scrollSettings = extractTerminalScrollFromYaml(text) ?: settingsRepository.settings.value.terminalScroll
         val localProjects = JSONArray(extractSettingsValue(text, "localProjects") ?: "[]")
         for (index in 0 until localProjects.length()) {
             val local = localProjects.getJSONObject(index)
@@ -227,6 +229,7 @@ class ExportImportManager @Inject constructor(
         settingsRepository.setKeyBarHighlightedKeyIds(keyBarHighlightedKeyIds)
         settingsRepository.setKeyBarHighlightIntensity(keyBarHighlightIntensity)
         settingsRepository.setTextInputPanelOpacity(textInputPanelOpacity)
+        settingsRepository.setTerminalScroll(scrollSettings)
         return ImportResult(serversImported, projectsImported)
     }
 
@@ -347,6 +350,8 @@ internal fun extractKeyBarHighlightIntensityFromYaml(text: String): Float? {
     val rawValue = extractSettingsValue(text, "keyBarHighlightIntensity") ?: return null
     return rawValue.toFloatOrNull()?.let(::normalizeKeyBarHighlightIntensity)
 }
+
+internal fun extractTerminalScrollFromYaml(text: String) = se.joynes.terminalhub.data.settings.TerminalScrollSettings.decode(extractSettingsValue(text, "terminalScroll"))
 
 private fun extractSettingsValue(text: String, key: String): String? {
     var inSettings = false

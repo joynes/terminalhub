@@ -14,6 +14,11 @@ import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
 
 @RunWith(AndroidJUnit4::class)
 class AppSettingsPersistenceTest {
+    @Test fun allScrollControlsSurviveRecreation() {
+        val config = se.joynes.terminalhub.data.settings.TerminalScrollSettings(3f, .5f, false, 2f, .5f, 700f, 250, 4, true)
+        AppSettingsRepository(context).setTerminalScroll(config)
+        assertEquals(config, AppSettingsRepository(context).settings.value.terminalScroll)
+    }
     @Test fun automaticBackgroundSshDefaultsOffPersistsAndExplicitStopRevokesIt() {
         val settings = AppSettingsRepository(context)
         assertEquals(false, settings.settings.value.automaticallyStartBackgroundSsh)

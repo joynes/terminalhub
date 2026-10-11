@@ -26,6 +26,7 @@ class SettingsViewModel @Inject constructor(
     private val inputActions: se.joynes.terminalhub.data.repository.InputActionsRepository
 ) : ViewModel() {
     val settings = settingsRepository.settings
+    fun setTerminalScroll(settings: se.joynes.terminalhub.data.settings.TerminalScrollSettings) = settingsRepository.setTerminalScroll(settings)
     val runtimeState = runtimeRepository.state
     val backgroundSshMode = backgroundSshModeController.mode
     fun setAutomaticallyStartBackgroundSsh(enabled: Boolean) {

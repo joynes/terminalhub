@@ -30,6 +30,8 @@ class InputHistoryBackupTest {
         val file = File.createTempFile("history-backup-test", ".yaml", context.cacheDir)
         try {
             settings.setInputHistoryEnabled(true)
+            val scrollConfig = se.joynes.terminalhub.data.settings.TerminalScrollSettings.fast.copy(reverseDirection = true)
+            settings.setTerminalScroll(scrollConfig)
             database.textInputHistoryDao().insert(TextInputHistoryEntity(projectId = 1, text = "private-history-marker"))
             database.pinnedActionDao().save(PinnedActionEntity(name = "Global action", text = "git status", scope = "GLOBAL"))
             manager.exportYaml(context, Uri.fromFile(file))
@@ -38,7 +40,9 @@ class InputHistoryBackupTest {
             assertFalse(text.contains("inputHistoryEnabled"))
             assertFalse(text.contains("input_history_enabled"))
             assertTrue(text.contains("Global action"))
+            settings.setTerminalScroll(se.joynes.terminalhub.data.settings.TerminalScrollSettings())
             manager.importYaml(context, Uri.fromFile(file))
+            assertEquals(scrollConfig, settings.settings.value.terminalScroll)
             assertFalse(settings.settings.value.inputHistoryEnabled)
             assertFalse(AppSettingsRepository(context).settings.value.inputHistoryEnabled)
             assertEquals("Global action", database.pinnedActionDao().all().single().name)

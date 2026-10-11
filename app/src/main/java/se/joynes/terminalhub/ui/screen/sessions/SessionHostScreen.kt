@@ -1,5 +1,7 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
+import se.joynes.terminalhub.data.settings.applyTo
+
 import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
@@ -127,6 +129,7 @@ fun SessionHostScreen(
     val executeTextInputOnSend by viewModel.executeTextInputOnSend.collectAsState()
     val inputHistoryEnabled by viewModel.inputHistoryEnabled.collectAsState(initial = false)
     val textInputPanelOpacity by viewModel.textInputPanelOpacity.collectAsState()
+    val terminalScrollSettings by viewModel.terminalScrollSettings.collectAsState(initial = se.joynes.terminalhub.data.settings.TerminalScrollSettings())
     val keyBarRows by viewModel.keyBarRows.collectAsState()
     val keyBarHighlightedKeyIds by viewModel.keyBarHighlightedKeyIds.collectAsState()
     val keyBarHighlightIntensity by viewModel.keyBarHighlightIntensity.collectAsState()
@@ -1120,6 +1123,7 @@ fun SessionHostScreen(
                                                 syncRemotePty(view as TerminalView)
                                             }
                                         }.also { tv ->
+                                            terminalScrollSettings.applyTo(tv)
                                             terminalViewRef.value = tv
                                             tv.post {
                                                 syncRemotePty(tv)
@@ -1129,6 +1133,7 @@ fun SessionHostScreen(
                                         }
                                     },
                                     update = { tv ->
+                                        terminalScrollSettings.applyTo(tv)
                                         if (tv.mTermSession !== sess) {
                                             tv.attachSession(sess)
                                             lastSyncedCols = -1

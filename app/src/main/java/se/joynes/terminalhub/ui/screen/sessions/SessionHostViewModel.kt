@@ -261,6 +261,7 @@ class SessionHostViewModel @Inject constructor(
             )
     val runtimeState = runtimeRepository.state
     val autoBackgroundSshSettings = settingsRepository.settings
+    val terminalScrollSettings = settingsRepository.settings.map { it.terminalScroll }
     val autoBackgroundSshMode = backgroundSshModeController.mode
     val showBackgroundSshRecommendation: StateFlow<Boolean> = combine(
         settingsRepository.settings,

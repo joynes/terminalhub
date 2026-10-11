@@ -98,6 +98,27 @@ public final class TerminalView extends View {
     private long mMouseStartDownTime = -1;
 
     final Scroller mScroller;
+    private float mTerminalScrollSpeed = 1.5f, mRemoteScrollSpeed = 1f, mFlingSpeed = 1f, mBraking = 1f, mMinimumFlickSpeed = 150f;
+    private boolean mScrollInertia = true, mReverseScroll = false;
+    private int mRemoteFlingLimit = 120, mRemoteEventsPerFrame = 6;
+    private int mFlingGeneration;
+
+    public void setScrollPreferences(float terminalSpeed, float remoteSpeed, boolean inertia,
+        float flingSpeed, float braking, float minimumFlickSpeed, int remoteLimit, int eventsPerFrame, boolean reverse) {
+        if (mTerminalScrollSpeed == terminalSpeed && mRemoteScrollSpeed == remoteSpeed && mScrollInertia == inertia &&
+            mFlingSpeed == flingSpeed && mBraking == braking && mMinimumFlickSpeed == minimumFlickSpeed &&
+            mRemoteFlingLimit == remoteLimit && mRemoteEventsPerFrame == eventsPerFrame && mReverseScroll == reverse) return;
+        stopFling();
+        mTerminalScrollSpeed = terminalSpeed; mRemoteScrollSpeed = remoteSpeed; mScrollInertia = inertia;
+        mFlingSpeed = flingSpeed; mBraking = braking; mMinimumFlickSpeed = minimumFlickSpeed;
+        mRemoteFlingLimit = remoteLimit; mRemoteEventsPerFrame = eventsPerFrame; mReverseScroll = reverse;
+        mScrollRemainder = 0;
+    }
+
+    private void stopFling() {
+        mFlingGeneration++;
+        mScroller.abortAnimation();
+    }
 
     /** What was left in from scrolling movement. */
     float mScrollRemainder;
@@ -205,6 +226,9 @@ public final class TerminalView extends View {
                     sendMouseEventCode(e, TerminalEmulator.MOUSE_LEFT_BUTTON_MOVED, true);
                 } else {
                     scrolledWithFinger = true;
+                    distanceY = TerminalScrollPhysics.scaledDistance(distanceY,
+                        mEmulator.isMouseTrackingActive() || mEmulator.isAlternateBufferActive() ? mRemoteScrollSpeed : mTerminalScrollSpeed,
+                        mReverseScroll);
                     distanceY += mScrollRemainder;
                     int deltaRows = (int) (distanceY / mRenderer.mFontLineSpacing);
                     mScrollRemainder = distanceY - deltaRows * mRenderer.mFontLineSpacing;
@@ -223,43 +247,51 @@ public final class TerminalView extends View {
 
             @Override
             public boolean onFling(final MotionEvent e2, float velocityX, float velocityY) {
-                if (mEmulator == null) return true;
-                // Do not start scrolling until last fling has been taken care of:
-                if (!mScroller.isFinished()) return true;
-
-                final boolean touchFling = e2 != null && !e2.isFromSource(InputDevice.SOURCE_MOUSE);
-                final boolean mouseTrackingAtStartOfFling = mEmulator.isMouseTrackingActive() && !touchFling;
-                float SCALE = 0.25f;
-                if (mouseTrackingAtStartOfFling) {
-                    mScroller.fling(0, 0, 0, -(int) (velocityY * SCALE), 0, 0, -mEmulator.mRows / 2, mEmulator.mRows / 2);
-                } else {
-                    mScroller.fling(0, mTopRow, 0, -(int) (velocityY * SCALE), 0, 0, -mEmulator.getScreen().getActiveTranscriptRows(), 0);
-                }
-
-                post(new Runnable() {
-                    private int mLastY = 0;
-
-                    @Override
-                    public void run() {
-                        if (mouseTrackingAtStartOfFling != mEmulator.isMouseTrackingActive()) {
-                            mScroller.abortAnimation();
-                            return;
-                        }
-                        if (mScroller.isFinished()) return;
+                if (mEmulator == null || !mScrollInertia || isSelectingText() || Math.abs(velocityY) < mMinimumFlickSpeed) return true;
+                stopFling();
+                final int generation = mFlingGeneration;
+                final TerminalEmulator emulator = mEmulator;
+                final boolean mouse = emulator.isMouseTrackingActive();
+                final boolean alternate = emulator.isAlternateBufferActive();
+                final boolean remote = mouse || alternate;
+                final int spacing = Math.max(1, mRenderer.mFontLineSpacing);
+                final int start = remote ? 0 : mTopRow * spacing;
+                int velocity = (int) TerminalScrollPhysics.scaledDistance(-velocityY,
+                    (remote ? mRemoteScrollSpeed : mTerminalScrollSpeed) * mFlingSpeed, mReverseScroll);
+                velocity = TerminalScrollPhysics.boundedRows(velocity, 30000);
+                mScroller.setFriction(android.view.ViewConfiguration.getScrollFriction() * mBraking);
+                mScroller.fling(0, start, 0, velocity, 0, 0,
+                    remote ? -mRemoteFlingLimit * spacing : -emulator.getScreen().getActiveTranscriptRows() * spacing,
+                    remote ? mRemoteFlingLimit * spacing : 0);
+                postOnAnimation(new Runnable() {
+                    private int lastPixel = start, deliveredRows = 0;
+                    private float remainingPixels = 0;
+                    @Override public void run() {
+                        if (generation != mFlingGeneration) return;
+                        if (emulator != mEmulator || !TerminalScrollPhysics.validFlingContext(mouse, alternate,
+                            mEmulator.isMouseTrackingActive(), mEmulator.isAlternateBufferActive())) { stopFling(); return; }
                         boolean more = mScroller.computeScrollOffset();
-                        int newY = mScroller.getCurrY();
-                        int diff = mouseTrackingAtStartOfFling ? (newY - mLastY) : (newY - mTopRow);
-                        doScroll(e2, diff);
-                        mLastY = newY;
-                        if (more) post(this);
+                        int pixel = mScroller.getCurrY();
+                        remainingPixels += pixel - lastPixel;
+                        lastPixel = pixel;
+                        int rows = (int) (remainingPixels / spacing);
+                        if (remote) rows = TerminalScrollPhysics.boundedRows(rows,
+                            Math.min(mRemoteEventsPerFrame, mRemoteFlingLimit - Math.abs(deliveredRows)));
+                        remainingPixels -= rows * spacing;
+                        deliveredRows += rows;
+                        doScroll(e2, rows);
+                        if (remote && Math.abs(deliveredRows) >= mRemoteFlingLimit) { stopFling(); return; }
+                        if (more || Math.abs(remainingPixels) >= spacing) postOnAnimation(this);
                     }
                 });
-
                 return true;
             }
 
             @Override
             public boolean onDown(float x, float y) {
+                stopFling();
+                mScrollRemainder = 0;
+                scrolledWithFinger = false;
                 // Why is true not returned here?
                 // https://developer.android.com/training/gestures/detector.html#detect-a-subset-of-supported-gestures
                 // Although setting this to true still does not solve the following errors when long pressing in terminal view text area
@@ -363,6 +395,7 @@ public final class TerminalView extends View {
      */
     public boolean attachSession(TerminalSession session) {
         if (session == mTermSession) return false;
+        stopFling();
         mTopRow = 0;
         mUserScrolledUp = false;
         mAltModeUpScrolls = 0;
@@ -1194,6 +1227,7 @@ public final class TerminalView extends View {
     }
 
     public void setTopRow(int mTopRow) {
+        stopFling();
         this.mTopRow = mTopRow;
     }
 
@@ -1567,7 +1601,7 @@ public final class TerminalView extends View {
     /** Scroll the terminal view so that [row] is visible (row 0 = bottom, negative = scrollback). */
     public void scrollToRow(int row) {
         if (mEmulator == null) return;
-        mScroller.abortAnimation();
+        stopFling();
         int minTopRow = -mEmulator.getScreen().getActiveTranscriptRows();
         mTopRow = Math.max(minTopRow, Math.min(0, row));
         mUserScrolledUp = mTopRow < 0;
@@ -1587,7 +1621,7 @@ public final class TerminalView extends View {
     public void scrollToBottom() {
         mScrollLocked = false;
         mUserScrolledUp = false;
-        mScroller.abortAnimation();
+        stopFling();
         mTopRow = 0;
         if (mEmulator != null && mEmulator.isMouseTrackingActive() && mAltModeUpScrolls > 0) {
             // tmux / mouse-tracking apps own the scrollback — replay enough wheel-down events
@@ -1663,6 +1697,7 @@ public final class TerminalView extends View {
 
     @Override
     protected void onDetachedFromWindow() {
+        stopFling();
         super.onDetachedFromWindow();
 
         if (mTextSelectionCursorController != null) {

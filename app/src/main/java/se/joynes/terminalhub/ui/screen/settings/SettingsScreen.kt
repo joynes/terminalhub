@@ -316,6 +316,8 @@ fun SettingsScreen(
                             onDeleteHistory = { viewModel.deleteInputHistory() }
                         )
                         SettingsSeparator()
+                        TerminalScrollSettingsEditor(settings.terminalScroll, viewModel::setTerminalScroll)
+                        SettingsSeparator()
                         SettingsSubheading(
                             title = "KEY BAR LAYOUT",
                             description = "Tap a key name to replace it. Tap its star to highlight buttons you use often. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows."
