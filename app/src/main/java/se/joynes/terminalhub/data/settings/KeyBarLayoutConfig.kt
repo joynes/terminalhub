@@ -112,12 +112,12 @@ object KeyBarLayoutConfig {
     fun encode(rows: List<List<String>>): String =
         normalize(rows).joinToString("|") { row -> row.joinToString(",") }
 
-    fun decode(encoded: String?): List<List<String>> {
+    fun decode(encoded: String?, migrateFactory: Boolean = true): List<List<String>> {
         if (encoded.isNullOrBlank()) return defaultRows
         val decoded = normalize(encoded.split('|').map { row -> row.split(',').filter(String::isNotBlank) })
         // Upgrade only the exact previous factory layout; never alter a custom keybar.
         val previousDefault = defaultRows.map { row -> row.map { if (it == "PROJECT_NOTES") "DIGIT_3" else it } }
-        return if (decoded == previousDefault) defaultRows else decoded
+        return if (migrateFactory && decoded == previousDefault) defaultRows else decoded
     }
 
     fun normalizeHighlights(keyIds: Set<String>): Set<String> = availableKeys

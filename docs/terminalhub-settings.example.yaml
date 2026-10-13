@@ -1,0 +1,150 @@
+# TerminalHub SETTINGS ONLY — safe to discuss and edit with an AI.
+# No servers, projects, credentials, pins, history text or notes are included.
+# AI: discuss the user's goal, change only relevant values, keep format/version and
+# key names, return YAML (not a Markdown code fence). Explain trade-offs separately.
+# Comments (#) can be edited/added anywhere. They are ignored on import.
+# Missing settings stay unchanged; unknown keys, wrong types, duplicates and
+# out-of-range values reject the entire import. Import previews changes first.
+# Background service and history approval cannot be silently enabled by this file.
+# For a new phone use Full app configuration instead; this is preferences only.
+format: terminalhub-settings
+version: 1
+settings:
+  # boolean; default true. Re-focuses the terminal/keyboard when returning to the app. Faster
+  # typing readiness; false avoids automatically opening the keyboard. Does not reconnect SSH
+  # or guarantee background survival.
+  preferFastResume: true
+
+  # boolean; default true. Text Input submissions send text then Enter, running commands or
+  # confirming interactive prompts. false sends text without execution. Direct pinned actions
+  # use their own per-action Send + Enter choice, independent of this setting. Review destructive
+  # commands first.
+  executeTextInputOnSend: true
+
+  # number 0.15..1.0; default 0.50. Text Input background opacity: 0.15 is mostly transparent,
+  # 1.0 opaque. Lower values reveal the terminal but can reduce readability. Does not affect
+  # all app screens.
+  textInputPanelOpacity: 0.5
+
+  # boolean; default false. Records text sent to terminals, up to 100 entries per project on
+  # this device. Can include passwords, tokens and private commands. Requires explicit approval
+  # in import preview when enabling. false stops recording but keeps old history. No history
+  # content is exported here.
+  inputHistoryEnabled: false
+
+  # boolean; default true. Sends SSH connection checks to help detect a lost connection and
+  # keep transports responsive. Does not replace the Android foreground service, battery
+  # configuration, network connectivity or tmux. Disabling reduces checks but can delay
+  # disconnect detection.
+  sshKeepaliveEnabled: true
+
+  # boolean; default false. User approval for background SSH with an ongoing Android
+  # notification; may use battery/mobile data. Importing true does not grant notification
+  # permission or immediately start the service. Use Start or opt into automatic start. Turning
+  # false stops the active service and may disconnect SSH tabs; remote tmux work continues.
+  keepSshActiveInBackground: false
+
+  # boolean; default false. With background SSH approved, start when the terminal screen is
+  # visible and a remote tab is connected, without repeated prompts. Needs
+  # keepSshActiveInBackground=true and Android notification permission. No hidden/boot start.
+  # Stop revokes automatic start. Import enabling requires explicit approval.
+  automaticallyStartBackgroundSsh: false
+
+  # enum: AGGRESSIVE (30 seconds), BALANCED (120 seconds, default), BATTERY_SAVER (300
+  # seconds), ULTRA_BATTERY_SAVER (600 seconds). Background SSH check interval: shorter detects
+  # drops sooner with more traffic/battery; longer saves power but can detect problems later.
+  # Foreground checks use 60 seconds. Only effective with keepalive enabled and Android
+  # allowing execution.
+  backgroundKeepaliveProfile: "BALANCED"
+
+  # enum: ACTIVE_TAB_ONLY (default) or ALL_SESSIONS. Selects remote projects eligible for
+  # background connection checks. Shared transports may still protect other tabs on the same
+  # server. All sessions checks idle server connections too; more traffic. Does not disable
+  # inactive tabs or their notifications.
+  backgroundKeepaliveScope: "ACTIVE_TAB_ONLY"
+
+  # list of 1..4 rows; each a list of 1..12 valid key IDs. Order is screen order. Modifier keys
+  # CTRL/ALT/SHIFT latch for combinations; CHAR_C is literal c (CTRL + CHAR_C sends Ctrl+C).
+  # Removing launchers hides shortcuts but not their features. Unknown IDs and oversized rows
+  # are rejected, never silently dropped. All available IDs and labels follow below.
+  # Terminal: ESC (ESC), TAB (TAB), ENTER (ENTER), BACKSPACE (BKSP)
+  # Modifiers: CTRL (CTRL), ALT (ALT), SHIFT (SHIFT)
+  # Symbols: EXCLAMATION (!), DOUBLE_QUOTE ("), HASH (#), DOLLAR ($), PERCENT (%), AMPERSAND
+  # (&), SINGLE_QUOTE ('), LEFT_PAREN ((), RIGHT_PAREN ()), ASTERISK (*), PLUS (+), COMMA (,),
+  # DASH (-), DOT (.), SLASH (/), COLON (:), SEMICOLON (;), LESS_THAN (<), EQUALS (=),
+  # GREATER_THAN (>), QUESTION (?), AT (@), LEFT_BRACKET ([), BACKSLASH (\), RIGHT_BRACKET (]),
+  # CARET (^), UNDERSCORE (_), BACKTICK (`), LEFT_BRACE ({), PIPE (|), RIGHT_BRACE (}), TILDE
+  # (~), SPACE (SPACE)
+  # Navigation: UP (UP), DOWN (DOWN), LEFT (LEFT), RIGHT (RIGHT), HOME (HOME), END (END),
+  # PAGE_UP (PGUP), PAGE_DOWN (PGDN)
+  # Actions: KEYBOARD (KEYBOARD), TEXT_INPUT (TEXT), VOICE_INPUT (MICROPHONE), PINNED_ACTIONS
+  # (PINNED ACTIONS), PROJECT_NOTES (PROJECT NOTES), UPLOAD (UPLOAD), DOWNLOAD (DOWNLOAD),
+  # PASTE (PASTE)
+  # Letters: CHAR_A (A), CHAR_B (B), CHAR_C (C), CHAR_D (D), CHAR_E (E), CHAR_F (F), CHAR_G
+  # (G), CHAR_H (H), CHAR_I (I), CHAR_J (J), CHAR_K (K), CHAR_L (L), CHAR_M (M), CHAR_N (N),
+  # CHAR_O (O), CHAR_P (P), CHAR_Q (Q), CHAR_R (R), CHAR_S (S), CHAR_T (T), CHAR_U (U), CHAR_V
+  # (V), CHAR_W (W), CHAR_X (X), CHAR_Y (Y), CHAR_Z (Z)
+  # Numbers: DIGIT_0 (0), DIGIT_1 (1), DIGIT_2 (2), DIGIT_3 (3), DIGIT_4 (4), DIGIT_5 (5),
+  # DIGIT_6 (6), DIGIT_7 (7), DIGIT_8 (8), DIGIT_9 (9)
+  keyBarRows: [["ESC", "TAB", "COLON", "SLASH", "AT", "DIGIT_1", "PINNED_ACTIONS", "PROJECT_NOTES", "DOWNLOAD", "UP", "ENTER"], ["CTRL", "ALT", "SHIFT", "KEYBOARD", "TEXT_INPUT", "VOICE_INPUT", "UPLOAD", "LEFT", "DOWN", "RIGHT"]]
+
+  # list of valid key IDs; default TEXT_INPUT, UPLOAD, DOWNLOAD. Gives those buttons a subtle
+  # accent; [] means no accents. IDs need not be present in the current rows. This changes
+  # appearance only, not key actions.
+  keyBarHighlightedKeyIds: ["DOWNLOAD", "TEXT_INPUT", "UPLOAD"]
+
+  # number 0.05..0.40; default 0.12. Strength of highlighted key backgrounds. Higher is more
+  # prominent; lower is subtler. Has no visible effect with no highlighted keys.
+  keyBarHighlightIntensity: 0.12
+
+  # Independent terminal scrolling controls. Gentle: 1/0.5 speeds, 0.65 flick,
+  # 1.8 braking, 250 threshold, 40 events/flick, 3/frame. Fast: 2.5/1.5 speeds,
+  # 1.5 flick, 0.7 braking, 100 threshold, 240 events/flick, 10/frame.
+  terminalScroll:
+    # number 0.25..5; default 1.5. Finger drag multiplier for normal terminal scrollback. Higher
+    # moves more rows per finger distance. Terminal text moves in whole rows, not sub-row pixels.
+    terminalSpeed: 1.5
+
+    # number 0.25..5; default 1.0. Drag multiplier in tmux/full-screen apps. They interpret wheel
+    # events themselves (or arrow keys without mouse tracking), so one event may move several
+    # lines. Network latency and server configuration also affect feel.
+    remoteSpeed: 1.0
+
+    # boolean; default true. Continue scrolling after a quick finger flick. false stops at
+    # release and disables the remaining flick-related controls, while both drag speed settings
+    # still work. A new touch/tab switch stops any glide.
+    inertia: true
+
+    # number 0.25..4; default 1.0. Velocity multiplier for after-scroll, in addition to the
+    # relevant drag multiplier. Higher starts faster and travels farther; lower is gentler. Only
+    # used when inertia=true.
+    flingSpeed: 1.0
+
+    # number 0.25..4; default 1.0. Android friction multiplier. Higher brakes harder and stops
+    # sooner; lower glides longer. Only used with inertia=true. Try increasing this if a flick
+    # overshoots.
+    braking: 1.0
+
+    # number 50..2000 pixels/second; default 150. Releases slower than this do not start
+    # after-scroll. Higher avoids accidental glides. Adds a threshold above Android gesture
+    # detection; cannot lower the device's own threshold. Only used with inertia=true.
+    minimumFlickSpeed: 150.0
+
+    # integer 10..1000; default 120. Maximum wheel/arrow events per remote flick, not necessarily
+    # screen lines. Caps a tmux glide and SSH input traffic. Does not cap direct finger dragging
+    # or mouse wheel events. Only used with inertia=true.
+    remoteFlingLimit: 120
+
+    # integer 1..20; default 6. Remote wheel/arrow burst limit per display frame during a glide.
+    # Smaller sends gentler bursts and drains a queued glide more slowly; larger catches up
+    # faster with more SSH traffic per frame. Only used with inertia=true.
+    remoteEventsPerFrame: 6
+
+    # boolean; default false. Reverses finger drag and flick direction in both normal and remote
+    # terminals. Does not reverse physical mouse wheel events or keybar arrow buttons.
+    reverseDirection: false
+
+# NOT IMPORTABLE: backgroundSshRecommendationHandled is internal prompt state.
+# Android notification permission and battery Unrestricted/Don't optimize are
+# device controls, changed in Android Settings, not portable YAML preferences.
+# Theme/terminal font size are not exposed as portable settings in this schema.

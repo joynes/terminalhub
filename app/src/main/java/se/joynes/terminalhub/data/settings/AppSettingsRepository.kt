@@ -81,7 +81,8 @@ class AppSettingsRepository @Inject constructor(
             backgroundKeepaliveScope = prefs.getString(KEY_BACKGROUND_KEEPALIVE_SCOPE, BackgroundKeepaliveScope.ACTIVE_TAB_ONLY.name)
                 ?.let { runCatching { BackgroundKeepaliveScope.valueOf(it) }.getOrNull() }
                 ?: BackgroundKeepaliveScope.ACTIVE_TAB_ONLY,
-            keyBarRows = KeyBarLayoutConfig.decode(prefs.getString(KEY_KEY_BAR_LAYOUT, null)),
+            keyBarRows = KeyBarLayoutConfig.decode(prefs.getString(KEY_KEY_BAR_LAYOUT, null),
+                migrateFactory = prefs.getInt("key_bar_layout_schema", 0) < 2),
             keyBarHighlightedKeyIds = KeyBarLayoutConfig.decodeHighlights(
                 prefs.getString(KEY_KEY_BAR_HIGHLIGHTS, null)
             ),
@@ -107,6 +108,13 @@ class AppSettingsRepository @Inject constructor(
     }
 
     fun setTerminalScroll(settings: TerminalScrollSettings) = update(_settings.value.copy(terminalScroll = settings.normalized()))
+
+    /** Validated settings-only import: one observable update, no project/credential mutation. */
+    fun applySettingsImport(expected: AppSettings, next: AppSettings) {
+        require(_settings.value == expected) { "Settings changed during preview. Import the file again to review the latest changes." }
+        update(next)
+        if (!next.inputHistoryEnabled) historyDisabledListeners.forEach { it() }
+    }
 
     fun setExecuteTextInputOnSend(enabled: Boolean) {
         update(_settings.value.copy(executeTextInputOnSend = enabled))
@@ -180,6 +188,7 @@ class AppSettingsRepository @Inject constructor(
             .putString(KEY_BACKGROUND_KEEPALIVE_PROFILE, next.backgroundKeepaliveProfile.name)
             .putString(KEY_BACKGROUND_KEEPALIVE_SCOPE, next.backgroundKeepaliveScope.name)
             .putString(KEY_KEY_BAR_LAYOUT, KeyBarLayoutConfig.encode(next.keyBarRows))
+            .putInt("key_bar_layout_schema", 2)
             .putString(
                 KEY_KEY_BAR_HIGHLIGHTS,
                 KeyBarLayoutConfig.encodeHighlights(next.keyBarHighlightedKeyIds)

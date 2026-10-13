@@ -1,9 +1,15 @@
 # Touch scrolling
 
-Settings → Terminal & Input → Touch scrolling applies live to the current view and
+Settings → Terminal & Input → Touch scrolling is a collapsible subgroup and applies live to the current view and
 every newly opened tab. All nine controls persist through app/process restart and
 configuration export/import. Older backups without scroll settings keep the current
 values. No export is needed before a normal app update.
+
+For AI-assisted tuning, use Settings → Backup & AI Settings → Export Settings.
+The YAML file has separate named scroll fields and detailed comments/ranges, not an
+opaque comma-separated string. Import Settings validates and previews changed values
+without replacing servers or projects. Export Backup/Restore Backup in the same
+category are separately labeled full configuration operations for phone migration.
 
 | Control | Range | Default |
 | --- | --- | --- |

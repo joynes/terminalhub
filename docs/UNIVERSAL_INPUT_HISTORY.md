@@ -57,6 +57,16 @@ Configuration import always turns history recording off. Consent is also exclude
 from Android backup and device transfer, so another device requires its own opt-in.
 Protect exported files: pinned commands may contain secrets.
 
+Settings → Backup & AI Settings now has two distinct workflows. Full app backup
+exports all saved servers/projects and pins for phone migration and replaces the
+current configuration on restore. Settings-only YAML is designed for discussing
+preferences with an AI: it exports detailed comments/defaults/ranges but no commands,
+history, notes, projects or credentials. Partial settings imports preserve unspecified
+values and show a before/after preview. Enabling history requires explicit checkbox
+approval in that preview; cancelling or invalid YAML changes nothing. Device Android
+permissions and internal recommendation state cannot be imported. A stale preview
+cannot overwrite preferences changed after the preview was prepared.
+
 The database is excluded from Android automatic cloud backup and device transfer
 because it contains raw input history. Use manual configuration export/import to
 move server/project configuration and pins to another device. This does not affect

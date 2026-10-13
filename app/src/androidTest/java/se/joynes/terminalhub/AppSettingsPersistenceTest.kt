@@ -14,6 +14,12 @@ import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
 
 @RunWith(AndroidJUnit4::class)
 class AppSettingsPersistenceTest {
+    @Test fun intentionallyImportedOldFactoryKeybarIsNotMigratedAgainOnRestart() {
+        val settings = AppSettingsRepository(context)
+        val rows = se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.defaultRows.map { row -> row.map { if (it == "PROJECT_NOTES") "DIGIT_3" else it } }
+        settings.applySettingsImport(settings.settings.value, settings.settings.value.copy(keyBarRows = rows))
+        assertEquals(rows, AppSettingsRepository(context).settings.value.keyBarRows)
+    }
     @Test fun allScrollControlsSurviveRecreation() {
         val config = se.joynes.terminalhub.data.settings.TerminalScrollSettings(3f, .5f, false, 2f, .5f, 700f, 250, 4, true)
         AppSettingsRepository(context).setTerminalScroll(config)

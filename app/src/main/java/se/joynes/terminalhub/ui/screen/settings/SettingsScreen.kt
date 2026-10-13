@@ -69,6 +69,7 @@ import kotlin.math.roundToInt
 internal enum class SettingsSectionId {
     CONNECTIONS,
     TERMINAL_INPUT,
+    TRANSFER,
     ADVANCED,
     STATUS
 }
@@ -76,12 +77,13 @@ internal enum class SettingsSectionId {
 internal val settingsSectionOrder = listOf(
     SettingsSectionId.CONNECTIONS,
     SettingsSectionId.TERMINAL_INPUT,
+    SettingsSectionId.TRANSFER,
     SettingsSectionId.ADVANCED,
     SettingsSectionId.STATUS
 )
 
 internal fun isSettingsSectionExpandedByDefault(section: SettingsSectionId): Boolean =
-    section == SettingsSectionId.CONNECTIONS || section == SettingsSectionId.TERMINAL_INPUT
+    false
 
 internal fun batteryOptimizationStatusLabel(exempt: Boolean): String =
     if (exempt) "Unrestricted" else "Restricted — change recommended"
@@ -127,6 +129,7 @@ fun SettingsScreen(
     var statusExpanded by rememberSaveable {
         mutableStateOf(isSettingsSectionExpandedByDefault(SettingsSectionId.STATUS))
     }
+    var transferExpanded by rememberSaveable { mutableStateOf(false) }
 
     fun showStartResult(result: BackgroundSshStartResult) {
         val message = when (result) {
@@ -203,18 +206,6 @@ fun SettingsScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
-                    BackgroundSshSettingCard(
-                        status = backgroundSshStatus,
-                        enabled = settings.keepSshActiveInBackground,
-                        serviceRunning = backgroundSshIsRunning,
-                        onEnabledChange = { enabled ->
-                            if (enabled) showBackgroundSshConfirmation = true
-                            else viewModel.stopBackgroundSsh()
-                        },
-                        onStart = ::requestBackgroundSshStart
-                    )
-                }
-                item {
                     ExpandableSettingsSection(
                         title = "CONNECTION & RECOVERY",
                         summary = "SSH keepalive ${if (settings.sshKeepaliveEnabled) "on" else "off"} · Battery ${if (batteryOptimizationExempt) "unrestricted" else "restricted"}",
@@ -222,6 +213,12 @@ fun SettingsScreen(
                         expanded = connectionsExpanded,
                         onExpandedChange = { connectionsExpanded = it }
                     ) {
+                        BackgroundSshSettingCard(
+                            status = backgroundSshStatus, enabled = settings.keepSshActiveInBackground,
+                            serviceRunning = backgroundSshIsRunning,
+                            onEnabledChange = { if (it) showBackgroundSshConfirmation = true else viewModel.stopBackgroundSsh() },
+                            onStart = ::requestBackgroundSshStart
+                        )
                         SettingsToggleRow(
                             title = "SSH keepalive",
                             description = "Helps detect broken SSH connections and keep them responsive.",
@@ -302,6 +299,7 @@ fun SettingsScreen(
                         expanded = terminalInputExpanded,
                         onExpandedChange = { terminalInputExpanded = it }
                     ) {
+                        SettingsSubgroup("Text input", "Enter execution and panel transparency") {
                         SettingsToggleRow(
                             title = "Execute text input with Enter",
                             description = "Runs text immediately in the terminal. Disable it when composing or reviewing multiline commands.",
@@ -309,15 +307,24 @@ fun SettingsScreen(
                             checked = settings.executeTextInputOnSend,
                             onCheckedChange = viewModel::setExecuteTextInputOnSend
                         )
+                        Text("Text Input opacity: ${(settings.textInputPanelOpacity * 100).roundToInt()}%", color = MegaDriveOnSurface)
+                        Slider(settings.textInputPanelOpacity, viewModel::setTextInputPanelOpacity, valueRange = .15f..1f)
+                        Text("Lower is more transparent; higher is easier to read over terminal text.", color = MegaDriveDim)
+                        }
                         SettingsSeparator()
+                        SettingsSubgroup("History & privacy", "${if (settings.inputHistoryEnabled) "Recording on" else "Recording off"} · delete saved input") {
                         InputHistorySettings(
                             enabled = settings.inputHistoryEnabled,
                             onEnabledChange = viewModel::setInputHistoryEnabled,
                             onDeleteHistory = { viewModel.deleteInputHistory() }
                         )
+                        }
                         SettingsSeparator()
+                        SettingsSubgroup("Touch scrolling", "Speed, inertia and advanced tmux controls") {
                         TerminalScrollSettingsEditor(settings.terminalScroll, viewModel::setTerminalScroll)
+                        }
                         SettingsSeparator()
+                        SettingsSubgroup("Key bar", "Rows, buttons, highlights and accent strength") {
                         SettingsSubheading(
                             title = "KEY BAR LAYOUT",
                             description = "Tap a key name to replace it. Tap its star to highlight buttons you use often. Add, delete or reorder up to ${se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.MAX_ROWS} rows."
@@ -368,6 +375,13 @@ fun SettingsScreen(
                             onRowsChange = viewModel::setKeyBarRows,
                             onHighlightedKeyIdsChange = viewModel::setKeyBarHighlightedKeyIds
                         )
+                        }
+                    }
+                }
+                item {
+                    ExpandableSettingsSection("BACKUP & AI SETTINGS", "Settings-only YAML vs full server/project backup",
+                        "IMPORT / EXPORT", transferExpanded, { transferExpanded = it }) {
+                        SettingsTransferSection(viewModel)
                     }
                 }
                 item {
@@ -487,7 +501,7 @@ private fun BackgroundSshSettingCard(
 }
 
 @Composable
-private fun ExpandableSettingsSection(
+internal fun ExpandableSettingsSection(
     title: String,
     summary: String,
     importance: String,
@@ -550,6 +564,12 @@ private fun ExpandableSettingsSection(
             }
         }
     }
+}
+
+@Composable
+internal fun SettingsSubgroup(title: String, summary: String, content: @Composable ColumnScope.() -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    ExpandableSettingsSection(title, summary, "DETAILS", expanded, { expanded = it }, content)
 }
 
 @Composable

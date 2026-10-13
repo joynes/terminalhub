@@ -70,12 +70,18 @@ class ExportImportManager @Inject constructor(
         val sb = StringBuilder()
         val pinnedActions = db.pinnedActionDao().all()
         sb.appendLine("version: 2")
+        sb.appendLine("format: terminalhub-configuration")
+        sb.appendLine("# Full configuration backup for phone migration. Not a settings-only AI file.")
+        sb.appendLine("# Includes all exported servers/projects and pins; never passwords/private SSH keys or history.")
         sb.appendLine("settings:")
         sb.appendLine("  keyBarLayout: ${ys(KeyBarLayoutConfig.encode(settingsRepository.settings.value.keyBarRows))}")
         sb.appendLine("  keyBarHighlights: ${ys(KeyBarLayoutConfig.encodeHighlights(settingsRepository.settings.value.keyBarHighlightedKeyIds))}")
         sb.appendLine("  keyBarHighlightIntensity: ${settingsRepository.settings.value.keyBarHighlightIntensity}")
         sb.appendLine("  textInputPanelOpacity: ${settingsRepository.settings.value.textInputPanelOpacity}")
         sb.appendLine("  terminalScroll: ${ys(settingsRepository.settings.value.terminalScroll.encode())}")
+        val portable = settingsRepository.settings.value.copy(inputHistoryEnabled = false,
+            keepSshActiveInBackground = false, automaticallyStartBackgroundSsh = false)
+        sb.appendLine("  portableSettingsYaml: ${ys(se.joynes.terminalhub.data.settings.SettingsYaml.export(portable, includeDeviceApprovals = false))}")
         sb.appendLine("  globalPinnedActions: ${ys(encodePinnedActions(pinnedActions.filter { it.scope == "GLOBAL" }))}")
         val locals = JSONArray()
         for (project in localProjects) {
@@ -136,6 +142,10 @@ class ExportImportManager @Inject constructor(
             ?: error("Cannot read file")
 
         val servers = parseYaml(text)
+        require(text.lineSequence().any { it.trimEnd() == "servers:" }) { "Not a full app configuration backup. Use the Settings-only importer for an AI settings file." }
+        val portableSettings = extractSettingsValue(text, "portableSettingsYaml")?.let {
+            se.joynes.terminalhub.data.settings.SettingsYaml.preview(it, settingsRepository.settings.value).next
+        }
         val scrollSettings = extractTerminalScrollFromYaml(text) ?: settingsRepository.settings.value.terminalScroll
         val localProjects = JSONArray(extractSettingsValue(text, "localProjects") ?: "[]")
         for (index in 0 until localProjects.length()) {
@@ -165,6 +175,11 @@ class ExportImportManager @Inject constructor(
 
         // Consent belongs to this device and is never imported, even from an edited backup.
         settingsRepository.setInputHistoryEnabled(false)
+        settingsRepository.setKeepSshActiveInBackground(false)
+        if (runtimeRepository.state.value.foregroundServiceRunning) {
+            se.joynes.terminalhub.service.BackgroundSshService.requestStop(appContext,
+                se.joynes.terminalhub.service.BackgroundSshService.STOP_REASON_USER_SETTINGS, closeTransports = false)
+        }
         notesRepository.resetForImport()
         sessionManager.clearForConfigImport()
         runtimeRepository.clearSessionState()
@@ -230,6 +245,10 @@ class ExportImportManager @Inject constructor(
         settingsRepository.setKeyBarHighlightIntensity(keyBarHighlightIntensity)
         settingsRepository.setTextInputPanelOpacity(textInputPanelOpacity)
         settingsRepository.setTerminalScroll(scrollSettings)
+        portableSettings?.let {
+            settingsRepository.applySettingsImport(settingsRepository.settings.value, it.copy(
+                inputHistoryEnabled = false, keepSshActiveInBackground = false, automaticallyStartBackgroundSsh = false))
+        }
         return ImportResult(serversImported, projectsImported)
     }
 

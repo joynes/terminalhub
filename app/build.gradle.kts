@@ -146,6 +146,7 @@ dependencies {
         exclude(group = "com.google.crypto.tink", module = "tink")
     }
     implementation(libs.jsch)
+    implementation(libs.snakeyaml)
 
     // Terminal emulator (local Termux modules, patched for SSH-backed embedded sessions)
     implementation(project(":terminal-emulator"))

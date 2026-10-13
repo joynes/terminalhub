@@ -15,6 +15,7 @@ class SettingsHierarchyTest {
             listOf(
                 SettingsSectionId.CONNECTIONS,
                 SettingsSectionId.TERMINAL_INPUT,
+                SettingsSectionId.TRANSFER,
                 SettingsSectionId.ADVANCED,
                 SettingsSectionId.STATUS
             ),
@@ -23,11 +24,8 @@ class SettingsHierarchyTest {
     }
 
     @Test
-    fun `everyday sections start expanded and technical sections start collapsed`() {
-        assertTrue(isSettingsSectionExpandedByDefault(SettingsSectionId.CONNECTIONS))
-        assertTrue(isSettingsSectionExpandedByDefault(SettingsSectionId.TERMINAL_INPUT))
-        assertFalse(isSettingsSectionExpandedByDefault(SettingsSectionId.ADVANCED))
-        assertFalse(isSettingsSectionExpandedByDefault(SettingsSectionId.STATUS))
+    fun `overview starts with categories rather than a flat list of controls`() {
+        SettingsSectionId.entries.forEach { assertFalse(isSettingsSectionExpandedByDefault(it)) }
     }
 
     @Test

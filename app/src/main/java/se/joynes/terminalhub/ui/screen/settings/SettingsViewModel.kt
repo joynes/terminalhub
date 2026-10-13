@@ -3,7 +3,11 @@ package se.joynes.terminalhub.ui.screen.settings
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import android.net.Uri
+import se.joynes.terminalhub.data.settings.SettingsFileManager
+import se.joynes.terminalhub.data.settings.SettingsImportPreview
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import se.joynes.terminalhub.data.runtime.AppRuntimeRepository
@@ -23,10 +27,39 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: AppSettingsRepository,
     private val runtimeRepository: AppRuntimeRepository,
     private val backgroundSshModeController: BackgroundSshModeController,
-    private val inputActions: se.joynes.terminalhub.data.repository.InputActionsRepository
+    private val inputActions: se.joynes.terminalhub.data.repository.InputActionsRepository,
+    private val settingsFiles: SettingsFileManager
 ) : ViewModel() {
     val settings = settingsRepository.settings
+    val settingsPreview = MutableStateFlow<SettingsImportPreview?>(null)
+    val settingsFileBusy = MutableStateFlow(false)
+    val settingsFileMessage = MutableStateFlow<String?>(null)
+    fun exportSettings(uri: Uri) = viewModelScope.launch {
+        settingsFileBusy.value = true
+        try { settingsFiles.export(uri); settingsFileMessage.value = "Settings-only YAML exported" }
+        catch (error: Exception) { settingsFileMessage.value = error.message ?: "Settings export failed" }
+        finally { settingsFileBusy.value = false }
+    }
+    fun previewSettings(uri: Uri) = viewModelScope.launch {
+        settingsFileBusy.value = true
+        try { settingsPreview.value = settingsFiles.preview(uri) }
+        catch (error: Exception) { settingsFileMessage.value = error.message ?: "Settings import failed" }
+        finally { settingsFileBusy.value = false }
+    }
+    fun applySettingsPreview(sensitiveChangesApproved: Boolean = false) {
+        val preview = settingsPreview.value ?: return
+        try {
+            // Validate the snapshot before stopping any service or changing any preferences.
+            require(settingsRepository.settings.value == preview.base) { "Settings changed during preview. Import again to review them." }
+            require(!(preview.enablesHistory || preview.enablesBackground) || sensitiveChangesApproved) { "Explicit approval is required for history/background SSH changes." }
+            settingsRepository.applySettingsImport(preview.base, preview.next)
+            if (preview.base.keepSshActiveInBackground && !preview.next.keepSshActiveInBackground) stopBackgroundSsh()
+            settingsFileMessage.value = "Imported ${preview.changes.size} setting changes. Servers and projects unchanged."
+            settingsPreview.value = null
+        } catch (error: Exception) { settingsFileMessage.value = error.message ?: "Settings import failed" }
+    }
     fun setTerminalScroll(settings: se.joynes.terminalhub.data.settings.TerminalScrollSettings) = settingsRepository.setTerminalScroll(settings)
+    fun setTextInputPanelOpacity(value: Float) = settingsRepository.setTextInputPanelOpacity(value)
     val runtimeState = runtimeRepository.state
     val backgroundSshMode = backgroundSshModeController.mode
     fun setAutomaticallyStartBackgroundSsh(enabled: Boolean) {

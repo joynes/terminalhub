@@ -47,10 +47,10 @@ protect your SSH account, server disks and backups. No raw note contents are log
 ## Local Android projects and backup
 
 App-private local notes do **not** survive uninstall or clearing application data.
-Export Config offers **Include local project notes**, off by default. Enable it and
+Settings → Backup & AI Settings → Export Backup offers **Include local project notes**, off by default. Enable it and
 keep the resulting backup safely before uninstalling. It includes readable private
 text, not encryption. Import restores local projects and remaps their notes/pins to
-the new project IDs. The current export workflow exports the open project tabs.
+the new project IDs. Full backup exports all saved projects, including closed tabs.
 
 SSH note text is never included in configuration exports. Export/import restores
 server/project configuration; restore credentials separately, then connect to the

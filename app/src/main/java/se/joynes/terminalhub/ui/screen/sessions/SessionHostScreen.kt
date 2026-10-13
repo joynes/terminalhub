@@ -53,8 +53,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.core.content.ContextCompat
 import se.joynes.terminalhub.R
 import se.joynes.terminalhub.BuildConfig
-import se.joynes.terminalhub.ui.screen.export.ExportImportState
-import se.joynes.terminalhub.ui.screen.export.ExportImportViewModel
 import se.joynes.terminalhub.ui.screen.download.DownloadState
 import se.joynes.terminalhub.ui.screen.download.FileDownloadViewModel
 import se.joynes.terminalhub.ui.screen.download.FloatingFileDownloadDialog
@@ -164,12 +162,8 @@ fun SessionHostScreen(
     var isTerminalAtBottom by remember { mutableStateOf(true) }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
-    val exportImportViewModel: ExportImportViewModel = hiltViewModel()
     val notesViewModel: ProjectNotesViewModel = hiltViewModel()
     var showProjectNotes by rememberSaveable { mutableStateOf(false) }
-    var showExportOptions by remember { mutableStateOf(false) }
-    var includeLocalNotes by remember { mutableStateOf(false) }
-    val exportImportState by exportImportViewModel.state.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.uiMessages.collect { message ->
@@ -285,64 +279,6 @@ fun SessionHostScreen(
         )
     }
 
-    val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("text/plain")
-    ) { uri ->
-        uri?.let {
-            exportImportViewModel.export(
-                context,
-                it,
-                activeProjectIds = projectTabs.map { tab -> tab.projectId }.toSet(),
-                includeLocalNotes = includeLocalNotes
-            )
-        }
-    }
-
-    val importLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> uri?.let { exportImportViewModel.import(context, it) } }
-
-    if (showExportOptions) AlertDialog(
-        onDismissRequest = { showExportOptions = false },
-        title = { Text("Export configuration") },
-        text = {
-            Column {
-                Text("SSH notes stay on your server and are not included. Restore the same server and project path to recover them.")
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = includeLocalNotes, onCheckedChange = { includeLocalNotes = it })
-                    Text("Include local project notes")
-                }
-                Text("Local notes cannot survive uninstall without a backup. If included, private note text is readable in this file.")
-            }
-        },
-        confirmButton = { TextButton(onClick = {
-            showExportOptions = false
-            exportLauncher.launch("terminalhub_backup.yaml")
-        }) { Text("EXPORT") } },
-        dismissButton = { TextButton(onClick = { showExportOptions = false }) { Text("CANCEL") } }
-    )
-
-    LaunchedEffect(exportImportState) {
-        when (val s = exportImportState) {
-            is ExportImportState.ExportDone -> {
-                Toast.makeText(context, "Config exported", Toast.LENGTH_SHORT).show()
-                exportImportViewModel.resetState()
-            }
-            is ExportImportState.ImportDone -> {
-                Toast.makeText(
-                    context,
-                    "Imported ${s.result.servers} server(s), ${s.result.projects} project(s)",
-                    Toast.LENGTH_LONG
-                ).show()
-                exportImportViewModel.resetState()
-            }
-            is ExportImportState.Error -> {
-                Toast.makeText(context, "Error: ${s.message}", Toast.LENGTH_LONG).show()
-                exportImportViewModel.resetState()
-            }
-            else -> {}
-        }
-    }
 
     val activeProjectId = remember(activeId, projectTabs) {
         projectTabs.firstOrNull { it.sessionId == activeId }?.projectId
@@ -921,35 +857,6 @@ fun SessionHostScreen(
                             onClick = {
                                 showSettingsMenu = false
                                 showSessionHistory = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    "Export Config",
-                                    color = Color.White,
-                                    fontFamily = MonoFontFamily,
-                                    fontSize = 12.sp
-                                )
-                            },
-                            onClick = {
-                                showSettingsMenu = false
-                                includeLocalNotes = false
-                                showExportOptions = true
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    "Import Config",
-                                    color = Color.White,
-                                    fontFamily = MonoFontFamily,
-                                    fontSize = 12.sp
-                                )
-                            },
-                            onClick = {
-                                showSettingsMenu = false
-                                importLauncher.launch(arrayOf("text/plain", "application/yaml", "*/*"))
                             }
                         )
                         DropdownMenuItem(
