@@ -14,6 +14,25 @@ import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
 
 @RunWith(AndroidJUnit4::class)
 class AppSettingsPersistenceTest {
+    @Test fun remoteSortingDefaultsToNameAndEveryChoiceSurvivesRecreation() {
+        val initial = AppSettingsRepository(context)
+        assertEquals("NAME", initial.settings.value.remoteDownloadSort)
+        assertEquals(true, initial.settings.value.remoteDownloadSortAscending)
+        listOf("NAME", "DATE", "TYPE", "SIZE").forEach { property ->
+            listOf(false, true).forEach { ascending ->
+                AppSettingsRepository(context).setRemoteDownloadSort(property, ascending)
+                val recreated = AppSettingsRepository(context).settings.value
+                assertEquals(property, recreated.remoteDownloadSort)
+                assertEquals(ascending, recreated.remoteDownloadSortAscending)
+            }
+        }
+    }
+
+    @Test fun invalidStoredRemoteSortFallsBackToName() {
+        context.getSharedPreferences("app_settings", Context.MODE_PRIVATE).edit()
+            .putString("remote_download_sort", "INVALID").commit()
+        assertEquals("NAME", AppSettingsRepository(context).settings.value.remoteDownloadSort)
+    }
     @Test fun intentionallyImportedOldFactoryKeybarIsNotMigratedAgainOnRestart() {
         val settings = AppSettingsRepository(context)
         val rows = se.joynes.terminalhub.data.settings.KeyBarLayoutConfig.defaultRows.map { row -> row.map { if (it == "PROJECT_NOTES") "DIGIT_3" else it } }

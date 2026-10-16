@@ -4,6 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsYamlTest {
+    @Test fun remoteSortingRoundTripsAndInvalidSortsAreRejected() {
+        val settings = AppSettings(remoteDownloadSort = "DATE", remoteDownloadSortAscending = false)
+        assertEquals(settings, SettingsYaml.preview(SettingsYaml.export(settings), AppSettings()).next)
+        assertTrue(runCatching { SettingsYaml.preview(file("  remoteDownloadSort: RANDOM"), settings) }.isFailure)
+        assertTrue(runCatching { SettingsYaml.preview(file("  remoteDownloadSortAscending: \"false\""), settings) }.isFailure)
+    }
     @Test fun checkedInCommentedExampleIsImportableWithoutChangesOrDeviceApprovals() {
         val sample = listOf(java.io.File("../docs/terminalhub-settings.example.yaml"), java.io.File("docs/terminalhub-settings.example.yaml"))
             .first { it.exists() }.readText()

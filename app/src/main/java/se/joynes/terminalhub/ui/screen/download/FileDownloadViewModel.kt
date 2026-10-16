@@ -19,6 +19,7 @@ import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.security.SecurePrefsManager
+import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 import se.joynes.terminalhub.data.ssh.ScpDownloader
 import se.joynes.terminalhub.data.ssh.remoteSubdirectory
@@ -51,7 +52,8 @@ sealed interface DownloadState {
         val entries: List<RemoteFileEntry>,
         val fileName: String,
         val content: String,
-        val markdown: Boolean
+        val markdown: Boolean,
+        val imageBytes: ByteArray? = null
     ) : DownloadState
     data class Error(val message: String, val directory: String = "") : DownloadState
 }
@@ -64,11 +66,16 @@ class FileDownloadViewModel @Inject constructor(
     private val projectRepo: ProjectRepository,
     private val engine: ScriptTemplateEngine,
     private val scpDownloader: ScpDownloader,
-    private val securePrefs: SecurePrefsManager
+    private val securePrefs: SecurePrefsManager,
+    private val settingsRepository: AppSettingsRepository
 ) : ViewModel() {
 
     private val states = MutableStateFlow<Map<Long, DownloadState>>(emptyMap())
     private val previewJobs = mutableMapOf<Long, Job>()
+
+    val settings = settingsRepository.settings
+    internal fun setSort(selection: RemoteFileSortSelection) =
+        settingsRepository.setRemoteDownloadSort(selection.property.name, selection.ascending)
 
     fun downloadState(projectId: Long): Flow<DownloadState> =
         states.map { it[projectId] ?: DownloadState.Idle }
@@ -111,12 +118,14 @@ class FileDownloadViewModel @Inject constructor(
         entry: RemoteFileEntry
     ) {
         val listed = states.value[projectId] as? DownloadState.Listed ?: return
-        if (!isPreviewableTextFile(entry.name) || entry.isDirectory) return
-        if (entry.size > MAX_REMOTE_TEXT_PREVIEW_BYTES) {
+        val image = isPreviewableImageFile(entry.name)
+        if ((!isPreviewableTextFile(entry.name) && !image) || entry.isDirectory) return
+        val limit = if (image) MAX_REMOTE_IMAGE_PREVIEW_BYTES else MAX_REMOTE_TEXT_PREVIEW_BYTES
+        if (entry.size > limit) {
             setState(
                 projectId,
                 DownloadState.Error(
-                    "Preview supports text files up to ${MAX_REMOTE_TEXT_PREVIEW_BYTES / 1024} KB.",
+                    "Preview supports ${if (image) "images" else "text files"} up to ${limit / 1024} KB.",
                     listed.directory
                 )
             )
@@ -124,7 +133,7 @@ class FileDownloadViewModel @Inject constructor(
         }
 
         previewJobs[projectId] = viewModelScope.launch {
-            val output = LimitedPreviewOutputStream(MAX_REMOTE_TEXT_PREVIEW_BYTES.toInt())
+            val output = LimitedPreviewOutputStream(limit.toInt())
             try {
                 val (server, project) = resolveRemoteProject(serverId, projectId)
                 val directory = remoteSubdirectory(engine.projectPath(server, project), listed.directory)
@@ -151,8 +160,8 @@ class FileDownloadViewModel @Inject constructor(
                     )
                 }
                 val bytes = output.toByteArray()
-                check(bytes.none { it == 0.toByte() }) { "This file appears to be binary and cannot be previewed." }
-                val content = bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
+                if (!image) check(bytes.none { it == 0.toByte() }) { "This file appears to be binary and cannot be previewed." }
+                val content = if (image) "" else bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
                 setState(
                     projectId,
                     DownloadState.PreviewReady(
@@ -160,7 +169,8 @@ class FileDownloadViewModel @Inject constructor(
                         entries = listed.entries,
                         fileName = entry.name,
                         content = content,
-                        markdown = isMarkdownFile(entry.name)
+                        markdown = isMarkdownFile(entry.name),
+                        imageBytes = if (image) bytes else null
                     )
                 )
             } catch (cancelled: CancellationException) {
@@ -238,6 +248,8 @@ class FileDownloadViewModel @Inject constructor(
         createDestination: (String) -> Uri
     ) {
         if (fileNames.isEmpty() || states.value[projectId] is DownloadState.Downloading) return
+        // Reserve the batch before repository/IO suspension so repeated taps cannot start it twice.
+        setState(projectId, DownloadState.Downloading(fileNames.first(), 0f, 1, fileNames.size))
         viewModelScope.launch {
             val completed = mutableListOf<DownloadedRemoteFile>()
             try {
@@ -331,7 +343,7 @@ private class LimitedPreviewOutputStream(
 
     private fun ensureCapacityFor(additionalBytes: Int) {
         if (count + additionalBytes > maximumBytes) {
-            throw IOException("Preview supports text files up to ${maximumBytes / 1024} KB.")
+            throw IOException("Preview supports files up to ${maximumBytes / 1024} KB.")
         }
     }
 }

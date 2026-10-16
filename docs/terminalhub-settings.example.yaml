@@ -10,6 +10,11 @@
 format: terminalhub-settings
 version: 1
 settings:
+  # Last remote file sort, shared across projects: NAME, DATE, TYPE or SIZE.
+  # Directories always come first. Folder permissions cannot move to a new phone.
+  remoteDownloadSort: NAME
+  # true = ascending (oldest first for DATE); false = descending (newest first).
+  remoteDownloadSortAscending: true
   # boolean; default true. Re-focuses the terminal/keyboard when returning to the app. Faster
   # typing readiness; false avoids automatically opening the keyboard. Does not reconnect SSH
   # or guarantee background survival.

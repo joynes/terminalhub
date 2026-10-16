@@ -6,6 +6,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RemoteTextPreviewTest {
+    @Test fun previewSupportsNativeImagesButNotActiveMarkupOrArchives() {
+        listOf("a.png", "b.JPG", "c.jpeg", "d.webp", "e.gif", "f.bmp").forEach {
+            assertTrue(it, isPreviewableImageFile(it))
+        }
+        listOf("a.svg", "b.zip", "c.png.exe", "no-extension", "x.txt").forEach {
+            assertFalse(it, isPreviewableImageFile(it))
+        }
+    }
     @Test
     fun previewableTypesIncludeTextMarkdownAndCommonSourceFiles() {
         assertTrue(isPreviewableTextFile("README.md"))

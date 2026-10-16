@@ -23,6 +23,8 @@ internal fun normalizeKeyBarHighlightIntensity(value: Float): Float =
     value.coerceIn(MIN_KEY_BAR_HIGHLIGHT_INTENSITY, MAX_KEY_BAR_HIGHLIGHT_INTENSITY)
 
 data class AppSettings(
+    val remoteDownloadSort: String = "NAME",
+    val remoteDownloadSortAscending: Boolean = true,
     val terminalScroll: TerminalScrollSettings = TerminalScrollSettings(),
     val inputHistoryEnabled: Boolean = false,
     val preferFastResume: Boolean = true,
@@ -61,6 +63,9 @@ class AppSettingsRepository @Inject constructor(
 
     private val _settings = MutableStateFlow(
         AppSettings(
+            remoteDownloadSort = prefs.getString("remote_download_sort", "NAME")
+                ?.takeIf { it in setOf("NAME", "DATE", "TYPE", "SIZE") } ?: "NAME",
+            remoteDownloadSortAscending = prefs.getBoolean("remote_download_sort_ascending", true),
             terminalScroll = TerminalScrollSettings.decode(prefs.getString("terminal_scroll", null)) ?: TerminalScrollSettings(),
             inputHistoryEnabled = historyConsentPrefs.getBoolean(KEY_INPUT_HISTORY_ENABLED, false),
             preferFastResume = prefs.getBoolean(KEY_FAST_RESUME, true),
@@ -108,6 +113,11 @@ class AppSettingsRepository @Inject constructor(
     }
 
     fun setTerminalScroll(settings: TerminalScrollSettings) = update(_settings.value.copy(terminalScroll = settings.normalized()))
+
+    fun setRemoteDownloadSort(property: String, ascending: Boolean) {
+        require(property in setOf("NAME", "DATE", "TYPE", "SIZE"))
+        update(_settings.value.copy(remoteDownloadSort = property, remoteDownloadSortAscending = ascending))
+    }
 
     /** Validated settings-only import: one observable update, no project/credential mutation. */
     fun applySettingsImport(expected: AppSettings, next: AppSettings) {
@@ -178,6 +188,8 @@ class AppSettingsRepository @Inject constructor(
         historyConsentPrefs.edit().putBoolean(KEY_INPUT_HISTORY_ENABLED, next.inputHistoryEnabled).apply()
         prefs.edit()
             .putString("terminal_scroll", next.terminalScroll.encode())
+            .putString("remote_download_sort", next.remoteDownloadSort)
+            .putBoolean("remote_download_sort_ascending", next.remoteDownloadSortAscending)
             .putBoolean(KEY_FAST_RESUME, next.preferFastResume)
             .putBoolean(KEY_EXECUTE_TEXT_INPUT_ON_SEND, next.executeTextInputOnSend)
             .putFloat(KEY_TEXT_INPUT_PANEL_OPACITY, next.textInputPanelOpacity)

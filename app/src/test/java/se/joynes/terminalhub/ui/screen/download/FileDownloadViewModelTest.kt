@@ -51,10 +51,12 @@ class FileDownloadViewModelTest {
     private val downloader: ScpDownloader = mock()
     private val securePrefs: SecurePrefsManager = mock()
     private val engine = ScriptTemplateEngine()
+    private val settingsRepository: se.joynes.terminalhub.data.settings.AppSettingsRepository = mock()
 
     @Before
     fun setUp() {
         Dispatchers.setMain(dispatcher)
+        whenever(settingsRepository.settings).thenReturn(kotlinx.coroutines.flow.MutableStateFlow(se.joynes.terminalhub.data.settings.AppSettings()))
     }
 
     @After
@@ -309,6 +311,71 @@ class FileDownloadViewModelTest {
         )
     }
 
+    @Test fun imagePreviewPreservesBinaryBytesInMemoryAndReturnsToSameFolder() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val bytes = byteArrayOf(0, 1, 2, -1, 0)
+        val entry = RemoteFileEntry("cover.PNG", bytes.size.toLong())
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), eq("~/terminalhub/music/images")))
+            .thenReturn(listOf(entry))
+        whenever(downloader.download(eq(server), isNull(), isNull(), eq("~/terminalhub/music/images"), eq(entry.name), any()))
+            .thenAnswer { invocation ->
+                val output = invocation.getArgument<OutputStream>(5)
+                flow { output.write(bytes); emit(ScpDownloadProgress(entry.name, bytes.size.toLong(), bytes.size.toLong())) }
+            }
+        val viewModel = createViewModel()
+        viewModel.loadRemoteFiles(server.id, project.id, "images")
+        advanceUntilIdle()
+        viewModel.previewRemoteFile(server.id, project.id, entry)
+        advanceUntilIdle()
+        val preview = viewModel.downloadState(project.id).first() as DownloadState.PreviewReady
+        org.junit.Assert.assertArrayEquals(bytes, preview.imageBytes)
+        assertEquals("", preview.content)
+        assertEquals(false, preview.markdown)
+        viewModel.closePreview(project.id)
+        assertEquals(DownloadState.Listed("images", listOf(entry)), viewModel.downloadState(project.id).first())
+    }
+
+    @Test fun imageTransferIsBoundedEvenIfRemoteSizeIsIncorrect() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val entry = RemoteFileEntry("growing.png", 1)
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), any())).thenReturn(listOf(entry))
+        whenever(downloader.download(eq(server), isNull(), isNull(), any(), eq(entry.name), any()))
+            .thenAnswer { invocation ->
+                val output = invocation.getArgument<OutputStream>(5)
+                flow<ScpDownloadProgress> {
+                    output.write(ByteArray(MAX_REMOTE_IMAGE_PREVIEW_BYTES.toInt() + 1))
+                }
+            }
+        val viewModel = createViewModel()
+        viewModel.loadRemoteFiles(server.id, project.id)
+        advanceUntilIdle()
+        viewModel.previewRemoteFile(server.id, project.id, entry)
+        advanceUntilIdle()
+        val state = viewModel.downloadState(project.id).first() as DownloadState.Error
+        assertTrue(state.message.contains("8192 KB"))
+    }
+
+    @Test fun oversizedImageIsRejectedBeforeTransfer() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val entry = RemoteFileEntry("huge.png", MAX_REMOTE_IMAGE_PREVIEW_BYTES + 1)
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), any())).thenReturn(listOf(entry))
+        val viewModel = createViewModel()
+        viewModel.loadRemoteFiles(server.id, project.id)
+        advanceUntilIdle()
+        viewModel.previewRemoteFile(server.id, project.id, entry)
+        assertTrue(viewModel.downloadState(project.id).first() is DownloadState.Error)
+        verify(downloader, never()).download(any(), any(), any(), any(), any(), any())
+    }
+
     @Test
     fun batchDownloadWritesEverySelectedFileAndReportsCombinedResult() = runTest(dispatcher) {
         val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
@@ -379,11 +446,23 @@ class FileDownloadViewModelTest {
         assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
     }
 
+    @Test fun repeatedDownloadTapsReserveOnlyOneBatchBeforeRepositoryReturns() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val context: Context = mock()
+        repeat(2) {
+            viewModel.startDownloads(7, 11, "images", listOf("photo.png"), context) { mock() }
+        }
+        assertTrue(viewModel.downloadState(11).first() is DownloadState.Downloading)
+        advanceUntilIdle()
+        verify(serverRepo).getById(7)
+    }
+
     private fun createViewModel() = FileDownloadViewModel(
         serverRepo = serverRepo,
         projectRepo = projectRepo,
         engine = engine,
         scpDownloader = downloader,
-        securePrefs = securePrefs
+        securePrefs = securePrefs,
+        settingsRepository = settingsRepository
     )
 }

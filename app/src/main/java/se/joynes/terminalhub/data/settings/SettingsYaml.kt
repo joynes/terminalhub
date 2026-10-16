@@ -16,6 +16,8 @@ object SettingsYaml {
     const val MAX_BYTES = 64 * 1024
     private data class Field(val key: String, val explanation: String, val read: (AppSettings) -> Any)
     private val fields = listOf(
+        Field("remoteDownloadSort", "NAME, DATE, TYPE or SIZE; default NAME. Last remote file browser sort, shared across projects. Directories always appear first. Folder access permissions stay on this device and are not exported.") { it.remoteDownloadSort },
+        Field("remoteDownloadSortAscending", "boolean; default true. Last file browser sort direction: true is ascending (oldest first for DATE), false descending (newest first). Tapping the selected sort reverses direction.") { it.remoteDownloadSortAscending },
         Field("preferFastResume", "boolean; default true. Re-focuses the terminal/keyboard when returning to the app. Faster typing readiness; false avoids automatically opening the keyboard. Does not reconnect SSH or guarantee background survival.") { it.preferFastResume },
         Field("executeTextInputOnSend", "boolean; default true. Text Input submissions send text then Enter, running commands or confirming interactive prompts. false sends text without execution. Direct pinned actions use their own per-action Send + Enter choice, independent of this setting. Review destructive commands first.") { it.executeTextInputOnSend },
         Field("textInputPanelOpacity", "number 0.15..1.0; default 0.50. Text Input background opacity: 0.15 is mostly transparent, 1.0 opaque. Lower values reveal the terminal but can reduce readability. Does not affect all app screens.") { it.textInputPanelOpacity },
@@ -123,7 +125,11 @@ object SettingsYaml {
         val old = current.terminalScroll
         val profile = if ("backgroundKeepaliveProfile" in values) enumValue<BackgroundKeepaliveProfile>(values["backgroundKeepaliveProfile"], "backgroundKeepaliveProfile") else current.backgroundKeepaliveProfile
         val scope = if ("backgroundKeepaliveScope" in values) enumValue<BackgroundKeepaliveScope>(values["backgroundKeepaliveScope"], "backgroundKeepaliveScope") else current.backgroundKeepaliveScope
+        val remoteSort = if ("remoteDownloadSort" in values) values["remoteDownloadSort"] else current.remoteDownloadSort
+        require(remoteSort is String && remoteSort in setOf("NAME", "DATE", "TYPE", "SIZE")) { "remoteDownloadSort must be NAME, DATE, TYPE or SIZE." }
         val next = current.copy(
+            remoteDownloadSort = remoteSort,
+            remoteDownloadSortAscending = bool(values, "remoteDownloadSortAscending", current.remoteDownloadSortAscending),
             preferFastResume = bool(values, "preferFastResume", current.preferFastResume),
             executeTextInputOnSend = bool(values, "executeTextInputOnSend", current.executeTextInputOnSend),
             inputHistoryEnabled = bool(values, "inputHistoryEnabled", current.inputHistoryEnabled),

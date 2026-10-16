@@ -30,12 +30,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +62,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun FloatingFileDownloadDialog(
@@ -82,33 +87,48 @@ fun FloatingFileDownloadDialog(
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
     var panelHeightPx by remember { mutableIntStateOf(0) }
     var selectedFileNames by remember(projectId) { mutableStateOf<Set<String>>(emptySet()) }
-    var sortSelection by remember(projectId) {
-        mutableStateOf(RemoteFileSortSelection(RemoteFileSort.NAME, ascending = true))
+    val settings by viewModel.settings.collectAsState()
+    val sortSelection = RemoteFileSortSelection(RemoteFileSort.valueOf(settings.remoteDownloadSort), settings.remoteDownloadSortAscending)
+    val scope = rememberCoroutineScope()
+    var pendingDownload by remember { mutableStateOf<PendingFolderDownload?>(null) }
+    var destination by remember { mutableStateOf(destinationDirectoryStore.lastPersistedDirectory()) }
+    var checkingDestination by remember { mutableStateOf(false) }
+    var destinationMessage by remember { mutableStateOf<String?>(null) }
+
+    fun downloadTo(request: PendingFolderDownload, uri: Uri) {
+        viewModel.startDownloads(request.serverId, request.projectId, request.directory,
+            request.fileNames, context) { fileName ->
+            try {
+                createDownloadDocument(context, uri, fileName)
+            } catch (error: Exception) {
+                destinationDirectoryStore.clear()
+                throw java.io.IOException("Cannot write to the download folder. Return to the file list and use CHANGE FOLDER. ${error.message.orEmpty()}", error)
+            }
+        }
     }
 
     val destinationPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { directoryUri ->
-        val state = downloadState as? DownloadState.Listed
-        val selected = selectedFileNames.toList()
-        if (directoryUri != null && state != null && selected.isNotEmpty()) {
+        val request = pendingDownload
+        pendingDownload = null
+        if (directoryUri != null) {
             val permissionPersisted = runCatching {
                 context.contentResolver.takePersistableUriPermission(
                     directoryUri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
                 )
             }.isSuccess
-            if (permissionPersisted) destinationDirectoryStore.save(directoryUri)
-            viewModel.startDownloads(
-                serverId = serverId,
-                projectId = projectId,
-                relativeDirectory = state.directory,
-                fileNames = selected,
-                context = context,
-                createDestination = { fileName ->
-                    createDownloadDocument(context, directoryUri, fileName)
-                }
-            )
+            if (permissionPersisted) {
+                destinationDirectoryStore.save(directoryUri)
+                destination = directoryUri
+                destinationMessage = null
+            } else {
+                destinationDirectoryStore.clear()
+                destination = null
+                destinationMessage = "Folder access could not be remembered. Choose a folder again for the next download."
+            }
+            if (request != null) downloadTo(request, directoryUri)
         }
     }
 
@@ -118,11 +138,32 @@ fun FloatingFileDownloadDialog(
         }
     }
 
+    val folderController = RemoteDownloadFolderController(
+        remembered = { destinationDirectoryStore.lastPersistedDirectory() },
+        isWritable = { uri -> withContext(Dispatchers.IO) { destinationDirectoryStore.isWritableDirectory(uri) } },
+        forget = {
+            destinationDirectoryStore.clear()
+            if (destination != null) destinationMessage = "The previous folder is no longer available. Choose a download folder again."
+            destination = null
+        },
+        start = ::downloadTo,
+        choose = { request, initial ->
+            pendingDownload = request
+            destinationPicker.launch(initial?.let {
+                DocumentsContract.buildDocumentUriUsingTree(it, DocumentsContract.getTreeDocumentId(it))
+            })
+        }
+    )
+
     LaunchedEffect((downloadState as? DownloadState.Listed)?.directory) {
         selectedFileNames = emptySet()
     }
 
     if (downloadState is DownloadState.PreviewReady) {
+        if (downloadState.imageBytes != null) {
+            RemoteImagePreviewDialog(downloadState.fileName, downloadState.imageBytes) { viewModel.closePreview(projectId) }
+            return
+        }
         RemoteTextPreviewDialog(
             fileName = downloadState.fileName,
             content = downloadState.content,
@@ -222,7 +263,7 @@ fun FloatingFileDownloadDialog(
                         RemoteFileSortControls(
                             selection = sortSelection,
                             onSelect = { property ->
-                                sortSelection = nextRemoteFileSortSelection(sortSelection, property)
+                                viewModel.setSort(nextRemoteFileSortSelection(sortSelection, property))
                             }
                         )
                         RemoteFileList(
@@ -278,16 +319,30 @@ fun FloatingFileDownloadDialog(
                                     "DOWNLOAD SELECTED (${selectedFileNames.size})"
                                 },
                                 onClick = {
-                                    if (selectedFileNames.isNotEmpty()) {
-                                        destinationPicker.launch(
-                                            destinationDirectoryStore.lastPersistedDirectory()
-                                        )
+                                    if (selectedFileNames.isNotEmpty() && !checkingDestination) {
+                                        val request = PendingFolderDownload(serverId, projectId, downloadState.directory, selectedFileNames.toList())
+                                        checkingDestination = true
+                                        scope.launch {
+                                            try {
+                                                folderController.download(request)
+                                            } finally { checkingDestination = false }
+                                        }
                                     }
                                 },
-                                enabled = selectedFileNames.isNotEmpty(),
+                                enabled = selectedFileNames.isNotEmpty() && !checkingDestination,
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
+                        Text(
+                            if (checkingDestination) "Checking download folder…" else destination?.let {
+                                "SAVE TO: " + runCatching { DocumentsContract.getTreeDocumentId(it).substringAfterLast('/') }.getOrDefault(it.toString())
+                            } ?: "Choose a folder on your first download.",
+                            color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily, maxLines = 2
+                        )
+                        destinationMessage?.let { Text(it, color = MegaDriveAccent, fontSize = 11.sp) }
+                        RetroButton(text = "CHANGE FOLDER", enabled = !checkingDestination, onClick = {
+                            folderController.changeFolder()
+                        }, modifier = Modifier.fillMaxWidth())
                         if (downloadState.directory.isNotEmpty()) {
                             RetroButton(
                                 text = "UP ONE LEVEL",
@@ -557,7 +612,7 @@ internal fun RemoteFileList(
                 if (entry.isDirectory) {
                     Text(">", color = MegaDrivePrimary, fontSize = 11.sp, fontFamily = MonoFontFamily)
                 } else {
-                    if (isPreviewableTextFile(entry.name)) {
+                    if (isPreviewableTextFile(entry.name) || isPreviewableImageFile(entry.name)) {
                         Text(
                             "PREVIEW",
                             color = MegaDriveAccent,
