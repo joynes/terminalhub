@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
@@ -86,9 +88,20 @@ fun FloatingFileDownloadDialog(
     var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
     var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
     var panelHeightPx by remember { mutableIntStateOf(0) }
-    var selectedFileNames by remember(projectId) { mutableStateOf<Set<String>>(emptySet()) }
     val settings by viewModel.settings.collectAsState()
     val sortSelection = RemoteFileSortSelection(RemoteFileSort.valueOf(settings.remoteDownloadSort), settings.remoteDownloadSortAscending)
+    val listed = downloadState as? DownloadState.Listed
+    val sortedEntries = listed?.let { sortRemoteFileEntries(it.entries, sortSelection) }.orEmpty()
+    val identity = viewModel.browseIdentity(projectId)
+    val browserState = if (listed != null) rememberRemoteBrowserUiState(
+        identity = identity ?: "project:$projectId",
+        directory = listed.directory,
+        entries = sortedEntries,
+        load = { identity?.let { viewModel.readBrowseView(it, listed.directory) }
+            ?: se.joynes.terminalhub.data.settings.RemoteBrowseViewState() },
+        save = { state -> identity?.let { viewModel.saveBrowseView(it, listed.directory, state) } }
+    ) else null
+    val selectedFileNames = browserState?.selectedFiles.orEmpty()
     val scope = rememberCoroutineScope()
     var pendingDownload by remember { mutableStateOf<PendingFolderDownload?>(null) }
     var destination by remember { mutableStateOf(destinationDirectoryStore.lastPersistedDirectory()) }
@@ -155,10 +168,6 @@ fun FloatingFileDownloadDialog(
         }
     )
 
-    LaunchedEffect((downloadState as? DownloadState.Listed)?.directory) {
-        selectedFileNames = emptySet()
-    }
-
     if (downloadState is DownloadState.PreviewReady) {
         if (downloadState.imageBytes != null) {
             RemoteImagePreviewDialog(downloadState.fileName, downloadState.imageBytes) { viewModel.closePreview(projectId) }
@@ -199,7 +208,7 @@ fun FloatingFileDownloadDialog(
                 .heightIn(max = panelMaxHeight)
                 .onSizeChanged { panelHeightPx = it.height }
                 .background(MegaDriveSurface, RoundedCornerShape(4.dp))
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(browserState?.panel ?: rememberScrollState())
         ) {
             Row(
                 modifier = Modifier
@@ -267,7 +276,8 @@ fun FloatingFileDownloadDialog(
                             }
                         )
                         RemoteFileList(
-                            entries = sortRemoteFileEntries(downloadState.entries, sortSelection),
+                            entries = sortedEntries,
+                            listState = browserState!!.list,
                             selectedFileNames = selectedFileNames,
                             modifier = Modifier.heightIn(min = 140.dp, max = listMaxHeight),
                             onOpenDirectory = { directory ->
@@ -278,7 +288,7 @@ fun FloatingFileDownloadDialog(
                                 )
                             },
                             onToggleFile = { file ->
-                                selectedFileNames = toggleRemoteFileSelection(
+                                browserState.selectedFiles = toggleRemoteFileSelection(
                                     selectedFileNames,
                                     file.name
                                 )
@@ -299,7 +309,7 @@ fun FloatingFileDownloadDialog(
                                     fontSize = 10.sp,
                                     fontFamily = MonoFontFamily,
                                     modifier = Modifier
-                                        .clickable { selectedFileNames = files.map { it.name }.toSet() }
+                                        .clickable { browserState.selectedFiles = files.map { it.name }.toSet() }
                                         .padding(vertical = 6.dp)
                                 )
                                 Text(
@@ -308,7 +318,7 @@ fun FloatingFileDownloadDialog(
                                     fontSize = 10.sp,
                                     fontFamily = MonoFontFamily,
                                     modifier = Modifier
-                                        .clickable { selectedFileNames = emptySet() }
+                                        .clickable { browserState.selectedFiles = emptySet() }
                                         .padding(vertical = 6.dp)
                                 )
                             }
@@ -575,7 +585,8 @@ internal fun RemoteFileList(
     modifier: Modifier = Modifier,
     onOpenDirectory: (RemoteFileEntry) -> Unit,
     onToggleFile: (RemoteFileEntry) -> Unit,
-    onPreviewFile: (RemoteFileEntry) -> Unit = {}
+    onPreviewFile: (RemoteFileEntry) -> Unit = {},
+    listState: LazyListState = rememberLazyListState()
 ) {
     if (entries.isEmpty()) {
         Text("This remote folder is empty.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
@@ -583,10 +594,11 @@ internal fun RemoteFileList(
     }
 
     LazyColumn(
+        state = listState,
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        items(entries, key = { "${it.isDirectory}:${it.name}" }) { entry ->
+        items(entries, key = ::remoteEntryKey) { entry ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

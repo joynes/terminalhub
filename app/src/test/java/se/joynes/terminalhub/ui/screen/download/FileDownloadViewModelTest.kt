@@ -60,6 +60,7 @@ class FileDownloadViewModelTest {
     fun setUp() {
         Dispatchers.setMain(dispatcher)
         whenever(settingsRepository.settings).thenReturn(kotlinx.coroutines.flow.MutableStateFlow(se.joynes.terminalhub.data.settings.AppSettings()))
+        whenever(browseLocationStore.locationKey(any(), any(), any())).thenReturn("test-location")
     }
 
     @After

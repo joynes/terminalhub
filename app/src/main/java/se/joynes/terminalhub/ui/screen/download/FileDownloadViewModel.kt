@@ -23,6 +23,7 @@ import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.security.SecurePrefsManager
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
 import se.joynes.terminalhub.data.settings.RemoteBrowseLocationStore
+import se.joynes.terminalhub.data.settings.RemoteBrowseViewState
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 import se.joynes.terminalhub.data.ssh.ScpDownloader
 import se.joynes.terminalhub.data.ssh.remoteSubdirectory
@@ -77,6 +78,12 @@ class FileDownloadViewModel @Inject constructor(
     private val states = MutableStateFlow<Map<Long, DownloadState>>(emptyMap())
     private val previewJobs = mutableMapOf<Long, Job>()
     private val listingJobs = mutableMapOf<Long, Job>()
+    private val browseIdentities = mutableMapOf<Long, String>()
+
+    internal fun browseIdentity(projectId: Long): String? = browseIdentities[projectId]
+    internal fun readBrowseView(identity: String, directory: String) = browseLocationStore.readView(identity, directory)
+    internal fun saveBrowseView(identity: String, directory: String, state: RemoteBrowseViewState) =
+        browseLocationStore.saveView(identity, directory, state)
 
     val settings = settingsRepository.settings
     internal fun setSort(selection: RemoteFileSortSelection) =
@@ -115,6 +122,7 @@ class FileDownloadViewModel @Inject constructor(
                 )
                 currentCoroutineContext().ensureActive()
                 browseLocationStore.save(server, project, projectRoot, requestedDirectory)
+                browseIdentities[projectId] = browseLocationStore.locationKey(server, project, projectRoot)
                 setState(projectId, DownloadState.Listed(requestedDirectory, entries))
             } catch (cancelled: CancellationException) {
                 throw cancelled

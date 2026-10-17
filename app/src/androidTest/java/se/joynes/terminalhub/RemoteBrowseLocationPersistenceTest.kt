@@ -9,6 +9,7 @@ import org.junit.Test
 import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.data.settings.RemoteBrowseLocationStore
+import se.joynes.terminalhub.data.settings.RemoteBrowseViewState
 
 class RemoteBrowseLocationPersistenceTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
@@ -48,5 +49,26 @@ class RemoteBrowseLocationPersistenceTest {
             assertTrue(path, runCatching { store.save(server, project, root, path) }.isFailure)
         }
         assertEquals("photos", store.lastDirectory(server, project, root))
+    }
+
+    @Test fun exactViewportAndSelectionSurviveRecreationAndAreSeparateForEveryFolderAndProject() {
+        val store = RemoteBrowseLocationStore(context)
+        val identity = store.locationKey(server, project, root)
+        val state = RemoteBrowseViewState(27, 19, "false:photo.png", 83, setOf("a.txt", "b.png"))
+        store.saveView(identity, "images", state)
+        val recreated = RemoteBrowseLocationStore(context)
+        assertEquals(state, recreated.readView(identity, "images"))
+        assertEquals(RemoteBrowseViewState(), recreated.readView(identity, "other"))
+        assertEquals(RemoteBrowseViewState(), recreated.readView(store.locationKey(server, project.copy(id = 12), root), "images"))
+    }
+
+    @Test fun damagedViewportDataFallsBackToSafeDefaults() {
+        val store = RemoteBrowseLocationStore(context)
+        val identity = store.locationKey(server, project, root)
+        store.saveView(identity, "images", RemoteBrowseViewState(9, 12))
+        val prefs = context.getSharedPreferences("remote_browse_locations", Context.MODE_PRIVATE)
+        val key = prefs.all.keys.single { it.startsWith("view:") }
+        prefs.edit().putString(key, "not JSON").commit()
+        assertEquals(RemoteBrowseViewState(), RemoteBrowseLocationStore(context).readView(identity, "images"))
     }
 }
