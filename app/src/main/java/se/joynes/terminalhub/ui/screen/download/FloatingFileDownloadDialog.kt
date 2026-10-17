@@ -480,6 +480,13 @@ fun FloatingFileDownloadDialog(
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
+                        if (downloadState.directory.isNotEmpty()) {
+                            RetroButton(
+                                text = "PROJECT ROOT",
+                                onClick = { viewModel.loadRemoteFiles(serverId, projectId, "") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }

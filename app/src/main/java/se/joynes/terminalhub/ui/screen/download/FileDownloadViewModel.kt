@@ -8,6 +8,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -20,6 +22,7 @@ import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
 import se.joynes.terminalhub.data.security.SecurePrefsManager
 import se.joynes.terminalhub.data.settings.AppSettingsRepository
+import se.joynes.terminalhub.data.settings.RemoteBrowseLocationStore
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 import se.joynes.terminalhub.data.ssh.ScpDownloader
 import se.joynes.terminalhub.data.ssh.remoteSubdirectory
@@ -67,11 +70,13 @@ class FileDownloadViewModel @Inject constructor(
     private val engine: ScriptTemplateEngine,
     private val scpDownloader: ScpDownloader,
     private val securePrefs: SecurePrefsManager,
-    private val settingsRepository: AppSettingsRepository
+    private val settingsRepository: AppSettingsRepository,
+    private val browseLocationStore: RemoteBrowseLocationStore
 ) : ViewModel() {
 
     private val states = MutableStateFlow<Map<Long, DownloadState>>(emptyMap())
     private val previewJobs = mutableMapOf<Long, Job>()
+    private val listingJobs = mutableMapOf<Long, Job>()
 
     val settings = settingsRepository.settings
     internal fun setSort(selection: RemoteFileSortSelection) =
@@ -81,33 +86,45 @@ class FileDownloadViewModel @Inject constructor(
         states.map { it[projectId] ?: DownloadState.Idle }
 
     fun reset(projectId: Long) {
+        listingJobs.remove(projectId)?.cancel()
         previewJobs.remove(projectId)?.cancel()
         states.update { it - projectId }
     }
 
-    fun loadRemoteFiles(serverId: Long, projectId: Long, relativeDirectory: String = "") {
+    fun loadRemoteFiles(serverId: Long, projectId: Long, relativeDirectory: String? = null) {
         val current = states.value[projectId]
         if (current is DownloadState.LoadingList ||
             current is DownloadState.Downloading ||
             current is DownloadState.PreviewLoading
         ) return
-        viewModelScope.launch {
-            setState(projectId, DownloadState.LoadingList(relativeDirectory))
+        var requestedDirectory = relativeDirectory ?: ""
+        setState(projectId, DownloadState.LoadingList(requestedDirectory))
+        listingJobs[projectId] = viewModelScope.launch {
             try {
                 val (server, project) = resolveRemoteProject(serverId, projectId)
-                val directory = remoteSubdirectory(engine.projectPath(server, project), relativeDirectory)
+                val projectRoot = engine.projectPath(server, project)
+                requestedDirectory = relativeDirectory
+                    ?: browseLocationStore.lastDirectory(server, project, projectRoot) ?: ""
+                setState(projectId, DownloadState.LoadingList(requestedDirectory))
+                val directory = remoteSubdirectory(projectRoot, requestedDirectory)
                 val entries = scpDownloader.listFiles(
                     server = server,
                     password = securePrefs.getPassword(server.id),
                     privateKeyPem = securePrefs.getPrivateKey(server.id),
                     remoteDir = directory
                 )
-                setState(projectId, DownloadState.Listed(relativeDirectory, entries))
+                currentCoroutineContext().ensureActive()
+                browseLocationStore.save(server, project, projectRoot, requestedDirectory)
+                setState(projectId, DownloadState.Listed(requestedDirectory, entries))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 setState(
                     projectId,
-                    DownloadState.Error(e.message ?: "Could not list remote files", relativeDirectory)
+                    DownloadState.Error(e.message ?: "Could not list remote files", requestedDirectory)
                 )
+            } finally {
+                if (listingJobs[projectId] === currentCoroutineContext()[Job]) listingJobs.remove(projectId)
             }
         }
     }

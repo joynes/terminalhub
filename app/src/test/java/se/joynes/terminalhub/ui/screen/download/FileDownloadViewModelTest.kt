@@ -11,6 +11,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -26,6 +27,7 @@ import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.mockito.kotlin.doSuspendableAnswer
 import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.data.model.Server
@@ -52,6 +54,7 @@ class FileDownloadViewModelTest {
     private val securePrefs: SecurePrefsManager = mock()
     private val engine = ScriptTemplateEngine()
     private val settingsRepository: se.joynes.terminalhub.data.settings.AppSettingsRepository = mock()
+    private val browseLocationStore: se.joynes.terminalhub.data.settings.RemoteBrowseLocationStore = mock()
 
     @Before
     fun setUp() {
@@ -123,6 +126,7 @@ class FileDownloadViewModelTest {
             DownloadState.Listed("stems/drums", expected),
             viewModel.downloadState(project.id).first()
         )
+        verify(browseLocationStore).save(server, project, "~/terminalhub/music", "stems/drums")
     }
 
     @Test
@@ -457,12 +461,78 @@ class FileDownloadViewModelTest {
         verify(serverRepo).getById(7)
     }
 
+    @Test fun reopensRememberedDirectoryAfterCloseAndViewModelRecreation() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = 7L, name = "music")
+        val entries = listOf(RemoteFileEntry("photo.png", 10))
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(project)
+        whenever(browseLocationStore.lastDirectory(server, project, "~/terminalhub/music")).thenReturn("images/nested")
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), eq("~/terminalhub/music/images/nested"))).thenReturn(entries)
+        val first = createViewModel()
+        first.loadRemoteFiles(7, 11)
+        advanceUntilIdle()
+        assertEquals(DownloadState.Listed("images/nested", entries), first.downloadState(11).first())
+        first.reset(11)
+        assertEquals(DownloadState.Idle, first.downloadState(11).first())
+        val recreated = createViewModel()
+        recreated.loadRemoteFiles(7, 11)
+        advanceUntilIdle()
+        assertEquals(DownloadState.Listed("images/nested", entries), recreated.downloadState(11).first())
+    }
+
+    @Test fun explicitRootNavigationOverridesAndReplacesRememberedSubfolder() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = 7L, name = "music")
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(project)
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), eq("~/terminalhub/music"))).thenReturn(emptyList())
+        val viewModel = createViewModel()
+        viewModel.loadRemoteFiles(7, 11, "")
+        advanceUntilIdle()
+        assertEquals(DownloadState.Listed("", emptyList()), viewModel.downloadState(11).first())
+        verify(browseLocationStore, never()).lastDirectory(any(), any(), any())
+        verify(browseLocationStore).save(server, project, "~/terminalhub/music", "")
+    }
+
+    @Test fun unavailableFolderShowsRecoverablePathWithoutOverwritingLastGoodLocation() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = 7L, name = "music")
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(project)
+        whenever(browseLocationStore.lastDirectory(server, project, "~/terminalhub/music")).thenReturn("removed")
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), any())).thenAnswer { throw IOException("No such folder") }
+        val viewModel = createViewModel()
+        viewModel.loadRemoteFiles(7, 11)
+        advanceUntilIdle()
+        assertEquals("removed", (viewModel.downloadState(11).first() as DownloadState.Error).directory)
+        verify(browseLocationStore, never()).save(any(), any(), any(), any())
+    }
+
+    @Test fun closingWhileListingCancelsRequestAndDoesNotSaveUnopenedDirectory() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = 7L, name = "music")
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(project)
+        val gate = kotlinx.coroutines.CompletableDeferred<List<RemoteFileEntry>>()
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), any())).doSuspendableAnswer { gate.await() }
+        val viewModel = createViewModel()
+        viewModel.loadRemoteFiles(7, 11, "new-folder")
+        runCurrent()
+        viewModel.reset(11)
+        gate.complete(emptyList())
+        advanceUntilIdle()
+        assertEquals(DownloadState.Idle, viewModel.downloadState(11).first())
+        verify(browseLocationStore, never()).save(any(), any(), any(), any())
+    }
+
     private fun createViewModel() = FileDownloadViewModel(
         serverRepo = serverRepo,
         projectRepo = projectRepo,
         engine = engine,
         scpDownloader = downloader,
         securePrefs = securePrefs,
-        settingsRepository = settingsRepository
+        settingsRepository = settingsRepository,
+        browseLocationStore = browseLocationStore
     )
 }
