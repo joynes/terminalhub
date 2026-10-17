@@ -241,12 +241,12 @@ internal fun applyKeyBarModifiers(
         normal
     }
     if (ctrl) {
-        val controlChar = normal.lowercase().singleOrNull()
-        if (controlChar != null && controlChar in 'a'..'z') {
-            // ASCII control characters are the letter code with the upper three bits
-            // cleared. In particular, lowercase c (0x63) must become ETX (0x03),
-            // not '#' (0x23), which XOR 0x40 would produce.
-            return (controlChar.code and 0x1F).toChar().toString()
+        if (normal.codePointCount(0, normal.length) == 1) {
+            val original = normal.codePointAt(0)
+            val mapped = com.termux.terminal.TerminalKeyEncoding.controlCodePoint(original)
+            if (mapped != original || mapped < 32) {
+                return String(Character.toChars(mapped))
+            }
         }
     }
     return if (alt) "\u001B$shifted" else shifted

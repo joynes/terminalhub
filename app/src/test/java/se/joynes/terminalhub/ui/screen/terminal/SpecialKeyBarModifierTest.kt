@@ -5,6 +5,20 @@ import org.junit.Test
 
 class SpecialKeyBarModifierTest {
 
+    @Test fun `ctrl slash and underscore send the identical single raw byte`() {
+        listOf("/", "_").forEach { key ->
+            val result = applyKeyBarModifiers(key, ctrl = true, alt = false, shift = false)
+            assertEquals(listOf(0x1f), result.toByteArray().map(Byte::toInt))
+        }
+    }
+
+    @Test fun `unmodified punctuation and unicode stay intact`() {
+        listOf("/", "_", "å", "😀").forEach { key ->
+            assertEquals(key, applyKeyBarModifiers(key, ctrl = false, alt = false, shift = false))
+        }
+        assertEquals("å", applyKeyBarModifiers("å", ctrl = true, alt = false, shift = false))
+    }
+
     @Test
     fun `ctrl c produces terminal interrupt byte`() {
         val result = applyKeyBarModifiers("c", ctrl = true, alt = false, shift = false)

@@ -3,6 +3,7 @@ package se.joynes.terminalhub.ui.screen.terminal
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.termux.terminal.TerminalSession
+import com.termux.terminal.TerminalKeyEncoding
 import com.termux.view.TerminalViewClient
 
 /**
@@ -33,7 +34,8 @@ class TerminalViewClientImpl(
     // Return true = we handled it (don't write to session subprocess).
     override fun onCodePoint(codePoint: Int, ctrlDown: Boolean, session: TerminalSession?): Boolean {
         val bytes = when {
-            ctrlDown -> byteArrayOf((codePoint and 0x1F).toByte())
+            ctrlDown -> String(Character.toChars(TerminalKeyEncoding.controlCodePoint(codePoint)))
+                .toByteArray(Charsets.UTF_8)
             modifierManager.alt -> ("\u001B" + String(Character.toChars(codePoint)))
                 .toByteArray(Charsets.UTF_8)
             else -> String(Character.toChars(codePoint)).toByteArray(Charsets.UTF_8)
