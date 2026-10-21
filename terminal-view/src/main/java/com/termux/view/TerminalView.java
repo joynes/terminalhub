@@ -80,6 +80,7 @@ public final class TerminalView extends View {
     private final android.graphics.Paint mSearchCurrentPaint = new android.graphics.Paint();
     /** True while search overlay is active — prevents onScreenUpdated from snapping back to bottom. */
     private boolean mScrollLocked = false;
+    private boolean mReadingMode = false;
     /** True after the user manually scrolled into the scrollback — preserves their view across new output. */
     private boolean mUserScrolledUp = false;
     /** Net wheel-up scrolls forwarded to a mouse-tracking app (e.g. tmux copy mode), used to drive the scroll-to-bottom button. */
@@ -397,6 +398,8 @@ public final class TerminalView extends View {
     public boolean attachSession(TerminalSession session) {
         if (session == mTermSession) return false;
         stopFling();
+        mReadingMode = false;
+        mScrollLocked = false;
         mTopRow = 0;
         mUserScrolledUp = false;
         mAltModeUpScrolls = 0;
@@ -582,7 +585,7 @@ public final class TerminalView extends View {
         int rowsInHistory = mEmulator.getScreen().getActiveTranscriptRows();
         if (mTopRow < -rowsInHistory) mTopRow = -rowsInHistory;
 
-        if (isSelectingText() || mEmulator.isAutoScrollDisabled() || mUserScrolledUp) {
+        if (isSelectingText() || mEmulator.isAutoScrollDisabled() || mUserScrolledUp || mReadingMode) {
 
             // Do not scroll when selecting text or when user has scrolled into the scrollback.
             int rowShift = mEmulator.getScrollCounter();
@@ -592,7 +595,7 @@ public final class TerminalView extends View {
                 if (isSelectingText())
                     stopTextSelectionMode();
 
-                if (mEmulator.isAutoScrollDisabled() || mUserScrolledUp) {
+                if (mEmulator.isAutoScrollDisabled() || mUserScrolledUp || mReadingMode) {
                     mTopRow = -rowsInHistory;
                     skipScrolling = true;
                 }
@@ -1600,6 +1603,7 @@ public final class TerminalView extends View {
 
     /** Scroll to the bottom of the terminal output and unlock scroll-lock. */
     public void scrollToBottom() {
+        mReadingMode = false;
         mScrollLocked = false;
         mUserScrolledUp = false;
         stopFling();
@@ -1623,6 +1627,15 @@ public final class TerminalView extends View {
             mAltModeUpScrolls = 0;
         }
         return mTopRow == 0 && mAltModeUpScrolls == 0;
+    }
+
+    public boolean isReadingMode() { return mReadingMode; }
+
+    public void setReadingMode(boolean enabled) {
+        if (!enabled) { scrollToBottom(); return; }
+        stopFling();
+        mReadingMode = true;
+        notifyTopRowChanged();
     }
 
     /** Listener invoked whenever the visible top row changes (scroll, output, session switch). */
