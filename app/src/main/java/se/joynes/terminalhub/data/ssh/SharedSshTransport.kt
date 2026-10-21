@@ -29,6 +29,8 @@ interface SshTransport {
     fun openProjectSession(): Session
     fun openAuxiliarySession(): SshAuxiliarySession
     fun openSftpSession(): SshAuxiliarySftp
+    fun openLocalForward(localPort: Int, remotePort: Int): AutoCloseable =
+        throw UnsupportedOperationException("TCP forwarding is not supported by this transport")
     fun updateProjectIds(projectIds: Set<Long>)
     fun close()
     fun debugIdentity(): Int
@@ -118,6 +120,15 @@ private class TrileadSshTransport(
     private val keepaliveJob: Job = scope.launch { keepaliveLoop() }
 
     override fun openProjectSession(): Session = connection.openSession()
+
+    override fun openLocalForward(localPort: Int, remotePort: Int): AutoCloseable {
+        require(localPort in 1024..65535 && remotePort in 1..65535) { "Invalid tunnel port" }
+        // Never listen on Wi-Fi/mobile interfaces. Destination is loopback on the SSH server.
+        val forward = connection.createLocalPortForwarder(
+            java.net.InetSocketAddress("127.0.0.1", localPort), "127.0.0.1", remotePort
+        )
+        return AutoCloseable { forward.close() }
+    }
 
     override fun openAuxiliarySession(): SshAuxiliarySession {
         auxiliaryChannelPermits.acquire()

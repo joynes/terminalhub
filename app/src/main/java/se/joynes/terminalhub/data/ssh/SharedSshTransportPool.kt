@@ -34,10 +34,11 @@ class SharedSshTransportPool @Inject constructor(
     internal class Entry(
         val transport: CompletableDeferred<SshTransport> = CompletableDeferred(),
         val projectLeases: MutableMap<String, Long?> = linkedMapOf(),
-        val transferLeases: MutableSet<String> = linkedSetOf()
+        val transferLeases: MutableSet<String> = linkedSetOf(),
+        val tunnelLeases: MutableSet<String> = linkedSetOf()
     )
 
-    internal enum class LeaseKind { PROJECT, TRANSFER }
+    internal enum class LeaseKind { PROJECT, TRANSFER, TUNNEL }
 
     private val lock = Any()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -64,6 +65,10 @@ class SharedSshTransportPool @Inject constructor(
         }
     }
 
+    // Direct TCP channels are not SSH session channels and must not consume SFTP permits.
+    suspend fun acquireTunnel(server: Server, password: String?, privateKeyPem: String?): SshTransportLease =
+        acquireLease(server, password, privateKeyPem, LeaseKind.TUNNEL)
+
     private suspend fun acquireLease(
         server: Server,
         password: String?,
@@ -78,6 +83,7 @@ class SharedSshTransportPool @Inject constructor(
                     when (kind) {
                         LeaseKind.PROJECT -> candidate.projectLeases.size < MAX_PROJECT_CHANNELS_PER_TRANSPORT
                         LeaseKind.TRANSFER -> candidate.transferLeases.size < MAX_TRANSFERS_PER_TRANSPORT
+                        LeaseKind.TUNNEL -> true
                     }
                 }
                 ?.minByOrNull { it.transferLeases.size }
@@ -201,6 +207,7 @@ class SharedSshTransportPool @Inject constructor(
             if (entry !in shards) return
             entry.projectLeases.remove(leaseId)
             entry.transferLeases.remove(leaseId)
+            entry.tunnelLeases.remove(leaseId)
             if (entry.isUnused()) {
                 shards.remove(entry)
                 if (shards.isEmpty()) entries.remove(key)
@@ -236,6 +243,7 @@ class SharedSshTransportPool @Inject constructor(
         when (kind) {
             LeaseKind.PROJECT -> projectLeases[leaseId] = null
             LeaseKind.TRANSFER -> transferLeases += leaseId
+            LeaseKind.TUNNEL -> tunnelLeases += leaseId
         }
     }
 
@@ -243,10 +251,11 @@ class SharedSshTransportPool @Inject constructor(
         when (kind) {
             LeaseKind.PROJECT -> projectLeases.remove(leaseId)
             LeaseKind.TRANSFER -> transferLeases.remove(leaseId)
+            LeaseKind.TUNNEL -> tunnelLeases.remove(leaseId)
         }
     }
 
-    private fun Entry.isUnused(): Boolean = projectLeases.isEmpty() && transferLeases.isEmpty()
+    private fun Entry.isUnused(): Boolean = projectLeases.isEmpty() && transferLeases.isEmpty() && tunnelLeases.isEmpty()
 }
 
 class SshTransportLease internal constructor(
@@ -262,6 +271,7 @@ class SshTransportLease internal constructor(
     fun openSession() = transport.openProjectSession()
     fun openAuxiliarySession() = transport.openAuxiliarySession()
     fun openSftpSession() = transport.openSftpSession()
+    fun openLocalForward(localPort: Int, remotePort: Int) = transport.openLocalForward(localPort, remotePort)
     fun bindProject(projectId: Long) = pool.bindProject(this, projectId)
 
     fun release() {
