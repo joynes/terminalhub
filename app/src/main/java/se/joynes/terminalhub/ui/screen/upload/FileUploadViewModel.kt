@@ -32,11 +32,13 @@ class FileUploadViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uploadStates = MutableStateFlow<Map<Long, UploadState>>(emptyMap())
+    val activities = _uploadStates.asStateFlow()
 
     fun uploadState(projectId: Long): Flow<UploadState> =
         _uploadStates.map { it[projectId] ?: UploadState.Idle }
 
     fun reset(projectId: Long) {
+        if (_uploadStates.value[projectId] is UploadState.Uploading) return
         _uploadStates.update { states -> states - projectId }
     }
 
