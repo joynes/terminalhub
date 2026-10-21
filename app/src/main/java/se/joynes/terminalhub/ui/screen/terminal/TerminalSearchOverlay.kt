@@ -39,7 +39,7 @@ fun TerminalSearchOverlay(
     val focusRequester = remember { FocusRequester() }
 
     fun updateHighlight(q: String, matchRow: Int) {
-        terminalViewRef?.setSearchHighlight(q, matchRow)
+        terminalViewRef?.setSearchHighlight(q, matchRow, matchCase)
     }
 
     fun runSearch(q: String) {

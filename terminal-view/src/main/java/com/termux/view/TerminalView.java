@@ -76,6 +76,7 @@ public final class TerminalView extends View {
     int[] mDefaultSelectors = new int[]{-1,-1,-1,-1};
 
     private String mSearchQuery = null;
+    private boolean mSearchMatchCase = false;
     private final android.graphics.Paint mSearchHighlightPaint = new android.graphics.Paint();
     private final android.graphics.Paint mSearchCurrentPaint = new android.graphics.Paint();
     /** True while search overlay is active — prevents onScreenUpdated from snapping back to bottom. */
@@ -1595,7 +1596,12 @@ public final class TerminalView extends View {
 
     /** Set the search query to highlight in the terminal. Pass null or empty to clear. */
     public void setSearchHighlight(String query, int currentRow) {
-        mSearchQuery = (query != null && !query.isEmpty()) ? query.toLowerCase() : null;
+        setSearchHighlight(query, currentRow, false);
+    }
+
+    public void setSearchHighlight(String query, int currentRow, boolean matchCase) {
+        mSearchQuery = (query != null && !query.isEmpty()) ? query : null;
+        mSearchMatchCase = matchCase;
         mSearchCurrentRow = currentRow;
         mScrollLocked = (mSearchQuery != null);
         invalidate();
@@ -1659,12 +1665,11 @@ public final class TerminalView extends View {
             // Read this row only (selY1 == selY2 reads one row).
             String lineText = screen.getSelectedText(0, row, cols, row);
             if (lineText == null || lineText.isEmpty()) continue;
-            String lineLower = lineText.toLowerCase();
             int idx = 0;
             int r = row - mTopRow;
             float bottom = mRenderer.mFontLineSpacingAndAscent + (r + 1) * (float) mRenderer.mFontLineSpacing;
             float top    = bottom - mRenderer.mFontLineSpacing;
-            while ((idx = lineLower.indexOf(query, idx)) != -1) {
+            while ((idx = indexOfSearchMatch(lineText, query, idx, mSearchMatchCase)) != -1) {
                 float left  = idx * mRenderer.mFontWidth;
                 float right = (idx + query.length()) * mRenderer.mFontWidth;
                 android.graphics.Paint paint = (row == mSearchCurrentRow) ? mSearchCurrentPaint : mSearchHighlightPaint;
@@ -1672,6 +1677,14 @@ public final class TerminalView extends View {
                 idx += query.length();
             }
         }
+    }
+
+    static int indexOfSearchMatch(String text, String query, int from, boolean matchCase) {
+        if (query.isEmpty()) return -1;
+        for (int i = Math.max(0, from); i <= text.length() - query.length(); i++) {
+            if (text.regionMatches(!matchCase, i, query, 0, query.length())) return i;
+        }
+        return -1;
     }
 
     private void decrementYTextSelectionCursors(int decrement) {
