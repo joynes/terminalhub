@@ -8,12 +8,14 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import se.joynes.terminalhub.data.model.Project
@@ -26,6 +28,7 @@ import se.joynes.terminalhub.data.settings.RemoteBrowseLocationStore
 import se.joynes.terminalhub.data.settings.RemoteBrowseViewState
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
 import se.joynes.terminalhub.data.ssh.ScpDownloader
+import se.joynes.terminalhub.data.ssh.StagedRemoteDownload
 import se.joynes.terminalhub.data.ssh.remoteSubdirectory
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
 import java.io.ByteArrayOutputStream
@@ -41,9 +44,11 @@ sealed interface DownloadState {
         val fileName: String,
         val progress: Float,
         val currentFile: Int = 1,
-        val totalFiles: Int = 1
+        val totalFiles: Int = 1,
+        val estimate: TransferEstimate = TransferEstimate(),
+        val queuedFiles: Int = 0
     ) : DownloadState
-    data class Done(val fileName: String, val bytes: Long, val uri: Uri) : DownloadState
+    data class Paused(val fileName: String, val message: String, val completedFiles: Int) : DownloadState
     data class BatchDone(val files: List<DownloadedRemoteFile>) : DownloadState
     data class PreviewLoading(
         val directory: String,
@@ -76,6 +81,16 @@ class FileDownloadViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val states = MutableStateFlow<Map<Long, DownloadState>>(emptyMap())
+    val activities = states.asStateFlow()
+    private data class Batch(
+        val serverId: Long, val directory: String, val names: List<String>, val context: Context,
+        val destination: (String) -> Uri,
+        var index: Int = 0,
+        val completed: MutableList<DownloadedRemoteFile> = mutableListOf(),
+        var staging: StagedRemoteDownload? = null
+    )
+    private val batches = mutableMapOf<Long, java.util.ArrayDeque<Batch>>()
+    private val downloadJobs = mutableMapOf<Long, Job>()
     private val previewJobs = mutableMapOf<Long, Job>()
     private val listingJobs = mutableMapOf<Long, Job>()
     private val browseIdentities = mutableMapOf<Long, String>()
@@ -93,6 +108,8 @@ class FileDownloadViewModel @Inject constructor(
         states.map { it[projectId] ?: DownloadState.Idle }
 
     fun reset(projectId: Long) {
+        // Hiding the browser must not orphan a running/paused transfer or discard its checkpoint.
+        if (batches[projectId]?.isNotEmpty() == true) return
         listingJobs.remove(projectId)?.cancel()
         previewJobs.remove(projectId)?.cancel()
         states.update { it - projectId }
@@ -101,7 +118,7 @@ class FileDownloadViewModel @Inject constructor(
     fun loadRemoteFiles(serverId: Long, projectId: Long, relativeDirectory: String? = null) {
         val current = states.value[projectId]
         if (current is DownloadState.LoadingList ||
-            current is DownloadState.Downloading ||
+            current is DownloadState.Downloading || current is DownloadState.Paused ||
             current is DownloadState.PreviewLoading
         ) return
         var requestedDirectory = relativeDirectory ?: ""
@@ -218,52 +235,6 @@ class FileDownloadViewModel @Inject constructor(
         }
     }
 
-    fun startDownload(
-        serverId: Long,
-        projectId: Long,
-        relativeDirectory: String,
-        fileName: String,
-        uri: Uri,
-        context: Context
-    ) {
-        if (states.value[projectId] is DownloadState.Downloading) return
-        viewModelScope.launch {
-            var temporaryFile: File? = null
-            try {
-                val (server, project) = resolveRemoteProject(serverId, projectId)
-                val directory = remoteSubdirectory(engine.projectPath(server, project), relativeDirectory)
-                val transferDirectory = File(context.cacheDir, "downloads").also { directory ->
-                    check(directory.exists() || directory.mkdirs()) { "Cannot prepare download" }
-                }
-                val stagedDownload = File.createTempFile("terminalhub-", ".part", transferDirectory)
-                temporaryFile = stagedDownload
-
-                setState(projectId, DownloadState.Downloading(fileName, 0f))
-                var bytes = 0L
-                scpDownloader.download(
-                    server = server,
-                    password = securePrefs.getPassword(server.id),
-                    privateKeyPem = securePrefs.getPrivateKey(server.id),
-                    remoteDir = directory,
-                    fileName = fileName,
-                    outputStream = stagedDownload.outputStream()
-                ).collect { progress ->
-                    bytes = progress.bytesTransferred
-                    setState(projectId, DownloadState.Downloading(progress.fileName, progress.percent / 100f))
-                }
-                val output = context.contentResolver.openOutputStream(uri) ?: error("Cannot open destination")
-                output.use { destination ->
-                    stagedDownload.inputStream().use { source -> source.copyTo(destination) }
-                }
-                setState(projectId, DownloadState.Done(fileName, bytes, uri))
-            } catch (e: Exception) {
-                setState(projectId, DownloadState.Error(e.message ?: "Download failed"))
-            } finally {
-                temporaryFile?.delete()
-            }
-        }
-    }
-
     fun startDownloads(
         serverId: Long,
         projectId: Long,
@@ -272,35 +243,67 @@ class FileDownloadViewModel @Inject constructor(
         context: Context,
         createDestination: (String) -> Uri
     ) {
-        if (fileNames.isEmpty() || states.value[projectId] is DownloadState.Downloading) return
-        // Reserve the batch before repository/IO suspension so repeated taps cannot start it twice.
-        setState(projectId, DownloadState.Downloading(fileNames.first(), 0f, 1, fileNames.size))
-        viewModelScope.launch {
-            val completed = mutableListOf<DownloadedRemoteFile>()
-            try {
-                val (server, project) = resolveRemoteProject(serverId, projectId)
-                val directory = remoteSubdirectory(engine.projectPath(server, project), relativeDirectory)
-                val transferDirectory = File(context.cacheDir, "downloads").also { cacheDirectory ->
-                    check(cacheDirectory.exists() || cacheDirectory.mkdirs()) { "Cannot prepare download" }
-                }
+        if (fileNames.isEmpty()) return
+        val queue = batches.getOrPut(projectId) { java.util.ArrayDeque() }
+        val names = fileNames.distinct()
+        // Double taps must not enqueue the exact same request twice.
+        if (queue.any { it.serverId == serverId && it.directory == relativeDirectory && it.names == names }) return
+        queue.add(Batch(serverId, relativeDirectory, names, context.applicationContext ?: context, createDestination))
+        runDownloads(projectId)
+    }
 
-                fileNames.forEachIndexed { index, fileName ->
-                    var temporaryFile: File? = null
-                    try {
-                        val stagedDownload = File.createTempFile("terminalhub-", ".part", transferDirectory)
-                        temporaryFile = stagedDownload
+    fun retryDownloads(projectId: Long) = runDownloads(projectId)
+
+    fun cancelDownloads(projectId: Long) {
+        downloadJobs[projectId]?.cancel()
+        batches[projectId]?.firstOrNull { it.index < it.names.size }?.staging?.cancel()
+        // Actual cleanup happens when the worker unwinds, after its output stream is closed.
+        if (downloadJobs[projectId] == null) clearDownloads(projectId)
+    }
+
+    override fun onCleared() {
+        batches.values.forEach { queue -> queue.firstOrNull { it.index < it.names.size }?.staging?.cancel() }
+        super.onCleared()
+    }
+
+    private fun clearDownloads(projectId: Long) {
+        batches.remove(projectId)?.forEach { it.staging?.file?.delete() }
+        setState(projectId, DownloadState.Idle)
+    }
+
+    private fun runDownloads(projectId: Long) {
+        val queue = batches[projectId] ?: return
+        if (downloadJobs[projectId]?.isActive == true || queue.isEmpty()) return
+        val first = queue.firstOrNull { it.index < it.names.size } ?: return
+        setState(projectId, DownloadState.Downloading(first.names[first.index], 0f))
+        val job = viewModelScope.launch(start = CoroutineStart.LAZY) {
+            try {
+                while (true) {
+                    val batch = queue.firstOrNull { it.index < it.names.size } ?: break
+                    val (server, project) = resolveRemoteProject(batch.serverId, projectId)
+                    val directory = remoteSubdirectory(engine.projectPath(server, project), batch.directory)
+                    val transferDirectory = File(batch.context.cacheDir, "downloads").also { cacheDirectory ->
+                        check(cacheDirectory.exists() || cacheDirectory.mkdirs()) { "Cannot prepare download" }
+                    }
+
+                    while (batch.index < batch.names.size) {
+                        val fileName = batch.names[batch.index]
+                        val staging = batch.staging ?: StagedRemoteDownload(
+                            File.createTempFile("terminalhub-", ".part", transferDirectory)
+                        ).also { batch.staging = it }
                         setState(
                             projectId,
-                            DownloadState.Downloading(fileName, 0f, index + 1, fileNames.size)
+                            DownloadState.Downloading(fileName, 0f, batch.index + 1, batch.names.size)
                         )
                         var bytes = 0L
-                        scpDownloader.download(
+                        val rate = TransferRate()
+                        scpDownloader.downloadToFile(
                             server = server,
                             password = securePrefs.getPassword(server.id),
                             privateKeyPem = securePrefs.getPrivateKey(server.id),
                             remoteDir = directory,
                             fileName = fileName,
-                            outputStream = stagedDownload.outputStream()
+                            staging = staging
                         ).collect { progress ->
                             bytes = progress.bytesTransferred
                             setState(
@@ -308,36 +311,50 @@ class FileDownloadViewModel @Inject constructor(
                                 DownloadState.Downloading(
                                     progress.fileName,
                                     progress.percent / 100f,
-                                    index + 1,
-                                    fileNames.size
+                                    batch.index + 1,
+                                    batch.names.size,
+                                    rate.sample(bytes, progress.totalBytes),
+                                    queue.sumOf { it.names.size - it.index } - 1
                                 )
                             )
                         }
-                        val uri = withContext(Dispatchers.IO) { createDestination(fileName) }
+                        currentCoroutineContext().ensureActive()
+                        val uri = withContext(Dispatchers.IO) { batch.destination(fileName) }
                         withContext(Dispatchers.IO) {
-                            val output = context.contentResolver.openOutputStream(uri)
+                            val output = batch.context.contentResolver.openOutputStream(uri)
                                 ?: error("Cannot open destination for $fileName")
                             output.use { destination ->
-                                stagedDownload.inputStream().use { source -> source.copyTo(destination) }
+                                staging.file.inputStream().use { source -> source.copyTo(destination) }
                             }
                         }
-                        completed += DownloadedRemoteFile(fileName, bytes, uri)
-                    } finally {
-                        temporaryFile?.delete()
+                        batch.completed += DownloadedRemoteFile(fileName, bytes, uri)
+                        staging.file.delete()
+                        batch.staging = null
+                        batch.index++
                     }
                 }
-                setState(projectId, DownloadState.BatchDone(completed))
+                batches.remove(projectId)
+                setState(projectId, DownloadState.BatchDone(queue.flatMap { it.completed }))
+            } catch (cancelled: CancellationException) {
+                clearDownloads(projectId)
+                throw cancelled
             } catch (e: Exception) {
-                val completedPrefix = if (completed.isEmpty()) "" else "${completed.size} file(s) downloaded. "
+                currentCoroutineContext().ensureActive()
+                val batch = queue.firstOrNull { it.index < it.names.size }
                 setState(
                     projectId,
-                    DownloadState.Error(
-                        completedPrefix + (e.message ?: "Download failed"),
-                        relativeDirectory
+                    DownloadState.Paused(
+                        batch?.names?.getOrNull(batch.index).orEmpty(),
+                        e.message ?: "Download failed",
+                        queue.sumOf { it.completed.size }
                     )
                 )
+            } finally {
+                downloadJobs.remove(projectId)
             }
         }
+        downloadJobs[projectId] = job
+        job.start()
     }
 
     private fun setState(projectId: Long, state: DownloadState) {

@@ -165,34 +165,34 @@ class FileDownloadViewModelTest {
         whenever(context.cacheDir).thenReturn(temporaryFolder.root)
         whenever(resolver.openOutputStream(uri)).thenReturn(output)
         whenever(
-            downloader.download(
+            downloader.downloadToFile(
                 server = eq(server),
                 password = isNull(),
                 privateKeyPem = isNull(),
                 remoteDir = eq("~/terminalhub/music/stems/drums"),
                 fileName = eq("beat.wav"),
-                outputStream = any()
+                staging = any()
             )
         ).thenAnswer { invocation ->
-            val stagedOutput = invocation.getArgument<OutputStream>(5)
+            val stage = invocation.getArgument<se.joynes.terminalhub.data.ssh.StagedRemoteDownload>(5)
             flow {
-                stagedOutput.write("complete file".toByteArray())
+                stage.file.writeBytes("complete file".toByteArray())
                 emit(ScpDownloadProgress("beat.wav", 456L, 456L))
             }
         }
         val viewModel = createViewModel()
 
-        viewModel.startDownload(server.id, project.id, "stems/drums", "beat.wav", uri, context)
-        advanceUntilIdle()
+        viewModel.startDownloads(server.id, project.id, "stems/drums", listOf("beat.wav"), context) { uri }
+        val final = viewModel.downloadState(project.id).first { it is DownloadState.BatchDone || it is DownloadState.Paused }
 
-        assertEquals(DownloadState.Done("beat.wav", 456L, uri), viewModel.downloadState(project.id).first())
-        verify(downloader).download(
+        assertEquals(DownloadState.BatchDone(listOf(DownloadedRemoteFile("beat.wav", 456L, uri))), final)
+        verify(downloader).downloadToFile(
             server = eq(server),
             password = isNull(),
             privateKeyPem = isNull(),
             remoteDir = eq("~/terminalhub/music/stems/drums"),
             fileName = eq("beat.wav"),
-            outputStream = any()
+            staging = any()
         )
         assertEquals("complete file", output.toString())
         assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
@@ -210,24 +210,23 @@ class FileDownloadViewModelTest {
         whenever(context.contentResolver).thenReturn(resolver)
         whenever(context.cacheDir).thenReturn(temporaryFolder.root)
         whenever(
-            downloader.download(
+            downloader.downloadToFile(
                 server = eq(server),
                 password = isNull(),
                 privateKeyPem = isNull(),
                 remoteDir = eq("~/terminalhub/music"),
                 fileName = eq("beat.wav"),
-                outputStream = any()
+                staging = any()
             )
         ).thenReturn(flow { throw IOException("connection lost") })
         val viewModel = createViewModel()
 
-        viewModel.startDownload(server.id, project.id, "", "beat.wav", uri, context)
-        advanceUntilIdle()
+        viewModel.startDownloads(server.id, project.id, "", listOf("beat.wav"), context) { uri }
 
-        val state = viewModel.downloadState(project.id).first()
-        assertTrue(state is DownloadState.Error)
-        assertEquals("connection lost", (state as DownloadState.Error).message)
+        val state = viewModel.downloadState(project.id).first { it is DownloadState.Paused }
+        assertEquals("connection lost", (state as DownloadState.Paused).message)
         verify(resolver, never()).openOutputStream(uri)
+        viewModel.cancelDownloads(project.id)
         assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
     }
 
@@ -398,20 +397,20 @@ class FileDownloadViewModelTest {
         whenever(resolver.openOutputStream(firstUri)).thenReturn(firstOutput)
         whenever(resolver.openOutputStream(secondUri)).thenReturn(secondOutput)
         whenever(
-            downloader.download(
+            downloader.downloadToFile(
                 server = eq(server),
                 password = isNull(),
                 privateKeyPem = isNull(),
                 remoteDir = eq("~/terminalhub/music/stems"),
                 fileName = any(),
-                outputStream = any()
+                staging = any()
             )
         ).thenAnswer { invocation ->
             val fileName = invocation.getArgument<String>(4)
-            val output = invocation.getArgument<OutputStream>(5)
+            val staging = invocation.getArgument<se.joynes.terminalhub.data.ssh.StagedRemoteDownload>(5)
             flow {
                 val content = "content-$fileName".toByteArray()
-                output.write(content)
+                staging.file.writeBytes(content)
                 emit(ScpDownloadProgress(fileName, content.size.toLong(), content.size.toLong()))
             }
         }
@@ -427,14 +426,8 @@ class FileDownloadViewModelTest {
                 if (fileName == "kick.wav") firstUri else secondUri
             }
         )
-        var finalState: DownloadState = DownloadState.Idle
-        for (attempt in 0 until 100) {
-            advanceUntilIdle()
-            finalState = viewModel.downloadState(project.id).first()
-            if (finalState is DownloadState.BatchDone || finalState is DownloadState.Error) {
-                break
-            }
-            Thread.sleep(10)
+        val finalState = viewModel.downloadState(project.id).first {
+            it is DownloadState.BatchDone || it is DownloadState.Paused || it is DownloadState.Error
         }
 
         assertEquals("content-kick.wav", firstOutput.toString())
@@ -460,6 +453,121 @@ class FileDownloadViewModelTest {
         assertTrue(viewModel.downloadState(11).first() is DownloadState.Downloading)
         advanceUntilIdle()
         verify(serverRepo).getById(7)
+    }
+
+    @Test fun failedBatchRetainsCheckpointAndRetryResumesWithoutRepeatingCompletedFiles() = runTest(dispatcher) {
+        val server = Server(id = 7, name = "dev", host = "example.test", username = "demo")
+        val project = Project(id = 11, serverId = 7, name = "music")
+        val context: Context = mock()
+        val resolver: ContentResolver = mock()
+        val output = ByteArrayOutputStream()
+        val uri: Uri = mock()
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(project)
+        whenever(context.cacheDir).thenReturn(temporaryFolder.root)
+        whenever(context.contentResolver).thenReturn(resolver)
+        whenever(resolver.openOutputStream(uri)).thenReturn(output)
+        var attempts = 0
+        whenever(downloader.downloadToFile(any(), isNull(), isNull(), any(), any(), any())).thenAnswer { call ->
+            val staging = call.getArgument<se.joynes.terminalhub.data.ssh.StagedRemoteDownload>(5)
+            flow {
+                val (stream, offset) = staging.open("/song", 4, 7)
+                stream.use {
+                    attempts++
+                    if (attempts == 1) {
+                        it.write(byteArrayOf(1, 2)); emit(ScpDownloadProgress("song", 2, 4))
+                        throw java.io.IOException("network lost")
+                    }
+                    assertEquals(2L, offset)
+                    it.write(byteArrayOf(3, 4)); emit(ScpDownloadProgress("song", 4, 4))
+                }
+            }
+        }
+        val viewModel = createViewModel()
+        viewModel.startDownloads(7, 11, "", listOf("song"), context) { uri }
+        val paused = viewModel.downloadState(11).first { it is DownloadState.Paused }
+        assertTrue((paused as DownloadState.Paused).message.contains("network lost"))
+        viewModel.reset(11)
+        assertEquals(paused, viewModel.downloadState(11).first())
+        viewModel.retryDownloads(11)
+        viewModel.downloadState(11).first { it is DownloadState.BatchDone }
+        assertEquals(2, attempts)
+        assertEquals(listOf<Byte>(1, 2, 3, 4), output.toByteArray().toList())
+        assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
+    }
+
+    @Test fun cancellingPausedQueueDeletesOnlyItsCheckpoint() = runTest(dispatcher) {
+        val server = Server(id = 7, name = "dev", host = "example.test", username = "demo")
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(Project(id = 11, serverId = 7, name = "music"))
+        val context: Context = mock()
+        whenever(context.cacheDir).thenReturn(temporaryFolder.root)
+        whenever(downloader.downloadToFile(any(), isNull(), isNull(), any(), any(), any())).thenReturn(flow {
+            throw java.io.IOException("network lost")
+        })
+        val unrelated = temporaryFolder.newFile("keep.txt").also { it.writeText("keep") }
+        val viewModel = createViewModel()
+        viewModel.startDownloads(7, 11, "", listOf("song"), context) { mock() }
+        viewModel.downloadState(11).first { it is DownloadState.Paused }
+        viewModel.cancelDownloads(11)
+        assertEquals(DownloadState.Idle, viewModel.downloadState(11).first())
+        assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
+        assertEquals("keep", unrelated.readText())
+    }
+
+    @Test fun retryKeepsSuccessfulEarlierBatchesAndProcessesNewRequestsInOrder() = runTest(dispatcher) {
+        val server = Server(id = 7, name = "dev", host = "example.test", username = "demo")
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(Project(id = 11, serverId = 7, name = "music"))
+        val context: Context = mock()
+        val resolver: ContentResolver = mock()
+        whenever(context.cacheDir).thenReturn(temporaryFolder.root)
+        whenever(context.contentResolver).thenReturn(resolver)
+        whenever(resolver.openOutputStream(any())).thenAnswer { ByteArrayOutputStream() }
+        val attempts = mutableListOf<String>()
+        whenever(downloader.downloadToFile(any(), isNull(), isNull(), any(), any(), any())).thenAnswer { call ->
+            val name = call.getArgument<String>(4)
+            val stage = call.getArgument<se.joynes.terminalhub.data.ssh.StagedRemoteDownload>(5)
+            flow {
+                attempts += name
+                if (name == "second" && attempts.count { it == name } == 1) throw IOException("network lost")
+                stage.file.writeText(name)
+                emit(ScpDownloadProgress(name, name.length.toLong(), name.length.toLong()))
+            }
+        }
+        val viewModel = createViewModel()
+        viewModel.startDownloads(7, 11, "", listOf("first"), context) { mock() }
+        viewModel.startDownloads(7, 11, "", listOf("second"), context) { mock() }
+        viewModel.downloadState(11).first { it is DownloadState.Paused }
+        viewModel.retryDownloads(11)
+        val done = viewModel.downloadState(11).first { it is DownloadState.BatchDone } as DownloadState.BatchDone
+        assertEquals(listOf("first", "second", "second"), attempts)
+        assertEquals(listOf("first", "second"), done.files.map { it.fileName })
+    }
+
+    @Test fun cancelActiveDownloadClosesItsChannelAndCleansPartialFile() = runTest(dispatcher) {
+        val server = Server(id = 7, name = "dev", host = "example.test", username = "demo")
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(Project(id = 11, serverId = 7, name = "music"))
+        val context: Context = mock()
+        whenever(context.cacheDir).thenReturn(temporaryFolder.root)
+        var closes = 0
+        whenever(downloader.downloadToFile(any(), isNull(), isNull(), any(), any(), any())).thenAnswer { call ->
+            val stage = call.getArgument<se.joynes.terminalhub.data.ssh.StagedRemoteDownload>(5)
+            flow {
+                stage.attach(AutoCloseable { closes++ })
+                stage.file.writeText("partial")
+                emit(ScpDownloadProgress("song", 7, 100))
+                kotlinx.coroutines.awaitCancellation()
+            }
+        }
+        val viewModel = createViewModel()
+        viewModel.startDownloads(7, 11, "", listOf("song"), context) { mock() }
+        viewModel.downloadState(11).first { it is DownloadState.Downloading && it.progress > 0 }
+        viewModel.cancelDownloads(11)
+        viewModel.downloadState(11).first { it is DownloadState.Idle }
+        assertEquals(1, closes)
+        assertTrue(temporaryFolder.root.resolve("downloads").listFiles().orEmpty().isEmpty())
     }
 
     @Test fun reopensRememberedDirectoryAfterCloseAndViewModelRecreation() = runTest(dispatcher) {

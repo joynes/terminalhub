@@ -127,20 +127,13 @@ class SftpTransferTest {
     @Test
     fun `download streams complete remote file over pooled SFTP channel`() = runBlocking {
         val client: SFTPv3Client = mock()
-        val handle: SFTPv3FileHandle = mock()
         val attributes = SFTPv3FileAttributes().also { it.size = 4L }
         val payload = byteArrayOf(1, 2, 3, 4)
+        val handle = com.trilead.ssh2.PipelinedSftpDownloadTest.install(client, payload)
         whenever(client.canonicalPath(".")).thenReturn("/home/alice")
         whenever(client.stat("/home/alice/terminalhub/demo/song.wav")).thenReturn(attributes)
         whenever(client.openFileRO("/home/alice/terminalhub/demo/song.wav")).thenReturn(handle)
-        var firstRead = true
-        whenever(client.read(eq(handle), any(), any(), eq(0), any())).thenAnswer { invocation ->
-            if (!firstRead) return@thenAnswer -1
-            firstRead = false
-            val buffer = invocation.getArgument<ByteArray>(2)
-            payload.copyInto(buffer)
-            payload.size
-        }
+        whenever(client.fstat(handle)).thenReturn(attributes)
         val fixture = fixture(client)
         val output = ByteArrayOutputStream()
 
@@ -156,6 +149,22 @@ class SftpTransferTest {
         assertEquals(payload.toList(), output.toByteArray().toList())
         assertEquals(4, progress.last().bytesTransferred)
         verify(client).closeFile(handle)
+        assertTrue(fixture.transport.closed)
+    }
+
+    @Test fun `changed remote file fails instead of reporting successful download`() = runBlocking {
+        val client: SFTPv3Client = mock()
+        val payload = byteArrayOf(1, 2, 3, 4)
+        val handle = com.trilead.ssh2.PipelinedSftpDownloadTest.install(client, payload)
+        whenever(client.stat("/song")).thenReturn(SFTPv3FileAttributes().also { it.size = 4; it.mtime = 7 })
+        whenever(client.openFileRO("/song")).thenReturn(handle)
+        whenever(client.fstat(handle)).thenReturn(SFTPv3FileAttributes().also { it.size = 4; it.mtime = 8 })
+        val fixture = fixture(client)
+        val failure = runCatching { ScpDownloader(logger, fixture.pool)
+            .download(server, null, null, "/", "song", ByteArrayOutputStream()).toList() }.exceptionOrNull()
+        assertTrue(failure is java.io.IOException)
+        assertTrue(failure!!.message!!.contains("changed"))
+        verify(client, never()).closeFile(handle)
         assertTrue(fixture.transport.closed)
     }
 

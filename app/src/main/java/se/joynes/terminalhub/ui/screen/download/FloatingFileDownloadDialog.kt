@@ -145,7 +145,7 @@ fun FloatingFileDownloadDialog(
         }
     }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(projectId, downloadState is DownloadState.Idle) {
         if (downloadState is DownloadState.Idle) {
             viewModel.loadRemoteFiles(serverId, projectId)
         }
@@ -387,6 +387,19 @@ fun FloatingFileDownloadDialog(
                             label = "DOWNLOADING...",
                             modifier = Modifier.fillMaxWidth()
                         )
+                        Text(downloadState.estimate.label(), color = MegaDrivePrimary, fontSize = 12.sp)
+                        if (downloadState.queuedFiles > 0) Text("${downloadState.queuedFiles} file(s) waiting",
+                            color = MegaDrivePrimary, fontSize = 12.sp)
+                        Text("You can close this panel and keep working.", color = MegaDrivePrimary, fontSize = 12.sp)
+                        RetroButton("CANCEL QUEUE", onClick = { viewModel.cancelDownloads(projectId) })
+                    }
+                    is DownloadState.Paused -> {
+                        Text("TRANSFER PAUSED: ${downloadState.fileName}", color = MegaDrivePrimary, fontSize = 12.sp)
+                        Text(downloadState.message, color = MegaDrivePrimary, fontSize = 12.sp)
+                        Text("Retry resumes partial files when the server's size and modification time still match. Otherwise it restarts the file.",
+                            color = MegaDrivePrimary, fontSize = 12.sp)
+                        RetroButton("RETRY QUEUE", onClick = { viewModel.retryDownloads(projectId) })
+                        RetroButton("CANCEL QUEUE", onClick = { viewModel.cancelDownloads(projectId) })
                     }
                     is DownloadState.PreviewLoading -> {
                         Text(
@@ -403,30 +416,6 @@ fun FloatingFileDownloadDialog(
                         )
                     }
                     is DownloadState.PreviewReady -> Unit
-                    is DownloadState.Done -> {
-                        Text(
-                            "DONE - ${downloadState.fileName}",
-                            color = MegaDrivePrimary,
-                            fontSize = 11.sp,
-                            fontFamily = MonoFontFamily
-                        )
-                        Text(
-                            formatBytes(downloadState.bytes),
-                            color = MegaDriveDim,
-                            fontSize = 10.sp,
-                            fontFamily = MonoFontFamily
-                        )
-                        RetroButton(
-                            text = "OPEN",
-                            onClick = { openDownloadedFile(context, downloadState) },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        RetroButton(
-                            text = "CLOSE",
-                            onClick = { viewModel.reset(projectId); onDismiss() },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
                     is DownloadState.BatchDone -> {
                         Text(
                             "DONE - ${downloadState.files.size} FILE(S)",
@@ -513,10 +502,6 @@ internal fun clampDownloadPanelTop(
     0f,
     (availableHeightPx - panelHeightPx - bottomMarginPx).coerceAtLeast(0f)
 )
-
-private fun openDownloadedFile(context: Context, download: DownloadState.Done) {
-    openDownloadedFile(context, download.fileName, download.uri)
-}
 
 private fun openDownloadedFile(context: Context, fileName: String, uri: Uri) {
     val reportedType = context.contentResolver.getType(uri)

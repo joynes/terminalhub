@@ -11,6 +11,7 @@ import se.joynes.terminalhub.data.logging.LogLevel
 import se.joynes.terminalhub.data.model.Server
 import java.io.IOException
 import java.io.OutputStream
+import com.trilead.ssh2.PipelinedSftpDownload
 import javax.inject.Inject
 
 data class RemoteFileEntry(
@@ -80,43 +81,79 @@ class ScpDownloader @Inject constructor(
         remoteDir: String,
         fileName: String,
         outputStream: OutputStream
+    ): Flow<ScpDownloadProgress> = transfer(server, password, privateKeyPem, remoteDir, fileName, outputStream) { _, _, _ ->
+        outputStream to 0L
+    }
+
+    fun downloadToFile(
+        server: Server, password: String?, privateKeyPem: String?, remoteDir: String,
+        fileName: String, staging: StagedRemoteDownload
+    ): Flow<ScpDownloadProgress> = transfer(server, password, privateKeyPem, remoteDir, fileName, staging = staging, destination = staging::open)
+
+    private fun transfer(
+        server: Server, password: String?, privateKeyPem: String?, remoteDir: String,
+        fileName: String, initialOutput: OutputStream? = null, staging: StagedRemoteDownload? = null,
+        destination: (String, Long?, Long?) -> Pair<OutputStream, Long>
     ): Flow<ScpDownloadProgress> = channelFlow {
         withContext(Dispatchers.IO) {
             requireValidTransferFileName(fileName)
             var lease: SshTransportLease? = null
+            var outputStream: OutputStream? = initialOutput
             try {
                 lease = transportPool.acquireTransfer(server, password, privateKeyPem)
                 lease.openSftpSession().use { session ->
+                    staging?.attach(session)
                     val client = session.client
                     val remotePath = joinRemotePath(resolveSftpPath(client, remoteDir), fileName)
-                    val totalBytes = client.stat(remotePath).size ?: 0L
+                    val attributes = client.stat(remotePath)
+                    val totalBytes = attributes.size
+                    val (stream, start) = destination(remotePath, totalBytes, attributes.mtime)
+                    outputStream = stream
                     val handle = client.openFileRO(remotePath)
+                    var complete = false
                     try {
-                        val buffer = ByteArray(BUFFER_SIZE)
-                        var received = 0L
-                        while (true) {
-                            currentCoroutineContext().ensureActive()
-                            val read = client.read(handle, received, buffer, 0, buffer.size)
-                            if (read < 0) break
-                            if (read == 0) throw IOException("SFTP download stopped before completion")
-                            outputStream.write(buffer, 0, read)
-                            received += read
-                            currentCoroutineContext().ensureActive()
-                            trySend(ScpDownloadProgress(fileName, received, totalBytes))
+                        var received = start
+                        trySend(ScpDownloadProgress(fileName, received, totalBytes ?: 0))
+                        val context = currentCoroutineContext()
+                        if (totalBytes != null) {
+                            PipelinedSftpDownload.copy(client, handle, totalBytes, start, stream) { count ->
+                                context.ensureActive()
+                                if (count != received) {
+                                    received = count
+                                    trySend(ScpDownloadProgress(fileName, received, totalBytes))
+                                }
+                            }
+                        } else {
+                            // Servers without a known size retain the compatible streaming path.
+                            val buffer = ByteArray(BUFFER_SIZE)
+                            while (true) {
+                                context.ensureActive()
+                                val read = client.read(handle, received, buffer, 0, buffer.size)
+                                if (read < 0) break
+                                if (read == 0) throw IOException("SFTP download stopped before completion")
+                                stream.write(buffer, 0, read)
+                                received += read
+                                trySend(ScpDownloadProgress(fileName, received, 0))
+                            }
                         }
-                        if (totalBytes > 0 && received != totalBytes) {
-                            throw IOException("SFTP download ended before the complete file was received")
+                        val finalAttributes = client.fstat(handle)
+                        if ((totalBytes != null && finalAttributes.size != totalBytes) ||
+                            (attributes.mtime != null && finalAttributes.mtime != attributes.mtime)) {
+                            throw IOException("Remote file changed during download. Retry to download its current version.")
                         }
-                        outputStream.flush()
-                        trySend(ScpDownloadProgress(fileName, received, totalBytes))
+                        stream.flush()
+                        complete = true
+                        trySend(ScpDownloadProgress(fileName, received, totalBytes ?: 0))
                         logger.log(LogLevel.INFO, TAG, "SFTP download complete: $fileName")
                     } finally {
-                        client.closeFile(handle)
+                        // On failure there may be read replies still in flight. Closing the entire
+                        // owned channel releases its handles without misreading those as CLOSE replies.
+                        if (complete) client.closeFile(handle)
                     }
                 }
             } finally {
-                outputStream.close()
-                lease?.release()
+                staging?.detach()
+                try { outputStream?.close() } finally { lease?.release() }
             }
         }
     }
