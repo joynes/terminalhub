@@ -36,6 +36,7 @@ import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.widget.Scroller;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -182,11 +183,13 @@ public final class TerminalView extends View {
         mGestureRecognizer = new GestureAndScaleRecognizer(context, new GestureAndScaleRecognizer.Listener() {
 
             boolean scrolledWithFinger;
+            String tappedUrl;
+            TerminalSession tappedSession;
 
             @Override
             public boolean onUp(MotionEvent event) {
                 mScrollRemainder = 0.0f;
-                boolean urlAtTap = mEmulator != null && findUrlAt(event) != null;
+                boolean urlAtTap = tappedUrl != null;
                 if (shouldSendTrackedMouseTap(
                     mEmulator != null && mEmulator.isMouseTrackingActive(),
                     event.isFromSource(InputDevice.SOURCE_MOUSE),
@@ -207,12 +210,18 @@ public final class TerminalView extends View {
             @Override
             public boolean onSingleTapUp(MotionEvent event) {
                 if (mEmulator == null) return true;
+                // Confirmation is delayed for double-tap detection. Neither a buffer update nor
+                // a session switch may reinterpret the original tap as keyboard input/a new URL.
+                if (tappedSession != mTermSession) return true;
 
                 if (isSelectingText()) {
                     stopTextSelectionMode();
                     return true;
                 }
-                if (openUrlAt(event)) return true;
+                if (tappedUrl != null) {
+                    openUrl(tappedUrl);
+                    return true;
+                }
                 requestFocus();
                 mClient.onSingleTapUp(event);
                 return true;
@@ -291,8 +300,10 @@ public final class TerminalView extends View {
             }
 
             @Override
-            public boolean onDown(float x, float y) {
+            public boolean onDown(MotionEvent event) {
                 stopFling();
+                tappedSession = mTermSession;
+                tappedUrl = mEmulator == null ? null : findUrlAt(event);
                 mScrollRemainder = 0;
                 scrolledWithFinger = false;
                 // Why is true not returned here?
@@ -687,16 +698,16 @@ public final class TerminalView extends View {
         return url;
     }
 
-    private boolean openUrlAt(MotionEvent event) {
-        String url = findUrlAt(event);
-        if (url == null) return false;
+    private void openUrl(String url) {
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             getContext().startActivity(intent);
-            return true;
         } catch (Exception e) {
-            return false;
+            // This was still a link tap. Falling through would open the IME, resize the terminal,
+            // and lose the user's scrollback position even though they never requested typing.
+            mClient.logWarn(LOG_TAG, "Could not open link: " + e.getClass().getSimpleName());
+            Toast.makeText(getContext(), "Could not open link in a browser.", Toast.LENGTH_LONG).show();
         }
     }
 

@@ -19,7 +19,7 @@ final class GestureAndScaleRecognizer {
 
         boolean onScale(float focusX, float focusY, float scale);
 
-        boolean onDown(float x, float y);
+        boolean onDown(MotionEvent event);
 
         boolean onUp(MotionEvent e);
 
@@ -47,7 +47,7 @@ final class GestureAndScaleRecognizer {
 
             @Override
             public boolean onDown(MotionEvent e) {
-                return mListener.onDown(e.getX(), e.getY());
+                return mListener.onDown(e);
             }
 
             @Override
