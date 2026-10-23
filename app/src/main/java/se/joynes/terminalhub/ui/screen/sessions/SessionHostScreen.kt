@@ -142,10 +142,6 @@ fun SessionHostScreen(
     var rememberAutomaticBackgroundSsh by rememberSaveable { mutableStateOf(false) }
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
-    var showCommandPalette by remember { mutableStateOf(false) }
-    var showActivity by remember { mutableStateOf(false) }
-    var showTunnels by remember { mutableStateOf(false) }
-    var readingMode by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTabClose by remember { mutableStateOf<PendingTabClose?>(null) }
     var pendingTmuxRestart by remember { mutableStateOf<PendingTmuxRestart?>(null) }
@@ -163,12 +159,9 @@ fun SessionHostScreen(
     val fileDownloadVisibleByProject = remember { mutableStateMapOf<Long, Boolean>() }
     var searchVisible by remember { mutableStateOf(false) }
     var searchInitialQuery by remember { mutableStateOf("") }
-    LaunchedEffect(activeId) { searchVisible = false }
     var isTerminalAtBottom by remember { mutableStateOf(true) }
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
-    val uploadActivities by fileUploadViewModel.activities.collectAsState()
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
-    val transferActivities by fileDownloadViewModel.activities.collectAsState()
     val notesViewModel: ProjectNotesViewModel = hiltViewModel()
     var showProjectNotes by rememberSaveable { mutableStateOf(false) }
 
@@ -387,12 +380,8 @@ fun SessionHostScreen(
     LaunchedEffect(terminalViewRef.value) {
         val tv = terminalViewRef.value
         if (tv != null) {
-            readingMode = tv.isReadingMode
-            isTerminalAtBottom = tv.isAtBottom() && !readingMode
-            tv.setOnTopRowChangedListener {
-                readingMode = tv.isReadingMode
-                isTerminalAtBottom = tv.isAtBottom() && !readingMode
-            }
+            isTerminalAtBottom = tv.isAtBottom()
+            tv.setOnTopRowChangedListener { isTerminalAtBottom = tv.isAtBottom() }
         } else {
             isTerminalAtBottom = true
         }
@@ -625,63 +614,6 @@ fun SessionHostScreen(
     if (showAboutDialog) {
         TerminalHubAboutDialog(onDismiss = { showAboutDialog = false })
     }
-    if (showTunnels) {
-        se.joynes.terminalhub.ui.screen.terminal.SshTunnelDialog(
-            serverId = serverId.takeIf { activeTab?.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH },
-            onDismiss = { showTunnels = false })
-    }
-    if (showActivity) {
-        WorkspaceActivityDialog(projectTabs, transferActivities,
-            onSelect = viewModel::openProject,
-            onReconnect = viewModel::reconnectProject,
-            onReconnectAll = viewModel::reconnectAllProjects,
-            onTransfer = { id -> viewModel.openProject(id); fileDownloadVisibleByProject[id] = true },
-            onDismiss = { showActivity = false }, uploads = uploadActivities,
-            onUpload = { id -> viewModel.openProject(id); fileUploadVisibleByProject[id] = true })
-    }
-    if (showCommandPalette) {
-        val projectId = activeProjectId
-        val hasRemoteProject = projectId != null && activeTab?.targetType == se.joynes.terminalhub.data.model.ProjectTargetType.SSH
-        val commands = buildList {
-            add(WorkspaceCommand("activity", "Connections & activity", "status anslutning downloads transfers") { showActivity = true })
-            add(WorkspaceCommand("search", "Search terminal", "find sök", terminalViewRef.value != null) {
-                searchInitialQuery = ""; searchVisible = true
-            })
-            add(WorkspaceCommand("read", if (readingMode) "Follow terminal output" else "Reading mode", "read pause läs", terminalViewRef.value != null) {
-                terminalViewRef.value?.setReadingMode(!readingMode)
-            })
-            add(WorkspaceCommand("download", "Download files", "remote filer", hasRemoteProject) {
-                showProjectNotes = false
-                projectId?.let {
-                    textInputVisibleByProject[it] = false; fileUploadVisibleByProject[it] = false
-                    fileDownloadVisibleByProject[it] = true
-                }
-            })
-            add(WorkspaceCommand("upload", "Upload files", "remote filer", hasRemoteProject) {
-                showProjectNotes = false
-                projectId?.let {
-                    textInputVisibleByProject[it] = false; fileDownloadVisibleByProject[it] = false
-                    fileUploadVisibleByProject[it] = true
-                }
-            })
-            add(WorkspaceCommand("notes", "Project notes", "anteckningar", projectId != null) {
-                projectId?.let {
-                    textInputVisibleByProject[it] = false; fileUploadVisibleByProject[it] = false
-                    fileDownloadVisibleByProject[it] = false; notesViewModel.open(it)
-                }
-                showProjectNotes = true
-            })
-            add(WorkspaceCommand("tunnels", "SSH web tunnels", "browser webbläsare port forwarding") { showTunnels = true })
-            add(WorkspaceCommand("reconnect", "Reconnect all", "anslut") { viewModel.reconnectAllProjects() })
-            add(WorkspaceCommand("settings", "Settings", "inställningar", run = onOpenSettings))
-            add(WorkspaceCommand("servers", "Servers", "servrar", run = onOpenServers))
-            add(WorkspaceCommand("logs", "See logs", "diagnostics loggar", run = onOpenLogs))
-            projectTabs.forEach { tab -> add(WorkspaceCommand("project:${tab.projectId}", "Open ${tab.projectName}", "project projekt") {
-                viewModel.openProject(tab.projectId)
-            }) }
-        }
-        CommandPalette(commands, onDismiss = { showCommandPalette = false })
-    }
     pendingTabClose?.let { pending ->
         AlertDialog(
             onDismissRequest = { pendingTabClose = null },
@@ -865,22 +797,6 @@ fun SessionHostScreen(
                         expanded = showSettingsMenu,
                         onDismissRequest = { showSettingsMenu = false }
                     ) {
-                        DropdownMenuItem(text = { Text("Actions & projects") }, onClick = {
-                            showSettingsMenu = false; showCommandPalette = true
-                        })
-                        DropdownMenuItem(text = { Text("Connections & activity") }, onClick = {
-                            showSettingsMenu = false; showActivity = true
-                        })
-                        DropdownMenuItem(text = { Text("Search terminal") }, enabled = terminalViewRef.value != null, onClick = {
-                            showSettingsMenu = false; searchInitialQuery = ""; searchVisible = true
-                        })
-                        DropdownMenuItem(text = { Text(if (readingMode) "Follow output" else "Reading mode") },
-                            enabled = terminalViewRef.value != null, onClick = {
-                                showSettingsMenu = false; terminalViewRef.value?.setReadingMode(!readingMode)
-                            })
-                        DropdownMenuItem(text = { Text("SSH web tunnels") }, onClick = {
-                            showSettingsMenu = false; showTunnels = true
-                        })
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -1407,9 +1323,6 @@ fun SessionHostScreen(
                         }
 
                         if (!isTerminalAtBottom) {
-                            if (readingMode) Text("READING MODE · tap ↓ to follow output", color = MegaDrivePrimary,
-                                fontSize = 11.sp, modifier = Modifier.align(Alignment.BottomStart)
-                                    .background(MegaDriveSurface).padding(8.dp))
                             ScrollToBottomButton(
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)

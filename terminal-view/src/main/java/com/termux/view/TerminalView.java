@@ -77,12 +77,10 @@ public final class TerminalView extends View {
     int[] mDefaultSelectors = new int[]{-1,-1,-1,-1};
 
     private String mSearchQuery = null;
-    private boolean mSearchMatchCase = false;
     private final android.graphics.Paint mSearchHighlightPaint = new android.graphics.Paint();
     private final android.graphics.Paint mSearchCurrentPaint = new android.graphics.Paint();
     /** True while search overlay is active — prevents onScreenUpdated from snapping back to bottom. */
     private boolean mScrollLocked = false;
-    private boolean mReadingMode = false;
     /** True after the user manually scrolled into the scrollback — preserves their view across new output. */
     private boolean mUserScrolledUp = false;
     /** Net wheel-up scrolls forwarded to a mouse-tracking app (e.g. tmux copy mode), used to drive the scroll-to-bottom button. */
@@ -410,8 +408,6 @@ public final class TerminalView extends View {
     public boolean attachSession(TerminalSession session) {
         if (session == mTermSession) return false;
         stopFling();
-        mReadingMode = false;
-        mScrollLocked = false;
         mTopRow = 0;
         mUserScrolledUp = false;
         mAltModeUpScrolls = 0;
@@ -597,7 +593,7 @@ public final class TerminalView extends View {
         int rowsInHistory = mEmulator.getScreen().getActiveTranscriptRows();
         if (mTopRow < -rowsInHistory) mTopRow = -rowsInHistory;
 
-        if (isSelectingText() || mEmulator.isAutoScrollDisabled() || mUserScrolledUp || mReadingMode) {
+        if (isSelectingText() || mEmulator.isAutoScrollDisabled() || mUserScrolledUp) {
 
             // Do not scroll when selecting text or when user has scrolled into the scrollback.
             int rowShift = mEmulator.getScrollCounter();
@@ -607,7 +603,7 @@ public final class TerminalView extends View {
                 if (isSelectingText())
                     stopTextSelectionMode();
 
-                if (mEmulator.isAutoScrollDisabled() || mUserScrolledUp || mReadingMode) {
+                if (mEmulator.isAutoScrollDisabled() || mUserScrolledUp) {
                     mTopRow = -rowsInHistory;
                     skipScrolling = true;
                 }
@@ -1607,12 +1603,7 @@ public final class TerminalView extends View {
 
     /** Set the search query to highlight in the terminal. Pass null or empty to clear. */
     public void setSearchHighlight(String query, int currentRow) {
-        setSearchHighlight(query, currentRow, false);
-    }
-
-    public void setSearchHighlight(String query, int currentRow, boolean matchCase) {
-        mSearchQuery = (query != null && !query.isEmpty()) ? query : null;
-        mSearchMatchCase = matchCase;
+        mSearchQuery = (query != null && !query.isEmpty()) ? query.toLowerCase() : null;
         mSearchCurrentRow = currentRow;
         mScrollLocked = (mSearchQuery != null);
         invalidate();
@@ -1620,7 +1611,6 @@ public final class TerminalView extends View {
 
     /** Scroll to the bottom of the terminal output and unlock scroll-lock. */
     public void scrollToBottom() {
-        mReadingMode = false;
         mScrollLocked = false;
         mUserScrolledUp = false;
         stopFling();
@@ -1646,15 +1636,6 @@ public final class TerminalView extends View {
         return mTopRow == 0 && mAltModeUpScrolls == 0;
     }
 
-    public boolean isReadingMode() { return mReadingMode; }
-
-    public void setReadingMode(boolean enabled) {
-        if (!enabled) { scrollToBottom(); return; }
-        stopFling();
-        mReadingMode = true;
-        notifyTopRowChanged();
-    }
-
     /** Listener invoked whenever the visible top row changes (scroll, output, session switch). */
     public void setOnTopRowChangedListener(Runnable listener) {
         mOnTopRowChangedListener = listener;
@@ -1676,11 +1657,12 @@ public final class TerminalView extends View {
             // Read this row only (selY1 == selY2 reads one row).
             String lineText = screen.getSelectedText(0, row, cols, row);
             if (lineText == null || lineText.isEmpty()) continue;
+            String lineLower = lineText.toLowerCase();
             int idx = 0;
             int r = row - mTopRow;
             float bottom = mRenderer.mFontLineSpacingAndAscent + (r + 1) * (float) mRenderer.mFontLineSpacing;
             float top    = bottom - mRenderer.mFontLineSpacing;
-            while ((idx = indexOfSearchMatch(lineText, query, idx, mSearchMatchCase)) != -1) {
+            while ((idx = lineLower.indexOf(query, idx)) != -1) {
                 float left  = idx * mRenderer.mFontWidth;
                 float right = (idx + query.length()) * mRenderer.mFontWidth;
                 android.graphics.Paint paint = (row == mSearchCurrentRow) ? mSearchCurrentPaint : mSearchHighlightPaint;
@@ -1688,14 +1670,6 @@ public final class TerminalView extends View {
                 idx += query.length();
             }
         }
-    }
-
-    static int indexOfSearchMatch(String text, String query, int from, boolean matchCase) {
-        if (query.isEmpty()) return -1;
-        for (int i = Math.max(0, from); i <= text.length() - query.length(); i++) {
-            if (text.regionMatches(!matchCase, i, query, 0, query.length())) return i;
-        }
-        return -1;
     }
 
     private void decrementYTextSelectionCursors(int decrement) {

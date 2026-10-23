@@ -20,7 +20,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.termux.view.TerminalView
-import kotlinx.coroutines.delay
 import se.joynes.terminalhub.ui.theme.*
 
 data class SearchMatch(val row: Int)
@@ -35,11 +34,10 @@ fun TerminalSearchOverlay(
     var query by remember(initialQuery) { mutableStateOf(initialQuery) }
     var matches by remember { mutableStateOf<List<SearchMatch>>(emptyList()) }
     var currentIndex by remember { mutableStateOf(0) }
-    var matchCase by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     fun updateHighlight(q: String, matchRow: Int) {
-        terminalViewRef?.setSearchHighlight(q, matchRow, matchCase)
+        terminalViewRef?.setSearchHighlight(q.trim(), matchRow)
     }
 
     fun runSearch(q: String) {
@@ -49,9 +47,25 @@ fun TerminalSearchOverlay(
         val transcriptRows = screen.activeTranscriptRows
         val cols = emulator.mColumns
         val rows = emulator.mRows
-        val found = findTerminalMatches((-transcriptRows until rows).map { row ->
-            TerminalSearchRow(row, screen.getSelectedText(0, row, cols, row) ?: "", screen.getLineWrap(row))
-        }, q, matchCase)
+        val found = mutableListOf<SearchMatch>()
+        val term = q.trim()
+        if (term.isNotEmpty()) {
+            // Read each row exactly once (selY1 == selY2 reads one row).
+            // Also probe row + next row to catch terms that wrap a line boundary.
+            for (row in -transcriptRows until rows) {
+                val current = screen.getSelectedText(0, row, cols, row) ?: ""
+                if (current.contains(term, ignoreCase = true)) {
+                    found.add(SearchMatch(row))
+                    continue
+                }
+                if (row + 1 < rows) {
+                    val next = screen.getSelectedText(0, row + 1, cols, row + 1) ?: ""
+                    if ((current + next).contains(term, ignoreCase = true)) {
+                        found.add(SearchMatch(row))
+                    }
+                }
+            }
+        }
         matches = found
         // Default to the FIRST (highest-up) match so the user sees the top-most hit.
         currentIndex = 0
@@ -66,17 +80,13 @@ fun TerminalSearchOverlay(
         updateHighlight(query, match.row)
     }
 
-    DisposableEffect(terminalViewRef) {
+    DisposableEffect(Unit) {
         onDispose { terminalViewRef?.setSearchHighlight(null, Int.MIN_VALUE) }
     }
 
-    LaunchedEffect(terminalViewRef) {
+    LaunchedEffect(Unit) {
         focusRequester.requestFocus()
-    }
-
-    LaunchedEffect(query, matchCase, terminalViewRef) {
-        delay(150)
-        runSearch(query)
+        if (initialQuery.isNotEmpty()) runSearch(initialQuery)
     }
 
     LaunchedEffect(currentIndex, matches) {
@@ -105,6 +115,7 @@ fun TerminalSearchOverlay(
                 value = query,
                 onValueChange = { q ->
                     query = q
+                    runSearch(q)
                 },
                 singleLine = true,
                 textStyle = TextStyle(
@@ -124,7 +135,7 @@ fun TerminalSearchOverlay(
         }
 
         val matchLabel = when {
-            query.isEmpty() -> ""
+            query.trim().isEmpty() -> ""
             matches.isEmpty() -> "0"
             else -> "${currentIndex + 1}/${matches.size}"
         }
@@ -138,7 +149,6 @@ fun TerminalSearchOverlay(
             )
         }
 
-        SearchNavBtn(if (matchCase) "Aa✓" else "Aa") { matchCase = !matchCase }
         SearchNavBtn("▲") {
             if (matches.isNotEmpty()) currentIndex = if (currentIndex == 0) matches.size - 1 else currentIndex - 1
         }
