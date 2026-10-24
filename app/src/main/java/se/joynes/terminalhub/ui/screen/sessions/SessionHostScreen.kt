@@ -163,6 +163,8 @@ fun SessionHostScreen(
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
     val notesViewModel: ProjectNotesViewModel = hiltViewModel()
+    val gitReviewViewModel: se.joynes.terminalhub.ui.screen.git.GitReviewViewModel = hiltViewModel()
+    var gitReviewProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showProjectNotes by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -285,6 +287,21 @@ fun SessionHostScreen(
     }
     val activeTab = remember(activeProjectId, projectTabs) {
         activeProjectId?.let { projectId -> projectTabs.firstOrNull { it.projectId == projectId } }
+    }
+    LaunchedEffect(gitReviewProjectId) {
+        gitReviewProjectId?.let(gitReviewViewModel::open)
+    }
+    if (gitReviewProjectId != null) {
+        val gitState by gitReviewViewModel.state.collectAsState()
+        se.joynes.terminalhub.ui.screen.git.GitReviewDialog(
+            state = gitState,
+            onRepository = gitReviewViewModel::selectRepository,
+            onMode = gitReviewViewModel::selectMode,
+            onFile = gitReviewViewModel::selectFile,
+            onBack = gitReviewViewModel::backToFiles,
+            onRefresh = gitReviewViewModel::refresh,
+            onDismiss = { gitReviewViewModel.close(); gitReviewProjectId = null }
+        )
     }
     val restoringTab = remember(projectTabs, runtimeState.recoveryActiveProjectId) {
         val recoveryId = runtimeState.recoveryActiveProjectId
@@ -797,6 +814,14 @@ fun SessionHostScreen(
                         expanded = showSettingsMenu,
                         onDismissRequest = { showSettingsMenu = false }
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("Git changes", fontFamily = MonoFontFamily) },
+                            enabled = activeProjectId != null,
+                            onClick = {
+                                showSettingsMenu = false
+                                gitReviewProjectId = activeProjectId
+                            }
+                        )
                         DropdownMenuItem(
                             text = {
                                 Text(
@@ -1383,6 +1408,7 @@ fun SessionHostScreen(
                                     notesViewModel.open(projectId)
                                 } else notesViewModel.flush()
                             },
+                            onGitReview = { gitReviewProjectId = activeProjectId },
                             onTextInput = {
                                 showProjectNotes = false
                                 activeProjectId?.let { projectId ->

@@ -77,6 +77,7 @@ object KeyBarLayoutConfig {
                 KeyBarKeyDefinition("VOICE_INPUT", "MICROPHONE", "Actions"),
                 KeyBarKeyDefinition("PINNED_ACTIONS", "PINNED ACTIONS", "Actions"),
                 KeyBarKeyDefinition("PROJECT_NOTES", "PROJECT NOTES", "Actions"),
+                KeyBarKeyDefinition("GIT_REVIEW", "GIT DIFF", "Actions"),
                 KeyBarKeyDefinition("UPLOAD", "UPLOAD", "Actions"),
                 KeyBarKeyDefinition("DOWNLOAD", "DOWNLOAD", "Actions"),
                 KeyBarKeyDefinition("PASTE", "PASTE", "Actions")

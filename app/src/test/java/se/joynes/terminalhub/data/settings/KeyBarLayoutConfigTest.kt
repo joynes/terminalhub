@@ -5,6 +5,12 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class KeyBarLayoutConfigTest {
+    @Test fun `git diff key and highlight survive configuration export and import`() {
+        val rows = listOf(listOf("GIT_REVIEW", "DOWNLOAD", "TEXT_INPUT"))
+        assertEquals("GIT DIFF", KeyBarLayoutConfig.definition("GIT_REVIEW")?.label)
+        assertEquals(rows, KeyBarLayoutConfig.decode(KeyBarLayoutConfig.encode(rows)))
+        assertEquals(setOf("GIT_REVIEW"), KeyBarLayoutConfig.decodeHighlights(KeyBarLayoutConfig.encodeHighlights(setOf("GIT_REVIEW"))))
+    }
     @Test fun `notes replaces only the old factory digit three without changing custom rows`() {
         val previousDefault = KeyBarLayoutConfig.defaultRows.map { row -> row.map { if (it == "PROJECT_NOTES") "DIGIT_3" else it } }
         assertEquals(KeyBarLayoutConfig.defaultRows, KeyBarLayoutConfig.decode(KeyBarLayoutConfig.encode(previousDefault)))
