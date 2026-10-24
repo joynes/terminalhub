@@ -64,16 +64,17 @@ class ProjectNotesPersistenceTest {
             db.close()
             SQLiteDatabase.openDatabase(app.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
                 it.execSQL("DROP TABLE project_notes")
+                restoreV11PinnedTable(it)
                 it.version = 10
             }
-            db = Room.databaseBuilder(app, AppDatabase::class.java, name).addMigrations(MIGRATION_10_11).build()
+            db = Room.databaseBuilder(app, AppDatabase::class.java, name).addMigrations(MIGRATION_10_11, MIGRATION_11_12).build()
             assertEquals("Keep", db.pinnedActionDao().all().single().name)
             assertEquals("demo", db.projectDao().getAll().first().single().name)
             val note = ProjectNoteEntity(1, "saved å😀", dirty = true, pendingDelete = true)
             db.projectNoteDao().save(note)
             assertEquals(note, db.projectNoteDao().observe(1).first())
             db.close()
-            db = Room.databaseBuilder(app, AppDatabase::class.java, name).addMigrations(MIGRATION_10_11).build()
+            db = Room.databaseBuilder(app, AppDatabase::class.java, name).addMigrations(MIGRATION_10_11, MIGRATION_11_12).build()
             assertEquals(note, db.projectNoteDao().get(1))
             db.projectNoteDao().save(note.copy(text = "updated"))
             assertEquals("updated", db.projectNoteDao().get(1)?.text)

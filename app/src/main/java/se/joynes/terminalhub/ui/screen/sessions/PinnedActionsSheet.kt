@@ -13,7 +13,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import se.joynes.terminalhub.data.db.entity.PinnedActionEntity
 import se.joynes.terminalhub.data.db.entity.TextInputHistoryEntity
-import se.joynes.terminalhub.data.model.pinnedActionName
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -79,9 +78,9 @@ fun PinnedActionsSheet(
                     items(pins, key = { it.id }) { action ->
                         ListItem(
                             headlineContent = { Text(action.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                            supportingContent = { Text("${if (action.scope == "GLOBAL") "Global" else "Project"} · ${if (action.sendEnter) "Send + Enter" else "Prepare in Text Input"}") },
+                            supportingContent = { Text("${if (action.scope == "GLOBAL") "Global" else "Project"} · ${if (action.isMacro) "Keyboard macro" else if (action.sendEnter) "Send + Enter" else "Prepare in Text Input"}") },
                             modifier = Modifier.combinedClickable(
-                                onClick = { if (action.sendEnter) onSend(action) else onPrepare(action.text) },
+                                onClick = { if (action.isMacro || action.sendEnter) onSend(action) else onPrepare(action.text) },
                                 onLongClick = { selectedPin = action }
                             ).heightIn(min = 64.dp)
                         )
@@ -122,7 +121,7 @@ fun PinnedActionsSheet(
             text = {
                 Column {
                     TextButton(onClick = { selectedPin = null; editing = action }) { Text("Edit action") }
-                    TextButton(onClick = { selectedPin = null; onPrepare(action.text) }) { Text("Prepare in Text Input") }
+                    if (!action.isMacro) TextButton(onClick = { selectedPin = null; onPrepare(action.text) }) { Text("Prepare in Text Input") }
                     TextButton(onClick = { onDeletePin(action.id); selectedPin = null }) { Text("Delete action") }
                 }
             },
@@ -131,42 +130,11 @@ fun PinnedActionsSheet(
     }
     editing?.let { initial ->
         key(initial) {
-            var name by remember { mutableStateOf(initial.name) }
-            var text by remember { mutableStateOf(initial.text) }
-            var global by remember { mutableStateOf(initial.scope == "GLOBAL") }
-            var sendEnter by remember { mutableStateOf(initial.sendEnter) }
-            AlertDialog(
-                onDismissRequest = { editing = null },
-                title = { Text(if (initial.id == 0L) "Pin action" else "Edit action") },
-                text = {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        item { OutlinedTextField(name, { name = it }, label = { Text("Name (optional)") },
-                            placeholder = { Text(pinnedActionName("", text), maxLines = 1, overflow = TextOverflow.Ellipsis) }, singleLine = true) }
-                        item { OutlinedTextField(text, { text = it }, label = { Text("Input") }, minLines = 2, maxLines = 5) }
-                        item {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                FilterChip(!global, { global = false }, label = { Text("Project") })
-                                FilterChip(global, { global = true }, label = { Text("Global") })
-                            }
-                        }
-                        item {
-                            Row {
-                                Checkbox(sendEnter, { sendEnter = it })
-                                Text("Send immediately with Enter", Modifier.padding(top = 12.dp))
-                            }
-                            Text("Off: open in Text Input for editing.", style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                },
-                confirmButton = {
-                    TextButton(enabled = text.isNotBlank(), onClick = {
-                        onSave(initial.copy(name = pinnedActionName(name, text), text = text, scope = if (global) "GLOBAL" else "PROJECT", projectId = if (global) null else projectId, sendEnter = sendEnter))
-                        editing = null
-                        recent = false
-                    }) { Text("Save") }
-                },
-                dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancel") } }
-            )
+            PinnedActionEditor(initial, projectId, onSave = {
+                onSave(it)
+                editing = null
+                recent = false
+            }, onDismiss = { editing = null })
         }
     }
 }

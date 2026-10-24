@@ -80,11 +80,15 @@ class InputActionsRepository @Inject constructor(
     suspend fun deletePin(id: Long) = pins.delete(id)
     suspend fun markUsed(id: Long) = pins.markUsed(id, System.currentTimeMillis())
     suspend fun savePin(action: PinnedActionEntity) {
-        require(action.text.isNotBlank())
+        val steps = if (action.isMacro) se.joynes.terminalhub.data.model.PinnedMacroCodec.decode(action.macroJson) else null
+        val text = steps?.let(se.joynes.terminalhub.domain.TerminalMacro::summary) ?: action.text
+        require(text.isNotBlank())
         require(action.scope == "GLOBAL" || (action.scope == "PROJECT" && action.projectId != null))
         pins.save(action.copy(
-            name = se.joynes.terminalhub.data.model.pinnedActionName(action.name, action.text),
+            name = se.joynes.terminalhub.data.model.pinnedActionName(action.name, text),
+            text = text,
             projectId = if (action.scope == "GLOBAL") null else action.projectId,
+            sendEnter = if (action.isMacro) false else action.sendEnter,
             updatedAt = System.currentTimeMillis()
         ))
     }

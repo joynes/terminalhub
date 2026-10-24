@@ -175,6 +175,18 @@ class SessionHostViewModel @Inject constructor(
     private val knownHosts: KnownHostRepository,
     private val backgroundSshModeController: BackgroundSshModeController
 ) : ViewModel() {
+    val pinnedMacro = se.joynes.terminalhub.domain.PinnedMacroController(viewModelScope)
+
+    fun runPinnedMacro(action: se.joynes.terminalhub.data.db.entity.PinnedActionEntity): Boolean {
+        if (!action.isMacro) return false
+        val steps = runCatching { se.joynes.terminalhub.data.model.PinnedMacroCodec.decode(action.macroJson) }.getOrNull() ?: return false
+        val target = sessionManager.macroTargetForActive() ?: return false
+        val projectName = sessionManager.sessions.value.firstOrNull { it.id == activeId.value }?.projectName.orEmpty()
+        val started = pinnedMacro.start(action.name, projectName, steps, target)
+        if (started) usePinnedAction(action.id)
+        return started
+    }
+
     private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
     private val tabOrderKey = "project_tab_order"
 

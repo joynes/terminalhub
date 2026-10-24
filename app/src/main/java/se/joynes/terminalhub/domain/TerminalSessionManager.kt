@@ -338,6 +338,39 @@ class TerminalSessionManager @Inject constructor(
         sendBytes(entry, bytes)
     }
 
+    /** Captures the terminal object, not merely the selected tab or reusable session id. */
+    fun macroTargetForActive(): MacroTerminalTarget? {
+        val id = _activeId.value ?: return null
+        val original = entries[id.value] ?: return null
+        val terminal = original.terminalSession
+        val connection = original.conn
+        return object : MacroTerminalTarget {
+            override fun isConnected(): Boolean {
+                val current = entries[id.value] ?: return false
+                return current.terminalSession === terminal && current.conn === connection && terminal.emulator != null &&
+                    (connection?.connected?.value ?: terminal.isRunning)
+            }
+            private fun requireConnected() = check(isConnected()) { "Macro terminal is no longer connected." }
+            override fun paste(text: String) {
+                requireConnected()
+                pasteTextToSession(id, text)
+            }
+            override fun press(key: MacroStep.Key) {
+                requireConnected()
+                val emulator = terminal.emulator
+                val encoded = TerminalMacro.encodeKey(key, emulator?.isCursorKeysApplicationMode ?: false,
+                    emulator?.isKeypadApplicationMode ?: false)
+                inputActions.recorder.input(original.meta.projectId, encoded)
+                sendBytes(entries.getValue(id.value), encoded.toByteArray(Charsets.UTF_8))
+            }
+            override suspend fun flush() {
+                requireConnected()
+                connection?.awaitPendingWrites()
+                requireConnected()
+            }
+        }.takeIf { it.isConnected() }
+    }
+
     /** Wait until preceding remote writes for this session have reached the SSH stream. */
     suspend fun awaitPendingWrites(id: TerminalSessionId) {
         entries[id.value]?.conn?.awaitPendingWrites()

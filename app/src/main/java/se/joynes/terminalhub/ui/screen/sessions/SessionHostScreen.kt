@@ -480,12 +480,20 @@ fun SessionHostScreen(
                     textInputVisibleByProject[activeProjectId] = true
                 },
                 onSend = { action ->
-                    if (viewModel.sendTextInputToActive(action.text, action.sendEnter)) {
+                    val sent = if (action.isMacro) viewModel.runPinnedMacro(action)
+                        else viewModel.sendTextInputToActive(action.text, action.sendEnter)
+                    if (sent) {
                         showPinnedActions = false
-                        viewModel.usePinnedAction(action.id)
-                        Toast.makeText(context, "Sending ${action.name}", Toast.LENGTH_SHORT).show()
+                        if (action.isMacro) {
+                            textInputVisibleByProject[activeProjectId] = false
+                            fileUploadVisibleByProject[activeProjectId] = false
+                            fileDownloadVisibleByProject[activeProjectId] = false
+                            showProjectNotes = false
+                        }
+                        if (!action.isMacro) viewModel.usePinnedAction(action.id)
+                        Toast.makeText(context, if (action.isMacro) "Running ${action.name}" else "Sending ${action.name}", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, "Connect a terminal first", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, if (action.isMacro) "Connect a terminal and stop any running macro first" else "Connect a terminal first", Toast.LENGTH_SHORT).show()
                     }
                 },
                 onSave = { viewModel.savePinnedAction(it) },
@@ -1357,6 +1365,12 @@ fun SessionHostScreen(
                                     terminalViewRef.value?.requestFocus()
                                 }
                             )
+                        }
+                        val macroRun by viewModel.pinnedMacro.state.collectAsState()
+                        macroRun?.let { run ->
+                            PinnedMacroStatus(run, onStop = viewModel.pinnedMacro::stop,
+                                onDismiss = viewModel.pinnedMacro::dismiss,
+                                modifier = Modifier.align(Alignment.BottomCenter).padding(8.dp))
                         }
                     }
 

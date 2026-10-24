@@ -2,6 +2,8 @@ package se.joynes.terminalhub.data.db.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
+import androidx.room.Ignore
 
 @Entity(tableName = "pinned_actions")
 data class PinnedActionEntity(
@@ -14,5 +16,8 @@ data class PinnedActionEntity(
     val updatedAt: Long = System.currentTimeMillis(),
     val usageCount: Long = 0,
     val lastUsedAt: Long? = null,
-    val sendEnter: Boolean = true
-)
+    val sendEnter: Boolean = true,
+    @ColumnInfo(defaultValue = "''") val macroJson: String = ""
+) {
+    @get:Ignore val isMacro: Boolean get() = macroJson.isNotEmpty()
+}
