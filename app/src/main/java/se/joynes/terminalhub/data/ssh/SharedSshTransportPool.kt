@@ -34,7 +34,8 @@ class SharedSshTransportPool @Inject constructor(
     internal class Entry(
         val transport: CompletableDeferred<SshTransport> = CompletableDeferred(),
         val projectLeases: MutableMap<String, Long?> = linkedMapOf(),
-        val transferLeases: MutableSet<String> = linkedSetOf()
+        val transferLeases: MutableSet<String> = linkedSetOf(),
+        var retired: Boolean = false
     )
 
     internal enum class LeaseKind { PROJECT, TRANSFER }
@@ -75,7 +76,7 @@ class SharedSshTransportPool @Inject constructor(
         val entry = synchronized(lock) {
             entries[key]
                 ?.filter { candidate ->
-                    when (kind) {
+                    !candidate.retired && when (kind) {
                         LeaseKind.PROJECT -> candidate.projectLeases.size < MAX_PROJECT_CHANNELS_PER_TRANSPORT
                         LeaseKind.TRANSFER -> candidate.transferLeases.size < MAX_TRANSFERS_PER_TRANSPORT
                     }
@@ -137,25 +138,27 @@ class SharedSshTransportPool @Inject constructor(
         }
     }
 
-    /**
-     * Removes a transport which failed while opening a channel. A completed transport used to
-     * remain reusable as long as another tab still held a lease, so every reconnect could pick
-     * the same dead connection until Android killed the whole app process.
-     */
+    /** Stop assigning new channels after an open failure, without killing sibling channels.
+     * A channel limit/rejection does not imply that the whole transport has died. */
     internal fun invalidate(lease: SshTransportLease) {
-        var removed = false
+        var closeTransport = false
         try {
             synchronized(lock) {
                 val shards = entries[lease.key] ?: return@synchronized
                 if (lease.entry !in shards) return@synchronized
-                shards.remove(lease.entry)
-                if (shards.isEmpty()) entries.remove(lease.key)
-                removed = true
+                lease.entry.retired = true
+                lease.entry.removeLease(lease.leaseId, lease.kind)
+                closeTransport = lease.entry.isUnused()
+                if (closeTransport) {
+                    shards.remove(lease.entry)
+                    if (shards.isEmpty()) entries.remove(lease.key)
+                }
+                lease.transport.updateProjectIds(lease.entry.projectLeases.values.filterNotNull().toSet())
             }
-            if (removed) {
+            if (closeTransport) {
                 lease.transport.close()
-                logger.log(LogLevel.WARN, TAG, "Discarded unusable shared SSH transport")
             }
+            logger.log(LogLevel.WARN, TAG, "Retired SSH transport for new channels; existing channels retain their leases")
         } finally {
             if (lease.kind == LeaseKind.TRANSFER) transferSlots.release()
         }

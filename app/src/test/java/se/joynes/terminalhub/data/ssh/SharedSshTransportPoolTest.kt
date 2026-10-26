@@ -225,7 +225,7 @@ class SharedSshTransportPoolTest {
     }
 
     @Test
-    fun `invalidated transport is closed and never reused by reconnect`() = runBlocking {
+    fun `reconnect open failure uses fresh transport without closing another tab`() = runBlocking {
         val connector = FakeConnector()
         val pool = SharedSshTransportPool(logger, connector)
         val failed = pool.acquire(server(), "secret", null)
@@ -235,13 +235,33 @@ class SharedSshTransportPoolTest {
         failed.invalidate()
         val replacement = pool.acquire(server(), "secret", null)
 
-        assertTrue(connector.transports.first().closed)
+        assertFalse(connector.transports.first().closed)
         assertEquals(2, connector.connectCount.get())
         assertTrue(failedIdentity != replacement.debugTransportIdentity())
-        assertEquals(1, pool.activeTransportCount())
+        assertEquals(2, pool.activeTransportCount())
 
         otherTab.release()
+        assertTrue(connector.transports.first().closed)
+        assertFalse(connector.transports.last().closed)
         replacement.release()
+        assertEquals(0, pool.activeTransportCount())
+    }
+
+    @Test fun `failed auxiliary channel preserves project and transfer leases until released`() = runBlocking {
+        val connector = FakeConnector()
+        val pool = SharedSshTransportPool(logger, connector)
+        val project = pool.acquire(server(), "secret", null)
+        val transfer = pool.acquireTransfer(server(), "secret", null)
+        val failed = pool.acquire(server(), "secret", null)
+        failed.invalidate(); failed.release()
+        val retry = pool.acquireTransfer(server(), "secret", null)
+        assertTrue(project.debugTransportIdentity() != retry.debugTransportIdentity())
+        assertFalse(connector.transports.first().closed)
+        project.release()
+        assertFalse(connector.transports.first().closed)
+        transfer.release()
+        assertTrue(connector.transports.first().closed)
+        retry.release()
         assertEquals(0, pool.activeTransportCount())
     }
 
