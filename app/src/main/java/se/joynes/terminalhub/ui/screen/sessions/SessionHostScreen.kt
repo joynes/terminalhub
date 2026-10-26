@@ -163,6 +163,10 @@ fun SessionHostScreen(
     val fileUploadViewModel: FileUploadViewModel = hiltViewModel()
     val fileDownloadViewModel: FileDownloadViewModel = hiltViewModel()
     val notesViewModel: ProjectNotesViewModel = hiltViewModel()
+    val tmuxWindowsViewModel: TmuxWindowsViewModel = hiltViewModel()
+    val tmuxWindows by tmuxWindowsViewModel.state.collectAsState()
+    val pendingInputSessions by viewModel.pendingInputSessions.collectAsState()
+    val activeMacro by viewModel.pinnedMacro.state.collectAsState()
     val gitReviewViewModel: se.joynes.terminalhub.ui.screen.git.GitReviewViewModel = hiltViewModel()
     var gitReviewProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
     var showProjectNotes by rememberSaveable { mutableStateOf(false) }
@@ -480,7 +484,9 @@ fun SessionHostScreen(
                     textInputVisibleByProject[activeProjectId] = true
                 },
                 onSend = { action ->
-                    val sent = if (action.isMacro) viewModel.runPinnedMacro(action)
+                    val windowChanging = activeTab?.usesTmux == true && (tmuxWindowsViewModel.state.value.busy || tmuxWindowsViewModel.state.value.loading)
+                    val inputPending = action.isMacro && activeId in pendingInputSessions
+                    val sent = if (windowChanging || inputPending) false else if (action.isMacro) viewModel.runPinnedMacro(action)
                         else viewModel.sendTextInputToActive(action.text, action.sendEnter)
                     if (sent) {
                         showPinnedActions = false
@@ -493,7 +499,7 @@ fun SessionHostScreen(
                         if (!action.isMacro) viewModel.usePinnedAction(action.id)
                         Toast.makeText(context, if (action.isMacro) "Running ${action.name}" else "Sending ${action.name}", Toast.LENGTH_SHORT).show()
                     } else {
-                        Toast.makeText(context, if (action.isMacro) "Connect a terminal and stop any running macro first" else "Connect a terminal first", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, if (windowChanging || inputPending) "Wait for terminal input or switching to finish" else if (action.isMacro) "Connect a terminal and stop any running macro first" else "Connect a terminal first", Toast.LENGTH_SHORT).show()
                     }
                 },
                 onSave = { viewModel.savePinnedAction(it) },
@@ -579,6 +585,19 @@ fun SessionHostScreen(
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(activeProjectId, activeTab?.sessionId, activeTab?.isConnected, activeTab?.usesTmux, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            tmuxWindowsViewModel.bind(
+                activeProjectId.takeIf { activeTab?.usesTmux == true },
+                activeTab?.sessionId?.value,
+                activeTab?.isConnected == true && activeTab?.usesTmux == true
+            )
+            try { kotlinx.coroutines.awaitCancellation() } finally { tmuxWindowsViewModel.pause() }
+        }
+    }
+    LaunchedEffect(tmuxWindows.selectionRevision) {
+        if (tmuxWindows.selectionRevision > 0 && tmuxWindows.projectId == activeProjectId) terminalViewRef.value?.scrollToBottom()
+    }
 
     LaunchedEffect(viewModel, lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
@@ -722,7 +741,7 @@ fun SessionHostScreen(
             },
             text = {
                 Text(
-                    "This stops the session for ${pending.projectName}, including programs running inside it, then creates a fresh session in the same project tab.",
+                    "This stops all terminals and programs in ${pending.projectName}, then creates a fresh session in the same project tab.",
                     color = Color.White,
                     fontFamily = MonoFontFamily,
                     fontSize = 12.sp
@@ -908,6 +927,33 @@ fun SessionHostScreen(
                         )
                     }
                 }
+            }
+
+            if (activeTab?.usesTmux == true) {
+                val currentWindows = tmuxWindows.takeIf { it.projectId == activeProjectId }
+                    ?: TmuxWindowsState(projectId = activeProjectId, connected = activeTab.isConnected, loading = activeTab.isConnected)
+                val inputBusy = activeId in pendingInputSessions ||
+                    (activeMacro?.running == true && activeMacro?.projectId == activeProjectId)
+                fun canChangeTerminal(): Boolean {
+                    val run = viewModel.pinnedMacro.state.value
+                    return activeId !in viewModel.pendingInputSessions.value && !(run?.running == true && run.projectId == activeProjectId)
+                }
+                fun showTerminal() {
+                    activeProjectId?.let {
+                        textInputVisibleByProject[it] = false
+                        fileUploadVisibleByProject[it] = false
+                        fileDownloadVisibleByProject[it] = false
+                    }
+                    showProjectNotes = false
+                    searchVisible = false
+                    terminalViewRef.value?.requestFocus()
+                }
+                TmuxWindowBar(currentWindows, inputBusy,
+                    onCreate = { if (canChangeTerminal()) { showTerminal(); tmuxWindowsViewModel.create(it) } },
+                    onSelect = { if (canChangeTerminal()) { showTerminal(); tmuxWindowsViewModel.select(it) } },
+                    onRename = { window, name -> if (canChangeTerminal()) tmuxWindowsViewModel.rename(window, name) },
+                    onClose = { if (canChangeTerminal()) tmuxWindowsViewModel.close(it) },
+                    onRefresh = tmuxWindowsViewModel::refresh)
             }
 
             if (projectTabs.isEmpty()) {

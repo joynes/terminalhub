@@ -176,13 +176,17 @@ class SessionHostViewModel @Inject constructor(
     private val backgroundSshModeController: BackgroundSshModeController
 ) : ViewModel() {
     val pinnedMacro = se.joynes.terminalhub.domain.PinnedMacroController(viewModelScope)
+    private val pendingSubmissions = mutableMapOf<TerminalSessionId, Int>()
+    private val _pendingInputSessions = MutableStateFlow<Set<TerminalSessionId>>(emptySet())
+    val pendingInputSessions = _pendingInputSessions.asStateFlow()
 
     fun runPinnedMacro(action: se.joynes.terminalhub.data.db.entity.PinnedActionEntity): Boolean {
         if (!action.isMacro) return false
+        if (activeId.value in pendingSubmissions) return false
         val steps = runCatching { se.joynes.terminalhub.data.model.PinnedMacroCodec.decode(action.macroJson) }.getOrNull() ?: return false
         val target = sessionManager.macroTargetForActive() ?: return false
-        val projectName = sessionManager.sessions.value.firstOrNull { it.id == activeId.value }?.projectName.orEmpty()
-        val started = pinnedMacro.start(action.name, projectName, steps, target)
+        val meta = sessionManager.sessions.value.firstOrNull { it.id == activeId.value } ?: return false
+        val started = pinnedMacro.start(action.name, meta.projectName, steps, target, projectId = meta.projectId)
         if (started) usePinnedAction(action.id)
         return started
     }
@@ -1008,13 +1012,22 @@ class SessionHostViewModel @Inject constructor(
         val submission = terminalTextInputSubmission(text, executeImmediately)
         val targetSessionId = sessionManager.pasteTextToActive(submission.pasteText, completedText = text) ?: return false
         if (submission.sendEnter) {
+            pendingSubmissions[targetSessionId] = (pendingSubmissions[targetSessionId] ?: 0) + 1
+            _pendingInputSessions.value = pendingSubmissions.keys.toSet()
             viewModelScope.launch {
-                sessionManager.awaitPendingWrites(targetSessionId)
-                delay(submission.enterDelayMs)
-                sessionManager.sendBytesToSession(
-                    targetSessionId,
-                    byteArrayOf('\r'.code.toByte())
-                )
+                try {
+                    val sent = withTimeoutOrNull(15_000) {
+                        sessionManager.awaitPendingWrites(targetSessionId)
+                        delay(submission.enterDelayMs)
+                        sessionManager.sendBytesToSession(targetSessionId, byteArrayOf('\r'.code.toByte()))
+                        true
+                    } == true
+                    if (!sent) _uiMessages.tryEmit("Enter could not be sent. Check the terminal connection before trying again.")
+                } finally {
+                    val remaining = (pendingSubmissions[targetSessionId] ?: 1) - 1
+                    if (remaining <= 0) pendingSubmissions.remove(targetSessionId) else pendingSubmissions[targetSessionId] = remaining
+                    _pendingInputSessions.value = pendingSubmissions.keys.toSet()
+                }
             }
         }
         return true

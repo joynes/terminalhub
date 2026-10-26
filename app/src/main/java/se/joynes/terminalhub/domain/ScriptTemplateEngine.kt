@@ -45,7 +45,9 @@ class ScriptTemplateEngine @Inject constructor() {
         return if (project.useTmux) {
             dirSetup +
             "if tmux has-session -t $session 2>/dev/null; then " +
-            "if tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1; then " +
+            // Never destroy other windows when one terminal has exited with remain-on-exit.
+            "if tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1 && " +
+            "[ \"\$(tmux list-windows -t $session -F '#{window_id}' 2>/dev/null | wc -l)\" -eq 1 ]; then " +
             "tmux kill-session -t $session 2>/dev/null; " +
             "tmux new-session -d -s $session -c $quotedPath && echo TMUX_SESSION_CREATED; " +
             "else " +
