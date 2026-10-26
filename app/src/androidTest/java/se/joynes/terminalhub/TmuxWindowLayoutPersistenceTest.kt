@@ -36,4 +36,15 @@ class TmuxWindowLayoutPersistenceTest {
         store.save(server, project, old, onlyIfMissing = true)
         assertEquals(listOf("Renamed", "New"), TmuxWindowLayoutStore(context).read(server, project)!!.names)
     }
+
+    @Test fun lastActualProgramSurvivesAppRecreationAndTmuxIdReuseIsIsolated() = runBlocking {
+        val window = TmuxWindow("@1", 0, "Code", true, 1, "original-key", "codex", "/work/src")
+        val snapshot = TmuxWindowsSnapshot("\$1", listOf(window))
+        TmuxWindowLayoutStore(context).save(server, project, snapshot)
+        val store = TmuxWindowLayoutStore(context)
+        store.save(server, project, snapshot.copy(windows = listOf(window.copy(currentProgram = "zsh", name = "Renamed"))))
+        assertEquals(TmuxProgram("codex", "/work/src"), TmuxWindowLayoutStore(context).read(server, project)!!.memories.single().program)
+        store.save(server, project, snapshot.copy(windows = listOf(window.copy(key = "unrelated-key", currentProgram = "bash"))))
+        assertNull(TmuxWindowLayoutStore(context).read(server, project)!!.memories.single().program)
+    }
 }

@@ -144,6 +144,7 @@ fun SessionHostScreen(
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var newTerminalProjectId by remember { mutableStateOf<Long?>(null) }
+    var terminalInfoProjectId by remember { mutableStateOf<Long?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTabClose by remember { mutableStateOf<PendingTabClose?>(null) }
     var pendingTmuxRestart by remember { mutableStateOf<PendingTmuxRestart?>(null) }
@@ -866,6 +867,10 @@ fun SessionHostScreen(
                             enabled = activeTab.isConnected,
                             onClick = { showSettingsMenu = false; newTerminalProjectId = activeProjectId }
                         )
+                        if (activeTab?.usesTmux == true) DropdownMenuItem(
+                            text = { Text("Terminal information") },
+                            onClick = { showSettingsMenu = false; terminalInfoProjectId = activeProjectId }
+                        )
                         DropdownMenuItem(
                             text = { Text("Git changes", fontFamily = MonoFontFamily) },
                             enabled = activeProjectId != null,
@@ -983,7 +988,9 @@ fun SessionHostScreen(
                     tabHeight = tabAppearance.terminalTabHeight,
                     tabTextSize = tabAppearance.terminalTabTextSize,
                     createRequested = newTerminalProjectId == activeProjectId,
-                    onCreateRequestHandled = { newTerminalProjectId = null })
+                    onCreateRequestHandled = { newTerminalProjectId = null },
+                    infoRequested = terminalInfoProjectId == activeProjectId,
+                    onInfoRequestHandled = { terminalInfoProjectId = null })
             }
 
             if (projectTabs.isEmpty()) {

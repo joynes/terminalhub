@@ -17,12 +17,18 @@ class TmuxWindowIntegrationTest {
     private val folder = Files.createTempDirectory(File("/tmp").toPath(), "thtw-").toFile()
     private val working = File(folder, "project ' å").apply { mkdirs() }
     private val binary = listOf("/opt/homebrew/bin/tmux", "/usr/bin/tmux").firstOrNull { File(it).canExecute() }
+    private val socket get() = File(folder, "owned.sock").path
     private fun q(value: String) = "'" + value.replace("'", "'\\''") + "'"
 
     private fun run(command: String, success: Boolean = true): String {
-        val builder = ProcessBuilder("/bin/bash", "-c", command).redirectErrorStream(true)
+        // Every path, including commands inside login shells and fault injection, names our socket.
+        val executable = "${q(binary!!)} -S ${q(socket)}"
+        val scoped = command.replace("command tmux ", "$executable ")
+        val wrapper = "tmux() { $executable \"\$@\"; }; export -f tmux; "
+        val builder = ProcessBuilder("/bin/bash", "-c", wrapper + scoped).redirectErrorStream(true)
         builder.environment()["TMUX_TMPDIR"] = folder.path
         builder.environment()["TMUX"] = ""
+        builder.environment()["SHELL"] = "/bin/sh"
         val process = builder.start()
         val text = process.inputStream.bufferedReader().readText()
         assertTrue("Command timed out", process.waitFor(10, TimeUnit.SECONDS))
@@ -30,7 +36,7 @@ class TmuxWindowIntegrationTest {
         return text
     }
 
-    private fun tmux(args: String) = run("${q(binary!!)} $args")
+    private fun tmux(args: String) = run("${q(binary!!)} -S ${q(socket)} $args")
     private fun snapshot(name: String = "project") = TmuxWindowCommands.parse(run(TmuxWindowCommands.list(name)))
     private fun execute(command: String) = TmuxWindowCommands.parse(run(command))
 
@@ -64,6 +70,31 @@ class TmuxWindowIntegrationTest {
         assertEquals(first.windows.single().id, closed.windows.single().id)
         assertEquals(pid, tmux("display-message -p -t ${q(firstPane)} '#{pane_pid}'").trim())
         assertEquals(1, tmux("list-sessions -F '#{session_id}'").lines().count(String::isNotBlank))
+    }
+
+    @Test fun `foreground program is detected without interpreting interactive input and survives restoration as a hint`() {
+        val initial = snapshot()
+        tmux("send-keys -t project: -l 'sleep 60'")
+        tmux("send-keys -t project: Enter")
+        var observed = snapshot()
+        repeat(40) {
+            if (observed.windows.single().currentProgram != "sleep") { Thread.sleep(50); observed = snapshot() }
+        }
+        assertEquals("sleep", observed.windows.single().currentProgram)
+        assertEquals(initial.windows.single().key, observed.windows.single().key)
+        val saved = TmuxWindowLayout.from(observed)
+        tmux("send-keys -t project: C-c")
+        var shell = snapshot()
+        repeat(40) {
+            if (shell.windows.single().currentProgram == "sleep") { Thread.sleep(50); shell = snapshot() }
+        }
+        assertEquals("sleep", TmuxWindowLayout.from(shell, saved).memories.single().program!!.command)
+        tmux("kill-server")
+        run(saved.renderCreate("project", working.path))
+        val restored = snapshot()
+        assertEquals(observed.windows.single().key, restored.windows.single().key)
+        assertNotEquals("sleep", restored.windows.single().currentProgram)
+        assertEquals("sleep", TmuxWindowLayout.from(restored, saved).memories.single().program!!.command)
     }
 
     @Test fun `exact project targets and membership prevent changes to another session`() {

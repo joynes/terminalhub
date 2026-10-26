@@ -1,6 +1,9 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -38,7 +41,9 @@ fun TmuxWindowBar(
     tabHeight: Int = 28,
     tabTextSize: Int = 12,
     createRequested: Boolean = false,
-    onCreateRequestHandled: () -> Unit = {}
+    onCreateRequestHandled: () -> Unit = {},
+    infoRequested: Boolean = false,
+    onInfoRequestHandled: () -> Unit = {}
 ) {
     var creating by remember(state.projectId) { mutableStateOf(false) }
     var selectedMenu by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
@@ -51,6 +56,9 @@ fun TmuxWindowBar(
     val height = maxOf(tabHeight, kotlin.math.ceil(tabTextSize * LocalDensity.current.fontScale * 1.3f + 8).toInt()).dp
     LaunchedEffect(createRequested) {
         if (createRequested) { creating = true; onCreateRequestHandled() }
+    }
+    LaunchedEffect(infoRequested) {
+        if (infoRequested) { selectedMenu = windows.firstOrNull { it.active }; onInfoRequestHandled() }
     }
     LaunchedEffect(state.projectId, activeIndex) { if (activeIndex >= 0) listState.animateScrollToItem(activeIndex) }
 
@@ -101,7 +109,21 @@ fun TmuxWindowBar(
     selectedMenu?.let { window ->
         AlertDialog(onDismissRequest = { selectedMenu = null }, title = { Text(window.name.ifBlank { "Terminal" }) },
             text = {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    val latest = windows.firstOrNull { it.key == window.key && it.id == window.id } ?: window
+                    SelectionContainer {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Current program: ${latest.currentProgram.ifBlank { "Unavailable" }}")
+                            if (latest.directory.isNotBlank()) Text("Current folder: ${latest.directory}")
+                            latest.lastProgram?.let {
+                                Text("Last observed program: ${it.command}")
+                                Text("Last program folder: ${it.directory}")
+                            }
+                            Text(if (latest.panes > 1) "Current information describes the selected pane. Program recovery hints are only recorded for terminals with one pane."
+                                else "Program names are recovery hints, not complete launch commands. Arguments and interactive state are not restored. Short-lived programs may not be observed.",
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
                     TextButton(enabled = enabled, onClick = { selectedMenu = null; renaming = window }) { Text("Rename terminal") }
                     TextButton(enabled = enabled && windows.size > 1, onClick = { selectedMenu = null; closing = window }) { Text("Close terminal") }
                     if (windows.size == 1) Text("Keep one terminal in the project. Restart session starts the project again.", style = MaterialTheme.typography.bodySmall)

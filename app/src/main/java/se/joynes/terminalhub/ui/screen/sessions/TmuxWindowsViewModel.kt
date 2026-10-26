@@ -119,11 +119,13 @@ class TmuxWindowsViewModel @Inject constructor(
         if (run != generation) return
         val current = binding ?: return
         layouts.save(current.server, current.project, snapshot)
+        val memories = layouts.read(current.server, current.project)?.memories.orEmpty().associateBy { it.key }
+        val enriched = snapshot.copy(windows = snapshot.windows.map { it.copy(lastProgram = memories[it.key]?.program) })
         if (run != generation) return
         val previousActive = mutable.value.snapshot?.windows?.firstOrNull { it.active }?.id
         val changed = previousActive != null && previousActive != snapshot.windows.firstOrNull { it.active }?.id
-        mutable.value.projectId?.let { snapshots[it] = snapshot }
-        mutable.value = mutable.value.copy(snapshot = snapshot, loading = false, error = null,
+        mutable.value.projectId?.let { snapshots[it] = enriched }
+        mutable.value = mutable.value.copy(snapshot = enriched, loading = false, error = null,
             selectionRevision = mutable.value.selectionRevision + if (changed) 1 else 0)
     }
 

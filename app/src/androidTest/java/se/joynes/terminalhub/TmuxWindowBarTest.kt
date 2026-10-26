@@ -20,6 +20,30 @@ class TmuxWindowBarTest {
     private val second = TmuxWindow("@2", 1, "Tests", false, 1)
     private fun state() = TmuxWindowsState(projectId = 1, connected = true, snapshot = TmuxWindowsSnapshot("\$1", listOf(first, second)))
 
+    @Test fun longPressShowsProgramAndFolderWithoutOfferingToExecuteInteractiveInput() {
+        val remembered = first.copy(key = "stable-key", currentProgram = "zsh", directory = "/work/project",
+            lastProgram = TmuxProgram("codex", "/work/project/src"))
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(state().copy(snapshot = TmuxWindowsSnapshot("\$1", listOf(remembered, second))), false,
+            {}, {}, { _, _ -> }, {}, {}) } }
+        compose.onNodeWithContentDescription("Terminal 1: Codex").performTouchInput { longClick() }
+        compose.onNodeWithText("Current program: zsh").assertIsDisplayed()
+        compose.onNodeWithText("Last observed program: codex").assertIsDisplayed()
+        compose.onNodeWithText("Last program folder: /work/project/src").assertIsDisplayed()
+        compose.onNodeWithText("Program names are recovery hints", substring = true).assertExists()
+    }
+
+    @Test fun hiddenSingleTerminalStillOffersProgramInformationViaMenuRequest() {
+        var requested by mutableStateOf(false)
+        val only = first.copy(currentProgram = "vim", directory = "/work")
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(state().copy(snapshot = TmuxWindowsSnapshot("\$1", listOf(only))), false,
+            {}, {}, { _, _ -> }, {}, {}, infoRequested = requested, onInfoRequestHandled = { requested = false }) } }
+        compose.onNodeWithTag("project-terminal-bar").assertDoesNotExist()
+        compose.runOnIdle { requested = true }
+        compose.onNodeWithText("Current program: vim").assertIsDisplayed()
+        compose.onNodeWithText("DONE").performClick()
+        compose.onNodeWithText("Current program: vim").assertDoesNotExist()
+    }
+
     @Test fun selectingTerminalCallsOnceAndDoesNotChangeProject() {
         var selected: TmuxWindow? = null
         compose.setContent { TerminalHubTheme { TmuxWindowBar(state(), false, {}, { selected = it }, { _, _ -> }, {}, {}) } }

@@ -4,13 +4,16 @@ import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
 import javax.inject.Inject
+import java.util.UUID
 
-data class TmuxWindow(val id: String, val index: Int, val name: String, val active: Boolean, val panes: Int)
+data class TmuxProgram(val command: String, val directory: String)
+data class TmuxWindow(val id: String, val index: Int, val name: String, val active: Boolean, val panes: Int,
+    val key: String = "", val currentProgram: String = "", val directory: String = "", val lastProgram: TmuxProgram? = null)
 data class TmuxWindowsSnapshot(val sessionId: String, val windows: List<TmuxWindow>)
 
 /** All targets are tmux object IDs, scoped to the project's exact session. */
 object TmuxWindowCommands {
-    internal const val START = "TERMINALHUB_WINDOWS_V1"
+    internal const val START = "TERMINALHUB_WINDOWS_V2"
     internal const val END = "TERMINALHUB_WINDOWS_END"
     private val sessionId = Regex("\\$\\d+")
     private val windowId = Regex("@\\d+")
@@ -42,8 +45,13 @@ object TmuxWindowCommands {
         "printf '%s\\000%s\\000' '$START' $target; " +
         "tmux list-windows -t $target -F '#{window_id} #{window_index} #{window_active} #{window_panes}' | " +
         "while read -r window_id window_index window_active window_panes; do " +
+        // -o only sets an absent option. The logical key survives rename and server restoration.
+        "tmux set-option -woq -t \"\$session_id:\$window_id\" @terminalhub_window_key '${UUID.randomUUID()}-'\"\$window_id\"; " +
         "window_name=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{window_name}'); " +
-        "printf '%s\\000%s\\000%s\\000%s\\000%s\\000' \"\$window_id\" \"\$window_index\" \"\$window_active\" \"\$window_panes\" \"\$window_name\"; " +
+        "window_key=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{@terminalhub_window_key}'); " +
+        "window_program=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{pane_current_command}'); " +
+        "window_directory=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{pane_current_path}'); " +
+        "printf '%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000' \"\$window_id\" \"\$window_index\" \"\$window_active\" \"\$window_panes\" \"\$window_name\" \"\$window_key\" \"\$window_program\" \"\$window_directory\"; " +
         "done; printf '%s\\000' '$END'"
 
     private fun verify(snapshot: TmuxWindowsSnapshot, window: TmuxWindow? = null): String {
@@ -92,12 +100,14 @@ object TmuxWindowCommands {
         val end = output.lastIndexOf("\u0000$END\u0000")
         require(start >= 0 && end > start) { "Could not read project terminals. Reconnect the project and refresh." }
         val fields = output.substring(start + START.length + 1, end).split('\u0000')
-        require(sessionId.matches(fields.first()) && fields.size >= 6 && (fields.size - 1) % 5 == 0) { "Invalid tmux terminal list." }
-        val windows = fields.drop(1).chunked(5).map { row ->
+        require(sessionId.matches(fields.first()) && fields.size >= 9 && (fields.size - 1) % 8 == 0) { "Invalid tmux terminal list." }
+        val windows = fields.drop(1).chunked(8).map { row ->
             require(windowId.matches(row[0]) && row[2] in listOf("0", "1")) { "Invalid tmux window." }
-            TmuxWindow(row[0], row[1].toInt(), row[4], row[2] == "1", row[3].toInt())
+            require(Regex("[a-zA-Z0-9@_-]{1,128}").matches(row[5])) { "Invalid terminal identity." }
+            TmuxWindow(row[0], row[1].toInt(), row[4], row[2] == "1", row[3].toInt(), row[5], row[6], row[7])
         }
-        require(windows.size <= 128 && windows.map { it.id }.distinct().size == windows.size && windows.count { it.active } == 1) {
+        require(windows.size <= 128 && windows.map { it.id }.distinct().size == windows.size &&
+            windows.map { it.key }.distinct().size == windows.size && windows.count { it.active } == 1) {
             "Could not read a complete terminal list. Refresh to try again."
         }
         return TmuxWindowsSnapshot(fields.first(), windows)

@@ -28,6 +28,29 @@ tmux enabled now show a second **TERMINALS** row beneath the project tabs.
 - History, notes and pinned-action scope remain project based. Terminal switching
   is paused while a macro or delayed Text Input Enter is being sent.
 
+## Program recovery hints
+
+The foreground screen observes `pane_current_command` and `pane_current_path`
+from tmux while refreshing the active project every three seconds. It never
+interprets terminal input or input history as a shell command. For a one-pane
+window it remembers the last observed non-shell program and that program's
+directory, including after the pane returns to a shell. Other projects are only
+observed when opened; brief commands between refreshes may be missed.
+
+Long press a terminal, or choose **Terminal information** from the screen menu
+(also available when the single-terminal row is hidden). Program hints survive
+app restarts and window restoration after tmux loss. Logical window keys prevent
+new windows that reuse a tmux ID from inheriting old hints. Existing version-one
+layouts migrate without losing their names or selected window.
+
+A program name is not a complete launch command. Wrappers may appear as `node`
+or `python`; arguments, pipelines, interactive conversations and process memory
+are not captured or automatically restarted. Information for multiple panes is
+limited to the selected pane; it does not overwrite single-pane recovery hints.
+Recovery still opens shells in the project folder; the remembered directory is
+shown as a hint. These hints use the same device-local store and backup/import
+limits as window layouts.
+
 ## Tab appearance
 
 Settings → Terminal & input → Project & terminal tabs provides separate width,
