@@ -131,6 +131,7 @@ fun SessionHostScreen(
     val keyBarRows by viewModel.keyBarRows.collectAsState()
     val keyBarHighlightedKeyIds by viewModel.keyBarHighlightedKeyIds.collectAsState()
     val keyBarHighlightIntensity by viewModel.keyBarHighlightIntensity.collectAsState()
+    val tabAppearance by viewModel.tabAppearance.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -142,6 +143,7 @@ fun SessionHostScreen(
     var rememberAutomaticBackgroundSsh by rememberSaveable { mutableStateOf(false) }
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
+    var newTerminalProjectId by remember { mutableStateOf<Long?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTabClose by remember { mutableStateOf<PendingTabClose?>(null) }
     var pendingTmuxRestart by remember { mutableStateOf<PendingTmuxRestart?>(null) }
@@ -785,7 +787,7 @@ fun SessionHostScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 28.dp)
+                    .heightIn(min = tabAppearance.projectTabHeight.dp)
                     .background(MegaDriveSurface)
                     .zIndex(1f)
             ) {
@@ -820,6 +822,13 @@ fun SessionHostScreen(
                         },
                         onReorder = viewModel::reorderSessions,
                         onAddProject = { onAddProject(serverId) },
+                        tabWidth = tabAppearance.projectTabWidth,
+                        tabHeight = tabAppearance.projectTabHeight,
+                        tabTextSize = tabAppearance.projectTabTextSize,
+                        onNewTerminal = { projectId ->
+                            newTerminalProjectId = projectId
+                            viewModel.openProject(projectId)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(end = 32.dp)
@@ -828,14 +837,14 @@ fun SessionHostScreen(
                     Spacer(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(28.dp)
+                            .height(tabAppearance.projectTabHeight.dp)
                     )
                 }
 
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .height(28.dp)
+                        .height(tabAppearance.projectTabHeight.dp)
                         .width(32.dp)
                         .background(MegaDriveSurface)
                         .border(1.dp, MegaDriveBg.copy(alpha = 0.35f))
@@ -852,6 +861,11 @@ fun SessionHostScreen(
                         expanded = showSettingsMenu,
                         onDismissRequest = { showSettingsMenu = false }
                     ) {
+                        if (activeTab?.usesTmux == true) DropdownMenuItem(
+                            text = { Text("New terminal") },
+                            enabled = activeTab.isConnected,
+                            onClick = { showSettingsMenu = false; newTerminalProjectId = activeProjectId }
+                        )
                         DropdownMenuItem(
                             text = { Text("Git changes", fontFamily = MonoFontFamily) },
                             enabled = activeProjectId != null,
@@ -964,7 +978,12 @@ fun SessionHostScreen(
                     onSelect = { if (canChangeTerminal()) { showTerminal(); tmuxWindowsViewModel.select(it) } },
                     onRename = { window, name -> if (canChangeTerminal()) tmuxWindowsViewModel.rename(window, name) },
                     onClose = { if (canChangeTerminal()) tmuxWindowsViewModel.close(it) },
-                    onRefresh = tmuxWindowsViewModel::refresh)
+                    onRefresh = tmuxWindowsViewModel::refresh,
+                    tabWidth = tabAppearance.terminalTabWidth,
+                    tabHeight = tabAppearance.terminalTabHeight,
+                    tabTextSize = tabAppearance.terminalTabTextSize,
+                    createRequested = newTerminalProjectId == activeProjectId,
+                    onCreateRequestHandled = { newTerminalProjectId = null })
             }
 
             if (projectTabs.isEmpty()) {

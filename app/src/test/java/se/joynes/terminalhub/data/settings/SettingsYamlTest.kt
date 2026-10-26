@@ -4,6 +4,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsYamlTest {
+    @Test fun tabAppearanceRoundTripsWithDescriptionsAndPartialImportPreservesOtherSizes() {
+        val settings = AppSettings(projectTabWidth = 110, projectTabHeight = 42, projectTabTextSize = 16,
+            terminalTabWidth = 180, terminalTabHeight = 36, terminalTabTextSize = 14)
+        assertEquals(settings, SettingsYaml.preview(SettingsYaml.export(settings), AppSettings()).next)
+        val preview = SettingsYaml.preview(file("  projectTabWidth: 90"), settings)
+        assertEquals(settings.copy(projectTabWidth = 90), preview.next)
+        assertEquals(listOf("projectTabWidth"), preview.changes.map { it.key })
+    }
+
+    @Test fun tabAppearanceRejectsOutOfRangeAndWrongTypesWithoutApplyingAnything() {
+        listOf("projectTabWidth: 47", "projectTabHeight: 65", "projectTabTextSize: 7",
+            "terminalTabWidth: 241", "terminalTabHeight: 0", "terminalTabTextSize: 25", "projectTabWidth: 90.5").forEach {
+            assertTrue(it, runCatching { SettingsYaml.preview(file("  $it"), AppSettings()) }.isFailure)
+        }
+    }
     @Test fun remoteSortingRoundTripsAndInvalidSortsAreRejected() {
         val settings = AppSettings(remoteDownloadSort = "DATE", remoteDownloadSortAscending = false)
         assertEquals(settings, SettingsYaml.preview(SettingsYaml.export(settings), AppSettings()).next)

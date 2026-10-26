@@ -3,6 +3,7 @@ package se.joynes.terminalhub
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -26,6 +27,21 @@ class SessionTabSwipeTest {
         sessionId = TerminalSessionId(name),
         isConnected = true
     )
+
+    @Test fun customProjectTabDimensionsKeepSelectionAndNewTerminalMenuWorking() {
+        val tab = makeTab(1, "project").copy(usesTmux = true)
+        var selected: Long? = null
+        var create: Long? = null
+        composeRule.setContent { TerminalHubTheme {
+            SessionTabBar(listOf(tab), tab.sessionId, { selected = it }, { _, _ -> }, onReorder = {}, onAddProject = {},
+                tabWidth = 120, tabHeight = 44, tabTextSize = 18, onNewTerminal = { create = it })
+        } }
+        composeRule.onNodeWithTag("project-tab-1").assertWidthIsEqualTo(120.dp).assertHeightIsEqualTo(44.dp).performClick()
+        composeRule.runOnIdle { assertEquals(1L, selected) }
+        composeRule.onNodeWithTag("project-tab-1").performTouchInput { longClick() }
+        composeRule.onNodeWithText("New terminal").performClick()
+        composeRule.runOnIdle { assertEquals(1L, create) }
+    }
 
     @Test
     fun sessionTabBarShowsTabs() {
@@ -286,7 +302,7 @@ class SessionTabSwipeTest {
             .fetchSemanticsNode().boundsInRoot.left
         val previewSecondLeft = composeRule.onNodeWithText("SECOND")
             .fetchSemanticsNode().boundsInRoot.left
-        assertTrue("Dropped tab must remain in its preview slot", previewSecondLeft < previewFirstLeft)
+        assertTrue("Dropped tab must remain in its preview slot: first=$previewFirstLeft second=$previewSecondLeft", previewSecondLeft < previewFirstLeft)
         composeRule.runOnIdle { assertEquals(null, committedOrder) }
 
         composeRule.onNodeWithText("DONE").performClick()

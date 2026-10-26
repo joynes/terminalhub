@@ -14,6 +14,17 @@ import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
 
 @RunWith(AndroidJUnit4::class)
 class AppSettingsPersistenceTest {
+    @Test fun independentTabSizesSurviveRestartAndYamlImport() {
+        val repository = AppSettingsRepository(context)
+        repository.setTabAppearance(true, 100, 40, 16)
+        repository.setTabAppearance(false, 140, 32, 11)
+        val expected = repository.settings.value
+        assertEquals(expected, AppSettingsRepository(context).settings.value)
+        val preview = se.joynes.terminalhub.data.settings.SettingsYaml.preview(
+            "format: terminalhub-settings\nversion: 1\nsettings:\n  terminalTabWidth: 180\n", expected)
+        repository.applySettingsImport(expected, preview.next)
+        assertEquals(expected.copy(terminalTabWidth = 180), AppSettingsRepository(context).settings.value)
+    }
     @Test fun remoteSortingDefaultsToNameAndEveryChoiceSurvivesRecreation() {
         val initial = AppSettingsRepository(context)
         assertEquals("NAME", initial.settings.value.remoteDownloadSort)

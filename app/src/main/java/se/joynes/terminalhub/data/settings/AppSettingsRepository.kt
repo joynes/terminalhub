@@ -23,6 +23,12 @@ internal fun normalizeKeyBarHighlightIntensity(value: Float): Float =
     value.coerceIn(MIN_KEY_BAR_HIGHLIGHT_INTENSITY, MAX_KEY_BAR_HIGHLIGHT_INTENSITY)
 
 data class AppSettings(
+    val projectTabWidth: Int = 70,
+    val projectTabHeight: Int = 28,
+    val projectTabTextSize: Int = 9,
+    val terminalTabWidth: Int = 100,
+    val terminalTabHeight: Int = 28,
+    val terminalTabTextSize: Int = 12,
     val remoteDownloadSort: String = "NAME",
     val remoteDownloadSortAscending: Boolean = true,
     val terminalScroll: TerminalScrollSettings = TerminalScrollSettings(),
@@ -63,6 +69,12 @@ class AppSettingsRepository @Inject constructor(
 
     private val _settings = MutableStateFlow(
         AppSettings(
+            projectTabWidth = prefs.getInt("projectTabWidth", 70).coerceIn(48, 200),
+            projectTabHeight = prefs.getInt("projectTabHeight", 28).coerceIn(24, 64),
+            projectTabTextSize = prefs.getInt("projectTabTextSize", 9).coerceIn(8, 24),
+            terminalTabWidth = prefs.getInt("terminalTabWidth", 100).coerceIn(48, 240),
+            terminalTabHeight = prefs.getInt("terminalTabHeight", 28).coerceIn(24, 64),
+            terminalTabTextSize = prefs.getInt("terminalTabTextSize", 12).coerceIn(8, 24),
             remoteDownloadSort = prefs.getString("remote_download_sort", "NAME")
                 ?.takeIf { it in setOf("NAME", "DATE", "TYPE", "SIZE") } ?: "NAME",
             remoteDownloadSortAscending = prefs.getBoolean("remote_download_sort_ascending", true),
@@ -113,6 +125,13 @@ class AppSettingsRepository @Inject constructor(
     }
 
     fun setTerminalScroll(settings: TerminalScrollSettings) = update(_settings.value.copy(terminalScroll = settings.normalized()))
+
+    fun setTabAppearance(project: Boolean, width: Int, height: Int, textSize: Int) {
+        update(if (project) _settings.value.copy(projectTabWidth = width.coerceIn(48, 200),
+            projectTabHeight = height.coerceIn(24, 64), projectTabTextSize = textSize.coerceIn(8, 24))
+        else _settings.value.copy(terminalTabWidth = width.coerceIn(48, 240),
+            terminalTabHeight = height.coerceIn(24, 64), terminalTabTextSize = textSize.coerceIn(8, 24)))
+    }
 
     fun setRemoteDownloadSort(property: String, ascending: Boolean) {
         require(property in setOf("NAME", "DATE", "TYPE", "SIZE"))
@@ -187,6 +206,12 @@ class AppSettingsRepository @Inject constructor(
         _settings.value = next
         historyConsentPrefs.edit().putBoolean(KEY_INPUT_HISTORY_ENABLED, next.inputHistoryEnabled).apply()
         prefs.edit()
+            .putInt("projectTabWidth", next.projectTabWidth)
+            .putInt("projectTabHeight", next.projectTabHeight)
+            .putInt("projectTabTextSize", next.projectTabTextSize)
+            .putInt("terminalTabWidth", next.terminalTabWidth)
+            .putInt("terminalTabHeight", next.terminalTabHeight)
+            .putInt("terminalTabTextSize", next.terminalTabTextSize)
             .putString("terminal_scroll", next.terminalScroll.encode())
             .putString("remote_download_sort", next.remoteDownloadSort)
             .putBoolean("remote_download_sort_ascending", next.remoteDownloadSortAscending)

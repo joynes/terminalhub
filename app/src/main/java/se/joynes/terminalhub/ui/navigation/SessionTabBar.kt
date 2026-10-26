@@ -24,16 +24,17 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.zIndex
 import se.joynes.terminalhub.domain.TerminalSessionId
 import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.ui.screen.sessions.ProjectTabState
 import se.joynes.terminalhub.ui.theme.*
-
-private const val TAB_WIDTH_DP = 70
 
 /** Deterministic hue from seed → dark background colour that reads well against light text. */
 private fun tabColor(seed: Int, active: Boolean): Color {
@@ -55,7 +56,11 @@ fun SessionTabBar(
     onRestartTmux: (Long) -> Unit = {},
     onReorder: (List<Long>) -> Unit,
     onAddProject: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    tabWidth: Int = 70,
+    tabHeight: Int = 28,
+    tabTextSize: Int = 9,
+    onNewTerminal: (Long) -> Unit = {}
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var menuTabId by remember { mutableStateOf<Long?>(null) }
@@ -75,6 +80,15 @@ fun SessionTabBar(
     }
     val latestDisplayedTabs by rememberUpdatedState(displayedTabs)
     val latestOnReorder by rememberUpdatedState(onReorder)
+    // FlowRow can retain placement for equal-sized keyed children after a move.
+    // Changing its arrangement identity makes the preview remeasure the new order.
+    val tabArrangement = remember(displayedTabs.map { it.projectId }) {
+        object : Arrangement.Horizontal {
+            override fun Density.arrange(totalSize: Int, sizes: IntArray, layoutDirection: LayoutDirection, outPositions: IntArray) {
+                with(Arrangement.Start) { arrange(totalSize, sizes, layoutDirection, outPositions) }
+            }
+        }
+    }
 
     LaunchedEffect(tabs.map { it.projectId }) {
         val currentIds = tabs.mapTo(mutableSetOf()) { it.projectId }
@@ -88,7 +102,7 @@ fun SessionTabBar(
     Column(
         modifier = modifier
             .background(MegaDriveSurface)
-            .heightIn(min = 28.dp)
+            .heightIn(min = tabHeight.dp)
     ) {
         if (reorderMode) {
             Row(
@@ -142,9 +156,9 @@ fun SessionTabBar(
         FlowRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 28.dp),
+                .heightIn(min = tabHeight.dp),
             verticalArrangement = Arrangement.Top,
-            horizontalArrangement = Arrangement.Start
+            horizontalArrangement = tabArrangement
         ) {
             displayedTabs.forEach { tab ->
                 val isSelected = tab.sessionId != null && tab.sessionId == activeId
@@ -171,8 +185,9 @@ fun SessionTabBar(
                     ) {
                         Row(
                             modifier = Modifier
-                                .width(TAB_WIDTH_DP.dp)
-                                .height(28.dp)
+                                .width(tabWidth.dp)
+                                .heightIn(min = tabHeight.dp)
+                                .testTag("project-tab-${tab.projectId}")
                                 .background(bg)
                                 .then(
                                     when (tab.projectId) {
@@ -245,13 +260,14 @@ fun SessionTabBar(
                                         )
                                     }
                                 )
-                                .padding(start = 7.dp, end = 7.dp),
+                                .padding(horizontal = 7.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = tab.projectName.uppercase(),
                                 color = textColor,
-                                fontSize = 9.sp,
+                                fontSize = tabTextSize.sp,
+                                lineHeight = (tabTextSize * 1.25f).sp,
                                 fontFamily = MonoFontFamily,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -262,6 +278,11 @@ fun SessionTabBar(
                             expanded = menuTabId == tab.projectId,
                             onDismissRequest = { menuTabId = null }
                         ) {
+                            if (tab.usesTmux) DropdownMenuItem(
+                                text = { Text("New terminal", fontFamily = MonoFontFamily, fontSize = 12.sp) },
+                                enabled = tab.isConnected && !tab.isConnecting,
+                                onClick = { menuTabId = null; onNewTerminal(tab.projectId) }
+                            )
                             if (tab.targetType == ProjectTargetType.SSH) {
                                 DropdownMenuItem(
                                     text = {
@@ -334,7 +355,7 @@ fun SessionTabBar(
             }
             Box(
                 modifier = Modifier
-                    .height(28.dp)
+                    .height(tabHeight.dp)
                     .clickable(enabled = !reorderMode) { onAddProject() }
                     .padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center

@@ -6,6 +6,9 @@ tmux enabled now show a second **TERMINALS** row beneath the project tabs.
 - Tap **+** in that row to open another terminal in the project's folder. A blank
   name gets an available name such as `Terminal 2`.
 - Tap a terminal to switch to it. Long press to rename or close it.
+- With one terminal the row is hidden. Hold the project tab and choose **New
+  terminal**, or use **New terminal** in the terminal screen's menu. Creating a
+  second terminal reveals the row again. Progress and errors remain visible.
 - Closing a terminal stops its programs and panes after confirmation. The last
   terminal cannot be closed here. **Restart session** in the project menu stops
   all terminals in that project.
@@ -13,6 +16,21 @@ tmux enabled now show a second **TERMINALS** row beneath the project tabs.
   reconnecting or restarting the app. No export or project migration is needed.
 - History, notes and pinned-action scope remain project based. Terminal switching
   is paused while a macro or delayed Text Input Enter is being sent.
+
+## Tab appearance
+
+Settings → Terminal & input → Project & terminal tabs provides separate width,
+minimum height and label-size controls for project tabs and tmux terminal tabs.
+Each group has its own reset button. The compact terminal-row default is 28 dp.
+Large labels or Android font scaling can increase the actual height to keep text
+readable. Widths stay fixed and long names use an ellipsis.
+
+All six preferences persist across restarts and are included in settings-only
+YAML and full backups. YAML keys: `projectTabWidth` (48–200 dp),
+`projectTabHeight` (24–64 dp), `projectTabTextSize` (8–24 sp),
+`terminalTabWidth` (48–240 dp), `terminalTabHeight` (24–64 dp) and
+`terminalTabTextSize` (8–24 sp). Missing keys preserve current values; invalid
+values reject the import. Defaults are 70/28/9 and 100/28/12 respectively.
 
 ## Implementation
 

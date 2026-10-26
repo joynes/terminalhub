@@ -176,6 +176,7 @@ class SessionHostViewModel @Inject constructor(
     private val backgroundSshModeController: BackgroundSshModeController
 ) : ViewModel() {
     val pinnedMacro = se.joynes.terminalhub.domain.PinnedMacroController(viewModelScope)
+    val tabAppearance = settingsRepository.settings
     private val pendingSubmissions = mutableMapOf<TerminalSessionId, Int>()
     private val _pendingInputSessions = MutableStateFlow<Set<TerminalSessionId>>(emptySet())
     val pendingInputSessions = _pendingInputSessions.asStateFlow()

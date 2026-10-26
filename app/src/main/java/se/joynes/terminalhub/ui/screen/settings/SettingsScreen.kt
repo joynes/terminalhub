@@ -324,6 +324,10 @@ fun SettingsScreen(
                         TerminalScrollSettingsEditor(settings.terminalScroll, viewModel::setTerminalScroll)
                         }
                         SettingsSeparator()
+                        SettingsSubgroup("Project & terminal tabs", "Width, height and label size") {
+                            TabAppearanceEditor(settings, viewModel::setTabAppearance)
+                        }
+                        SettingsSeparator()
                         SettingsSubgroup("Key bar", "Rows, buttons, highlights and accent strength") {
                         SettingsSubheading(
                             title = "KEY BAR LAYOUT",

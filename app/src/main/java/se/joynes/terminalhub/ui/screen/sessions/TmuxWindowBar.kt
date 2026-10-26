@@ -12,6 +12,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -32,7 +33,12 @@ fun TmuxWindowBar(
     onRename: (TmuxWindow, String) -> Unit,
     onClose: (TmuxWindow) -> Unit,
     onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    tabWidth: Int = 100,
+    tabHeight: Int = 28,
+    tabTextSize: Int = 12,
+    createRequested: Boolean = false,
+    onCreateRequestHandled: () -> Unit = {}
 ) {
     var creating by remember(state.projectId) { mutableStateOf(false) }
     var selectedMenu by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
@@ -42,25 +48,29 @@ fun TmuxWindowBar(
     val enabled = state.connected && state.snapshot != null && !state.loading && !state.busy && !inputBusy
     val listState = rememberLazyListState()
     val activeIndex = windows.indexOfFirst { it.active }
+    val height = maxOf(tabHeight, kotlin.math.ceil(tabTextSize * LocalDensity.current.fontScale * 1.3f + 8).toInt()).dp
+    LaunchedEffect(createRequested) {
+        if (createRequested) { creating = true; onCreateRequestHandled() }
+    }
     LaunchedEffect(state.projectId, activeIndex) { if (activeIndex >= 0) listState.animateScrollToItem(activeIndex) }
 
+    if (windows.size != 1 || !state.connected || state.loading || state.busy || state.error != null) {
     Column(modifier.fillMaxWidth().background(MegaDriveBg).testTag("project-terminal-bar")) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("TERMINALS", color = MegaDriveDim, fontFamily = MonoFontFamily, fontSize = 9.sp,
                 modifier = Modifier.padding(horizontal = 6.dp))
             LazyRow(Modifier.weight(1f).testTag("project-terminal-tabs"), state = listState,
-                horizontalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
+                horizontalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(vertical = 0.dp)) {
                 itemsIndexed(windows, key = { _, window -> window.id }) { position, window ->
                     val name = window.name.map { if (it.isISOControl()) ' ' else it }.joinToString("").ifBlank { "Terminal ${window.index + 1}" }
-                    Column(Modifier.widthIn(min = 70.dp, max = 180.dp)
+                    Box(Modifier.width(tabWidth.dp).height(height)
                         .background(if (window.active) MegaDrivePrimary.copy(alpha = 0.18f) else MegaDriveSurface)
                         .combinedClickable(enabled = enabled, onClick = { if (!window.active) onSelect(window) },
                             onLongClick = { selectedMenu = window })
                         .semantics { selected = window.active; contentDescription = "Terminal ${position + 1}: $name" }
-                        .padding(horizontal = 10.dp, vertical = 8.dp)) {
-                        Text("${position + 1} · $name", color = if (enabled || window.active) MegaDriveOnSurface else MegaDriveDim,
-                            fontFamily = MonoFontFamily, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (window.panes > 1) Text("${window.panes} panes", color = MegaDriveDim, fontSize = 10.sp)
+                        .padding(horizontal = 6.dp), contentAlignment = Alignment.CenterStart) {
+                        Text("${position + 1} · $name" + if (window.panes > 1) " (${window.panes} panes)" else "", color = if (enabled || window.active) MegaDriveOnSurface else MegaDriveDim,
+                            fontFamily = MonoFontFamily, fontSize = tabTextSize.sp, lineHeight = (tabTextSize * 1.3f).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -68,9 +78,9 @@ fun TmuxWindowBar(
                 CircularProgressIndicator(Modifier.padding(horizontal = 8.dp).size(18.dp).testTag("project-terminals-progress"), strokeWidth = 2.dp)
             }
             TextButton(onClick = { creating = true }, enabled = enabled,
-                modifier = Modifier.width(40.dp).semantics { contentDescription = "New terminal in project" }) { Text("+") }
+                contentPadding = PaddingValues(0.dp), modifier = Modifier.width(32.dp).height(height).semantics { contentDescription = "New terminal in project" }) { Text("+") }
             TextButton(onClick = onRefresh, enabled = state.connected && !state.busy && !state.loading,
-                modifier = Modifier.width(40.dp).semantics { contentDescription = "Refresh project terminals" }) { Text("↻") }
+                contentPadding = PaddingValues(0.dp), modifier = Modifier.width(32.dp).height(height).semantics { contentDescription = "Refresh project terminals" }) { Text("↻") }
         }
         val message = when {
             !state.connected -> "Reconnect to manage project terminals"
@@ -83,6 +93,7 @@ fun TmuxWindowBar(
             Text(it, color = if (state.error != null) MegaDriveWarning else MegaDriveDim, fontSize = 11.sp,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
         }
+    }
     }
 
     if (creating) TerminalNameDialog("New terminal", "", optional = true,

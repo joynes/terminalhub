@@ -1,6 +1,7 @@
 package se.joynes.terminalhub
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -57,17 +58,33 @@ class TmuxWindowBarTest {
         compose.runOnIdle { assertEquals(second, closed) }
     }
 
-    @Test fun lastTerminalCannotBeClosedAndMacroOrPendingInputBlocksWindowChanges() {
+    @Test fun singleTerminalHidesRowButMenuRequestCanCreateAnotherAndInputStillBlocksSwitching() {
         var busy by mutableStateOf(false)
         var current by mutableStateOf(state().copy(snapshot = TmuxWindowsSnapshot("\$1", listOf(first))))
-        compose.setContent { TerminalHubTheme { TmuxWindowBar(current, busy, {}, { fail("Must not switch while sending input") }, { _, _ -> }, {}, {}) } }
-        compose.onNodeWithContentDescription("Terminal 1: Codex").performTouchInput { longClick() }
-        compose.onNodeWithText("Close terminal").assertIsNotEnabled()
-        compose.onNodeWithText("DONE").performClick()
-        compose.runOnIdle { current = state(); busy = true }
+        var requested by mutableStateOf(false)
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(current, busy, { current = state() }, { fail("Must not switch while sending input") }, { _, _ -> }, {}, {},
+            createRequested = requested, onCreateRequestHandled = { requested = false }) } }
+        compose.onNodeWithTag("project-terminal-bar").assertDoesNotExist()
+        compose.runOnIdle { requested = true }
+        compose.onNodeWithText("Name (optional)").assertIsDisplayed()
+        compose.onNodeWithText("SAVE").performClick()
+        compose.onNodeWithContentDescription("Terminal 2: Tests").assertIsDisplayed()
+        compose.runOnIdle { busy = true }
         compose.onNodeWithContentDescription("Terminal 2: Tests").assertIsNotEnabled()
         compose.onNodeWithContentDescription("New terminal in project").assertIsNotEnabled()
         compose.onNodeWithText("Sending input — terminal switching is paused").assertIsDisplayed()
+    }
+
+    @Test fun terminalTabDimensionsChangeImmediatelyAndLargeTextHasRoom() {
+        var height by mutableIntStateOf(28)
+        var width by mutableIntStateOf(100)
+        var text by mutableIntStateOf(12)
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(state(), false, {}, {}, { _, _ -> }, {}, {},
+            tabWidth = width, tabHeight = height, tabTextSize = text) } }
+        compose.onNodeWithContentDescription("Terminal 1: Codex").assertWidthIsEqualTo(100.dp).assertHeightIsEqualTo(28.dp)
+        compose.onNodeWithTag("project-terminal-bar").assertHeightIsEqualTo(28.dp)
+        compose.runOnIdle { width = 150; height = 48; text = 20 }
+        compose.onNodeWithContentDescription("Terminal 1: Codex").assertWidthIsEqualTo(150.dp).assertHeightIsEqualTo(48.dp)
     }
 
     @Test fun failedRequestHasRefreshFeedbackAndDisconnectedControlsStayDisabled() {

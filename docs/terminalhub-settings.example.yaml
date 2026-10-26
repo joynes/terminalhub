@@ -10,6 +10,17 @@
 format: terminalhub-settings
 version: 1
 settings:
+  # Project-tab width (48..200 dp), minimum height (24..64 dp), label size (8..24 sp).
+  # Larger text/font scaling can increase height to preserve readability.
+  projectTabWidth: 70
+  projectTabHeight: 28
+  projectTabTextSize: 9
+  # Terminal-tab width (48..240 dp), minimum height (24..64 dp), label size (8..24 sp).
+  # One terminal hides the row. Hold a project tab -> New terminal to create another.
+  terminalTabWidth: 100
+  terminalTabHeight: 28
+  terminalTabTextSize: 12
+
   # Last remote file sort, shared across projects: NAME, DATE, TYPE or SIZE.
   # Directories always come first. Folder permissions cannot move to a new phone.
   remoteDownloadSort: NAME

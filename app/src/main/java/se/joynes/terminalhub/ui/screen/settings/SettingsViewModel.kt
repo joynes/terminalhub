@@ -59,6 +59,7 @@ class SettingsViewModel @Inject constructor(
         } catch (error: Exception) { settingsFileMessage.value = error.message ?: "Settings import failed" }
     }
     fun setTerminalScroll(settings: se.joynes.terminalhub.data.settings.TerminalScrollSettings) = settingsRepository.setTerminalScroll(settings)
+    fun setTabAppearance(project: Boolean, width: Int, height: Int, textSize: Int) = settingsRepository.setTabAppearance(project, width, height, textSize)
     fun setTextInputPanelOpacity(value: Float) = settingsRepository.setTextInputPanelOpacity(value)
     val runtimeState = runtimeRepository.state
     val backgroundSshMode = backgroundSshModeController.mode
