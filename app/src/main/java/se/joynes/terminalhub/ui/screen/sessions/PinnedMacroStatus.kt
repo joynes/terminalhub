@@ -3,15 +3,30 @@ package se.joynes.terminalhub.ui.screen.sessions
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import se.joynes.terminalhub.domain.MacroRunState
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun PinnedMacroStatus(state: MacroRunState, onStop: () -> Unit, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+    val dismiss = rememberUpdatedState(onDismiss)
+    val accessibility = LocalAccessibilityManager.current
+    LaunchedEffect(state, accessibility) {
+        if (!state.running) {
+            val timeout = accessibility?.calculateRecommendedTimeoutMillis(
+                3000L, containsIcons = false, containsText = true, containsControls = true
+            ) ?: 3000L
+            delay(timeout)
+            dismiss.value()
+        }
+    }
     Surface(modifier.testTag("macro-run-status"), tonalElevation = 6.dp, shadowElevation = 4.dp) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)) {

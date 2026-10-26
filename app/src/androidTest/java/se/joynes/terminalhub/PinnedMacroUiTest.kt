@@ -128,4 +128,33 @@ class PinnedMacroUiTest {
         compose.onNodeWithText("CLOSE").performClick()
         compose.runOnIdle { assertTrue(stopped); assertTrue(dismissed) }
     }
+
+    @Test fun completedStatusDisappearsAfterThreeSeconds() {
+        compose.mainClock.autoAdvance = false
+        var visible by mutableStateOf(true)
+        compose.setContent { TerminalHubTheme {
+            if (visible) PinnedMacroStatus(MacroRunState("Action", "project", total = 1, running = false, message = "Macro completed"),
+                onStop = {}, onDismiss = { visible = false })
+        } }
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithText("Macro completed").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(2100)
+        compose.onNodeWithTag("macro-run-status").assertDoesNotExist()
+    }
+
+    @Test fun startingAnotherMacroCancelsPreviousDismissTimer() {
+        compose.mainClock.autoAdvance = false
+        var state by mutableStateOf(MacroRunState("First", "project", total = 1, running = false, message = "Macro completed"))
+        var dismissed = false
+        compose.setContent { TerminalHubTheme { PinnedMacroStatus(state, {}, { dismissed = true }) } }
+        compose.mainClock.advanceTimeBy(2000)
+        compose.runOnIdle { state = MacroRunState("Second", "project", total = 2) }
+        compose.mainClock.advanceTimeBy(10000)
+        compose.onNodeWithText("STOP").assertIsDisplayed()
+        compose.runOnIdle { assertFalse(dismissed); state = state.copy(running = false, message = "Macro stopped") }
+        compose.mainClock.advanceTimeBy(1000)
+        compose.runOnIdle { assertFalse(dismissed) }
+        compose.mainClock.advanceTimeBy(2200)
+        compose.runOnIdle { assertTrue(dismissed) }
+    }
 }
