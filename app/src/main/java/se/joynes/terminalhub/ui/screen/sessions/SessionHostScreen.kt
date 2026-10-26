@@ -503,6 +503,16 @@ fun SessionHostScreen(
                     }
                 },
                 onSave = { viewModel.savePinnedAction(it) },
+                openProjects = projectTabs,
+                onSendToProjects = { action, ids ->
+                    val windowsBusy = tmuxWindowsViewModel.state.value.let { it.projectId in ids && (it.busy || it.loading) }
+                    val sent = !windowsBusy && viewModel.sendPinnedToProjects(action, ids)
+                    if (sent) {
+                        showPinnedActions = false
+                        Toast.makeText(context, "Sending to ${ids.size} projects", Toast.LENGTH_SHORT).show()
+                    } else Toast.makeText(context, "Connect selected projects and wait for input or switching to finish", Toast.LENGTH_LONG).show()
+                    sent
+                },
                 onDeletePin = { viewModel.deletePinnedAction(it) },
                 onDeleteHistory = { viewModel.deleteHistory(it) }
             )
@@ -933,10 +943,10 @@ fun SessionHostScreen(
                 val currentWindows = tmuxWindows.takeIf { it.projectId == activeProjectId }
                     ?: TmuxWindowsState(projectId = activeProjectId, connected = activeTab.isConnected, loading = activeTab.isConnected)
                 val inputBusy = activeId in pendingInputSessions ||
-                    (activeMacro?.running == true && activeMacro?.projectId == activeProjectId)
+                    (activeMacro?.running == true && activeMacro?.affectsProject(activeProjectId) == true)
                 fun canChangeTerminal(): Boolean {
                     val run = viewModel.pinnedMacro.state.value
-                    return activeId !in viewModel.pendingInputSessions.value && !(run?.running == true && run.projectId == activeProjectId)
+                    return activeId !in viewModel.pendingInputSessions.value && !(run?.running == true && run.affectsProject(activeProjectId))
                 }
                 fun showTerminal() {
                     activeProjectId?.let {

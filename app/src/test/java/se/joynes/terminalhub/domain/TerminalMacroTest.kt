@@ -122,4 +122,58 @@ class TerminalMacroTest {
         assertTrue(controller.state.value!!.message!!.contains("timed out"))
         assertFalse(target.events.contains("key:\r"))
     }
+
+    @Test fun `broadcast runs targets concurrently and preserves ordered steps for each`() = runTest {
+        val controller = PinnedMacroController(this)
+        val first = Target().apply { barrier = CompletableDeferred() }
+        val second = Target()
+        assertTrue(controller.startMany("Send", listOf(MacroStep.Text("hello"), MacroStep.Key("ENTER")),
+            listOf(MacroDestination(1, "one", first), MacroDestination(2, "two", second))))
+        runCurrent(); advanceTimeBy(1000); runCurrent()
+        assertFalse(first.events.contains("key:\r"))
+        assertTrue(second.events.contains("key:\r"))
+        assertTrue(controller.state.value!!.affectsProject(1))
+        assertTrue(controller.state.value!!.affectsProject(2))
+        assertFalse(controller.state.value!!.affectsProject(3))
+        assertFalse(controller.start("overlap", "one", listOf(MacroStep.Key("TAB")), first))
+        first.barrier!!.complete(Unit); advanceUntilIdle()
+        assertEquals(second.events, first.events)
+        assertEquals("Completed in 2 projects", controller.state.value!!.message)
+    }
+
+    @Test fun `broadcast disconnect in one project does not stop the other or replay`() = runTest {
+        val controller = PinnedMacroController(this)
+        val first = Target(); val second = Target()
+        val steps = listOf(MacroStep.Key("C", ctrl = true), MacroStep.Pause(1000), MacroStep.Text("restart"), MacroStep.Key("ENTER"))
+        controller.startMany("Restart", steps, listOf(MacroDestination(1, "one", first), MacroDestination(2, "two", second)))
+        runCurrent(); first.connected = false; advanceUntilIdle()
+        assertFalse(first.events.any { it.startsWith("paste:") })
+        assertEquals(1, second.events.count { it == "paste:restart" })
+        assertTrue(second.events.contains("key:\r"))
+        assertEquals("Completed in 1/2. Failed: one. Check connections before retrying.", controller.state.value!!.message)
+    }
+
+    @Test fun `broadcast rejects stale or duplicate destinations before any input`() = runTest {
+        val controller = PinnedMacroController(this)
+        val first = Target(); val offline = Target().apply { connected = false }
+        val steps = listOf(MacroStep.Key("ENTER"))
+        assertFalse(controller.startMany("test", steps, emptyList()))
+        assertFalse(controller.startMany("test", steps, listOf(MacroDestination(1, "one", first), MacroDestination(2, "offline", offline))))
+        assertFalse(controller.startMany("test", steps, listOf(MacroDestination(1, "one", first), MacroDestination(1, "duplicate", first))))
+        assertTrue(first.events.isEmpty()); assertTrue(offline.events.isEmpty())
+    }
+
+    @Test fun `stop cancels all broadcast targets and old children cannot replace a new status`() = runTest {
+        val controller = PinnedMacroController(this)
+        val first = Target(); val second = Target()
+        controller.startMany("old", listOf(MacroStep.Pause(5000), MacroStep.Text("never")),
+            listOf(MacroDestination(1, "one", first), MacroDestination(2, "two", second)))
+        runCurrent(); controller.stop()
+        assertTrue(controller.startMany("new", listOf(MacroStep.Key("TAB")), listOf(MacroDestination(2, "two", second))))
+        advanceUntilIdle()
+        assertTrue(first.events.isEmpty())
+        assertEquals(listOf("key:\t", "flush"), second.events)
+        assertEquals("new", controller.state.value!!.name)
+        assertEquals("Completed in 1 projects", controller.state.value!!.message)
+    }
 }

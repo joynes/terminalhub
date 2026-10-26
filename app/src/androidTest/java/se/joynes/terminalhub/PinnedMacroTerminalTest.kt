@@ -102,4 +102,28 @@ class PinnedMacroTerminalTest {
         assertTrue(controller.state.value!!.message!!.startsWith("Macro stopped"))
         assertFalse(File(sessions.localProjectPath(firstName), "must-not-exist").exists())
     }
+
+    @Test fun broadcastWritesToBothRealShellsWithoutSwitchingTheSelectedTab() {
+        val controller = PinnedMacroController(jobs)
+        compose.runOnIdle {
+            sessions.registerLocal(secondName, projectId = 900002)
+            sessions.switchTo(sessions.sessions.value.first { it.projectId == 900002L }.id)
+        }
+        compose.waitUntil(5000) { sessions.activeSession().value?.emulator != null }
+        compose.runOnIdle {
+            val first = sessions.sessions.value.first { it.projectId == 900001L }.id
+            val second = sessions.sessions.value.first { it.projectId == 900002L }.id
+            val before = sessions.activeId.value
+            val destinations = listOf(MacroDestination(900001, firstName, requireNotNull(sessions.macroTargetForSession(first))),
+                MacroDestination(900002, secondName, requireNotNull(sessions.macroTargetForSession(second))))
+            assertTrue(controller.startMany("Write", listOf(MacroStep.Text("printf broadcast-ok > broadcast.txt"), MacroStep.Key("ENTER")), destinations))
+            assertEquals(before, sessions.activeId.value)
+        }
+        compose.waitUntil(8000) { controller.state.value?.running == false }
+        compose.waitUntil(5000) {
+            listOf(firstName, secondName).all { File(sessions.localProjectPath(it), "broadcast.txt").exists() }
+        }
+        listOf(firstName, secondName).forEach { assertEquals("broadcast-ok", File(sessions.localProjectPath(it), "broadcast.txt").readText()) }
+        assertEquals("Completed in 2 projects", controller.state.value?.message)
+    }
 }

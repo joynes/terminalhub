@@ -1,12 +1,15 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,7 +31,9 @@ fun PinnedActionsSheet(
     onDeletePin: (Long) -> Unit,
     onDeleteHistory: (Long) -> Unit,
     historyEnabled: Boolean = false,
-    onEnableHistory: () -> Unit = {}
+    onEnableHistory: () -> Unit = {},
+    openProjects: List<ProjectTabState> = emptyList(),
+    onSendToProjects: ((PinnedActionEntity, Set<Long>) -> Boolean)? = null
 ) {
     var recent by remember { mutableStateOf(initiallyRecent) }
     var visibleCount by remember { mutableIntStateOf(20) }
@@ -36,6 +41,7 @@ fun PinnedActionsSheet(
     var selectedPin by remember { mutableStateOf<PinnedActionEntity?>(null) }
     var editing by remember { mutableStateOf<PinnedActionEntity?>(null) }
     var confirmHistoryEnable by remember { mutableStateOf(false) }
+    var broadcasting by remember { mutableStateOf<PinnedActionEntity?>(null) }
     val clipboard = LocalClipboardManager.current
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -49,7 +55,7 @@ fun PinnedActionsSheet(
             Text(
                 if (recent && !historyEnabled) "TerminalHub does not currently save terminal input."
                 else if (recent) "Tap to edit. Hold to pin, copy or delete. History is local to this device and may contain sensitive input."
-                else "Tap to send or prepare. Hold to edit or delete.",
+                else "Tap to send or prepare. Hold to edit, send to several projects or delete.",
                 style = MaterialTheme.typography.bodySmall
             )
             LazyColumn(Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 480.dp).padding(vertical = 8.dp)) {
@@ -121,6 +127,7 @@ fun PinnedActionsSheet(
             text = {
                 Column {
                     TextButton(onClick = { selectedPin = null; editing = action }) { Text("Edit action") }
+                    if (onSendToProjects != null) TextButton(onClick = { selectedPin = null; broadcasting = action }) { Text("Send to multiple projects") }
                     if (!action.isMacro) TextButton(onClick = { selectedPin = null; onPrepare(action.text) }) { Text("Prepare in Text Input") }
                     TextButton(onClick = { onDeletePin(action.id); selectedPin = null }) { Text("Delete action") }
                 }
@@ -137,4 +144,42 @@ fun PinnedActionsSheet(
             }, onDismiss = { editing = null })
         }
     }
+    broadcasting?.let { action ->
+        PinnedActionProjectsDialog(action, openProjects, onDismiss = { broadcasting = null },
+            onSend = { ids -> if (onSendToProjects?.invoke(action, ids) == true) broadcasting = null })
+    }
+}
+
+@Composable
+internal fun PinnedActionProjectsDialog(action: PinnedActionEntity, projects: List<ProjectTabState>, onDismiss: () -> Unit, onSend: (Set<Long>) -> Unit) {
+    var selected by remember(action) { mutableStateOf(projects.map { it.projectId }.toSet()) }
+    val chosen = projects.filter { it.projectId in selected }
+    val ready = chosen.isNotEmpty() && chosen.all { it.isConnected && it.sessionId != null }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("Send to multiple projects") }, text = {
+        Column {
+            Text(action.name, style = MaterialTheme.typography.titleMedium)
+            Text("Sends to the current terminal in each selected project. Projects run in parallel; your selected tab stays in place.", style = MaterialTheme.typography.bodySmall)
+            Text(if (action.isMacro) "Runs every keyboard macro step." else if (action.sendEnter) "Sends text and presses Enter." else "Pastes text without pressing Enter.", style = MaterialTheme.typography.bodySmall)
+            Row {
+                TextButton(onClick = { selected = projects.map { it.projectId }.toSet() }) { Text("All") }
+                TextButton(onClick = { selected = emptySet() }) { Text("None") }
+            }
+            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp)) {
+                items(projects, key = { it.projectId }) { project ->
+                    Row(Modifier.fillMaxWidth().toggleable(value = project.projectId in selected, role = Role.Checkbox,
+                        onValueChange = { checked -> selected = if (checked) selected + project.projectId else selected - project.projectId })
+                        .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = project.projectId in selected, onCheckedChange = null)
+                        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                            Text(project.projectName)
+                            if (!project.isConnected || project.sessionId == null) Text("Reconnect first", color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+            if (chosen.any { !it.isConnected || it.sessionId == null }) Text("Reconnect or deselect unavailable projects before sending.", style = MaterialTheme.typography.bodySmall)
+        }
+    }, confirmButton = { TextButton(enabled = ready, onClick = { onSend(chosen.map { it.projectId }.toSet()) }) { Text("SEND TO ${chosen.size} PROJECTS") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } })
 }

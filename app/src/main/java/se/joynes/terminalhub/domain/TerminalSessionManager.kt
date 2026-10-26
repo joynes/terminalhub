@@ -341,6 +341,10 @@ class TerminalSessionManager @Inject constructor(
     /** Captures the terminal object, not merely the selected tab or reusable session id. */
     fun macroTargetForActive(): MacroTerminalTarget? {
         val id = _activeId.value ?: return null
+        return macroTargetForSession(id)
+    }
+
+    fun macroTargetForSession(id: TerminalSessionId): MacroTerminalTarget? {
         val original = entries[id.value] ?: return null
         val terminal = original.terminalSession
         val connection = original.conn

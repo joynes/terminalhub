@@ -26,6 +26,34 @@ The progress banner shows the target project and current step; STOP cancels
 remaining steps. It cannot retract input already sent. Completion means the
 input sequence was sent, not that the remote command finished.
 
+Finished or stopped status banners close automatically after three seconds,
+respecting Android's accessibility timeout preference. Running banners remain
+available until completion or STOP. Starting a new run cancels the old banner's
+dismiss timer.
+
+## Send to several projects
+
+Hold a pinned action and choose **Send to multiple projects**. All currently open
+projects start selected. Uncheck projects to exclude, or use **All**/**None**.
+Disconnected projects show **Reconnect first** and must be reconnected or
+deselected before sending. The action is never queued for a later reconnect.
+
+The confirmation shows the number of destinations. Macros run their full ordered
+step sequence; text actions send their text, adding Enter only when that action
+has Send + Enter enabled. Text actions configured to prepare text paste directly
+without Enter when explicitly sent to multiple projects.
+
+Each selected project's current terminal receives input concurrently, using its
+existing connection. The selected project tab does not change. For tmux projects
+this means the current window in that project's session, not every child window.
+Switching tmux windows is paused for participating projects until the run ends.
+An external tmux client can still change its session's active window.
+
+One batch or individual macro runs at a time. STOP cancels all remaining batch
+steps. A failure in one terminal does not stop the others. The final status lists
+failed project names; no destinations are automatically retried. Check the
+terminal state before repeating an action, since some input may have arrived.
+
 Keys are separated by 80 ms. After a paste is flushed, the next key waits
 300 ms plus 5 ms per text character, capped at 5 seconds, to avoid interactive
 programs treating Enter as part of the paste. Explicit Pause steps count toward
@@ -61,3 +89,10 @@ validation, progress and stop controls. Real Android PTY tests interrupt a runni
 shell command, switch tabs during the macro, and close/recreate the target.
 Storage tests cover migration, reopening the database, old backups and complete
 global/project macro backup round trips.
+
+Broadcast tests cover simultaneous progress despite a stalled destination,
+ordered steps in each target, disconnect isolation, duplicate/offline rejection,
+batch cancellation and protection from stale status updates. UI tests cover
+default selection, exclusions, All/None, unavailable projects and cancellation.
+An Android PTY test writes and reads real files in two project shells without
+switching the active project during the batch.

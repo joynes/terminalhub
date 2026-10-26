@@ -191,6 +191,29 @@ class SessionHostViewModel @Inject constructor(
         return started
     }
 
+    fun sendPinnedToProjects(action: se.joynes.terminalhub.data.db.entity.PinnedActionEntity, projectIds: Set<Long>): Boolean {
+        if (projectIds.isEmpty()) return false
+        val open = projectTabs.value.associateBy { it.projectId }
+        val destinations = projectIds.map { id ->
+            val tab = open[id] ?: return false
+            val sessionId = tab.sessionId ?: return false
+            if (!tab.isConnected || sessionId in pendingSubmissions) return false
+            val target = sessionManager.macroTargetForSession(sessionId) ?: return false
+            se.joynes.terminalhub.domain.MacroDestination(id, tab.projectName, target)
+        }
+        val steps = if (action.isMacro) runCatching {
+            se.joynes.terminalhub.data.model.PinnedMacroCodec.decode(action.macroJson)
+        }.getOrNull() ?: return false else buildList {
+            if (action.text.isNotEmpty()) add(se.joynes.terminalhub.domain.MacroStep.Text(action.text))
+            if (action.sendEnter) add(se.joynes.terminalhub.domain.MacroStep.Key("ENTER"))
+        }
+        if (steps.isEmpty()) return false
+        if (runCatching { se.joynes.terminalhub.domain.TerminalMacro.validate(steps) }.isFailure) return false
+        val started = pinnedMacro.startMany(action.name, steps, destinations)
+        if (started) usePinnedAction(action.id)
+        return started
+    }
+
     private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
     private val tabOrderKey = "project_tab_order"
 
