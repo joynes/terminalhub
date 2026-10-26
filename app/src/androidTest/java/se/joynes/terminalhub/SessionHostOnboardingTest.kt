@@ -53,6 +53,7 @@ class SessionHostOnboardingTest {
     @Inject lateinit var runtimeRepository: AppRuntimeRepository
     @Inject lateinit var knownHosts: KnownHostRepository
     @Inject lateinit var backgroundSshModeController: BackgroundSshModeController
+    @Inject lateinit var remoteWindows: se.joynes.terminalhub.data.ssh.RemoteTmuxWindows
 
     @Before
     fun setup() {
@@ -87,7 +88,9 @@ class SessionHostOnboardingTest {
                 settingsRepository = settingsRepository,
                 runtimeRepository = runtimeRepository,
                 knownHosts = knownHosts,
-                backgroundSshModeController = backgroundSshModeController
+                backgroundSshModeController = backgroundSshModeController,
+                windowLayouts = se.joynes.terminalhub.data.ssh.TmuxWindowLayoutStore(context),
+                remoteWindows = remoteWindows
             )
 
             composeRule.setContent {

@@ -46,6 +46,7 @@ class SessionTabOrderTest {
     @Inject lateinit var runtimeRepository: AppRuntimeRepository
     @Inject lateinit var knownHosts: KnownHostRepository
     @Inject lateinit var backgroundSshModeController: BackgroundSshModeController
+    @Inject lateinit var remoteWindows: se.joynes.terminalhub.data.ssh.RemoteTmuxWindows
 
     private lateinit var viewModel: SessionHostViewModel
 
@@ -68,7 +69,9 @@ class SessionTabOrderTest {
             settingsRepository = settingsRepository,
             runtimeRepository = runtimeRepository,
             knownHosts = knownHosts,
-            backgroundSshModeController = backgroundSshModeController
+            backgroundSshModeController = backgroundSshModeController,
+            windowLayouts = se.joynes.terminalhub.data.ssh.TmuxWindowLayoutStore(context),
+            remoteWindows = remoteWindows
         )
     }
 

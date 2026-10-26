@@ -14,11 +14,11 @@ object TmuxWindowCommands {
     internal const val END = "TERMINALHUB_WINDOWS_END"
     private val sessionId = Regex("\\$\\d+")
     private val windowId = Regex("@\\d+")
-    private fun quote(value: String): String {
+    internal fun quote(value: String): String {
         require('\u0000' !in value) { "Invalid tmux argument." }
         return "'" + value.replace("'", "'\\''") + "'"
     }
-    private fun path(value: String) = when {
+    internal fun path(value: String) = when {
         value == "~" -> "\"\$HOME\""
         value.startsWith("~/") -> "\"\$HOME\"/" + quote(value.removePrefix("~/"))
         else -> quote(value)

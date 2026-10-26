@@ -26,10 +26,13 @@ class ScriptTemplateEngine @Inject constructor() {
         project.name.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
 
     /** Silent exec: mkdir + optional git clone + create tmux session if useTmux. */
-    fun renderSetup(server: Server, project: Project): String {
+    fun renderSetup(server: Server, project: Project, windowLayout: se.joynes.terminalhub.data.ssh.TmuxWindowLayout? = null): String {
         val path = shellPath(projectPath(server, project))
         val session = sessionName(project)
+        val exactSession = shellQuote("=$session")
         val quotedPath = shellQuote(path)
+        val createMissingSession = windowLayout?.renderCreate(sessionName(project), projectPath(server, project))
+            ?: "tmux new-session -d -s $session -c $quotedPath && echo TMUX_SESSION_CREATED"
         val dirSetup = if (project.gitUrl.isNotBlank()) {
             val safeUrl = project.gitUrl.replace("'", "'\\''")
             "if [ ! -d $quotedPath/.git ]; then " +
@@ -44,7 +47,7 @@ class ScriptTemplateEngine @Inject constructor() {
         }
         return if (project.useTmux) {
             dirSetup +
-            "if tmux has-session -t $session 2>/dev/null; then " +
+            "if tmux has-session -t $exactSession 2>/dev/null; then " +
             // Never destroy other windows when one terminal has exited with remain-on-exit.
             "if tmux list-panes -t $session -F '#{pane_dead}' 2>/dev/null | grep -q 1 && " +
             "[ \"\$(tmux list-windows -t $session -F '#{window_id}' 2>/dev/null | wc -l)\" -eq 1 ]; then " +
@@ -54,7 +57,7 @@ class ScriptTemplateEngine @Inject constructor() {
             "echo TMUX_SESSION_EXISTS; " +
             "fi; " +
             "else " +
-            "tmux new-session -d -s $session -c $quotedPath && echo TMUX_SESSION_CREATED; " +
+            "$createMissingSession; " +
             "fi; " +
             renderTmuxTouchScrollSetup(session)
         } else {

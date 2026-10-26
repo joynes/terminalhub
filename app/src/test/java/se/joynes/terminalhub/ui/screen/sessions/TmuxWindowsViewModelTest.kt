@@ -17,6 +17,7 @@ class TmuxWindowsViewModelTest {
     private val projects: ProjectRepository = mock()
     private val servers: ServerRepository = mock()
     private val remote: RemoteTmuxWindows = mock()
+    private val layouts: TmuxWindowLayoutStore = mock()
     private val server = Server(id = 1, name = "Server", host = "fixture", username = "fixture")
     private val a = Project(id = 1, serverId = 1, name = "one")
     private val b = Project(id = 2, serverId = 1, name = "two")
@@ -31,13 +32,14 @@ class TmuxWindowsViewModelTest {
         whenever(servers.getById(1)).thenReturn(server)
         whenever(remote.list(server, a)).thenReturn(snapshot)
         whenever(remote.list(server, b)).thenReturn(TmuxWindowsSnapshot("\$2", listOf(first.copy(id = "@9"))))
-        vm = TmuxWindowsViewModel(projects, servers, remote)
+        vm = TmuxWindowsViewModel(projects, servers, remote, layouts)
     }
     @After fun cleanup() { vm.pause(); Dispatchers.resetMain() }
 
     @Test fun `binding only lists and never creates or switches windows`() = runTest(dispatcher) {
         vm.bind(1, "connection-1", true); runCurrent()
         assertEquals(snapshot, vm.state.value.snapshot)
+        verify(layouts).save(server, a, snapshot)
         verify(remote, never()).create(any(), any(), any(), any())
         verify(remote, never()).select(any(), any(), any())
         val revision = vm.state.value.selectionRevision

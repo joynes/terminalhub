@@ -14,6 +14,17 @@ tmux enabled now show a second **TERMINALS** row beneath the project tabs.
   all terminals in that project.
 - Windows and their processes live on the server and are rediscovered after
   reconnecting or restarting the app. No export or project migration is needed.
+- The app also saves window names, order and the selected terminal on this device
+  after successful list updates and window actions. If the project's tmux session
+  disappears, reconnect recreates the saved windows as shells in the project
+  folder. Start the programs manually. This restores structure, not process memory,
+  terminal scrollback, pane splits or each shell's last directory.
+- Existing tmux sessions remain authoritative and are reused without adding
+  duplicate windows. Recovery builds a temporary session and publishes it only
+  after every saved window has been created; failure cleans up that temporary
+  session and retains the saved layout for retry. A restored session skips the
+  project's automatic startup commands. The device's saved layouts are cleared
+  during full configuration import; they are not part of settings-only export.
 - History, notes and pinned-action scope remain project based. Terminal switching
   is paused while a macro or delayed Text Input Enter is being sent.
 

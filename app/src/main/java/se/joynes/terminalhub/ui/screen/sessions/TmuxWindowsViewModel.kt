@@ -30,7 +30,8 @@ data class TmuxWindowsState(
 class TmuxWindowsViewModel @Inject constructor(
     private val projects: ProjectRepository,
     private val servers: ServerRepository,
-    private val remote: RemoteTmuxWindows
+    private val remote: RemoteTmuxWindows,
+    private val layouts: TmuxWindowLayoutStore
 ) : ViewModel() {
     private data class Binding(val project: Project, val server: Server)
     private val mutable = MutableStateFlow(TmuxWindowsState())
@@ -114,7 +115,10 @@ class TmuxWindowsViewModel @Inject constructor(
         }
     }
 
-    private fun publish(run: Long, snapshot: TmuxWindowsSnapshot) {
+    private suspend fun publish(run: Long, snapshot: TmuxWindowsSnapshot) {
+        if (run != generation) return
+        val current = binding ?: return
+        layouts.save(current.server, current.project, snapshot)
         if (run != generation) return
         val previousActive = mutable.value.snapshot?.windows?.firstOrNull { it.active }?.id
         val changed = previousActive != null && previousActive != snapshot.windows.firstOrNull { it.active }?.id

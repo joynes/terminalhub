@@ -134,4 +134,50 @@ class TmuxWindowIntegrationTest {
         assertTrue(output.contains("TMUX_SESSION_EXISTS"))
         assertEquals(extra.windows.map { it.id }.toSet(), snapshot().windows.map { it.id }.toSet())
     }
+
+    @Test fun `server restart restores saved window structure and repeated reconnect preserves processes`() {
+        val second = execute(TmuxWindowCommands.create(snapshot(), working.path, "Tests å😀"))
+        val third = execute(TmuxWindowCommands.create(second, working.path, "Logs ' \$(echo nope)"))
+        val selected = execute(TmuxWindowCommands.select(third, third.windows[1]))
+        val saved = TmuxWindowLayout.decode(TmuxWindowLayout.from(selected).encode())!!
+        tmux("kill-server")
+        val server = Server(name = "fixture", host = "fixture", username = "fixture", projectsFolder = folder.path)
+        val project = Project(serverId = 1, name = "project")
+        val command = ScriptTemplateEngine().renderSetup(server, project, saved)
+        assertTrue(run(command).contains("TMUX_WINDOWS_RESTORED"))
+        val restored = snapshot()
+        assertEquals(saved.names, restored.windows.map { it.name })
+        assertEquals(saved.active, restored.windows.indexOfFirst { it.active })
+        val pids = tmux("list-panes -s -t project -F '#{pane_pid}'")
+        assertTrue(run(command).contains("TMUX_SESSION_EXISTS"))
+        assertEquals(restored, snapshot())
+        assertEquals(pids, tmux("list-panes -s -t project -F '#{pane_pid}'"))
+        assertEquals(1, tmux("list-sessions -F '#{session_id}'").lines().count(String::isNotBlank))
+    }
+
+    @Test fun `failed restore cleans temporary session and leaves unrelated projects intact`() {
+        val before = snapshot()
+        val failSecondWindow = "tmux() { if [ \"\$1\" = new-window ]; then return 1; fi; command tmux \"\$@\"; }; "
+        run(failSecondWindow + TmuxWindowLayout(listOf("One", "Two"), 0).renderCreate("missing", working.path), success = false)
+        assertEquals(before, snapshot())
+        assertEquals(1, tmux("list-sessions -F '#{session_id}'").lines().count(String::isNotBlank))
+    }
+
+    @Test fun `restored window names remain literal tmux formats and shell arguments`() {
+        val marker = File(folder, "HACKED")
+        val names = listOf("#(touch ${marker.path})", "#{session_name} ' \$HOME")
+        run(TmuxWindowLayout(names, 1).renderCreate("restored", working.path))
+        assertEquals(names, snapshot("restored").windows.map { it.name })
+        assertFalse(marker.exists())
+    }
+
+    @Test fun `missing project is restored even when a similarly named project exists`() {
+        tmux("rename-session -t project project-other")
+        val before = snapshot("project-other")
+        val server = Server(name = "fixture", host = "fixture", username = "fixture", projectsFolder = folder.path)
+        val project = Project(serverId = 1, name = "project")
+        run(ScriptTemplateEngine().renderSetup(server, project, TmuxWindowLayout(listOf("Code", "Tests"), 0)))
+        assertEquals(listOf("Code", "Tests"), snapshot().windows.map { it.name })
+        assertEquals(before, snapshot("project-other"))
+    }
 }
