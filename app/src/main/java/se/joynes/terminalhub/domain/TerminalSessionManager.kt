@@ -133,6 +133,9 @@ class TerminalSessionManager @Inject constructor(
                 return true
             }
         })
+        // Match the initial SSH PTY dimensions. Background terminals must parse their
+        // output and accept macros even before a TerminalView has ever attached.
+        terminalSession.updateSize(80, 24, 0, 0)
 
         scope.launch {
             conn.output.collect { bytes ->
@@ -348,6 +351,9 @@ class TerminalSessionManager @Inject constructor(
         val original = entries[id.value] ?: return null
         val terminal = original.terminalSession
         val connection = original.conn
+        // Local shells are normally started by the view; an explicit macro can also
+        // target a local project that has not been displayed yet.
+        if (connection == null && terminal.emulator == null) terminal.updateSize(80, 24, 0, 0)
         return object : MacroTerminalTarget {
             override fun isConnected(): Boolean {
                 val current = entries[id.value] ?: return false

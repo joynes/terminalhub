@@ -96,3 +96,13 @@ batch cancellation and protection from stale status updates. UI tests cover
 default selection, exclusions, All/None, unavailable projects and cancellation.
 An Android PTY test writes and reads real files in two project shells without
 switching the active project during the batch.
+
+SSH terminal emulators initialize at registration with the initial SSH PTY size
+(80×24), so a connected tab can parse output and accept a macro before its first
+view attachment. Explicit macros can also initialize an unseen local shell.
+Reading/refreshing a tmux window list does not block sending; an actual window
+mutation still does. Preflight failures identify the project or the running/input
+operation preventing the batch, without sending partial input to other projects.
+An Android regression test registers 15 SSH terminals with in-memory transport
+streams, never creates a TerminalView, and verifies ordered bytes reach all of
+them without switching tabs. It also covers offline and excluded targets.

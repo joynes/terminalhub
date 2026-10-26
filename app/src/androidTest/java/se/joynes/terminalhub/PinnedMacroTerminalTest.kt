@@ -107,9 +107,7 @@ class PinnedMacroTerminalTest {
         val controller = PinnedMacroController(jobs)
         compose.runOnIdle {
             sessions.registerLocal(secondName, projectId = 900002)
-            sessions.switchTo(sessions.sessions.value.first { it.projectId == 900002L }.id)
         }
-        compose.waitUntil(5000) { sessions.activeSession().value?.emulator != null }
         compose.runOnIdle {
             val first = sessions.sessions.value.first { it.projectId == 900001L }.id
             val second = sessions.sessions.value.first { it.projectId == 900002L }.id
@@ -121,7 +119,10 @@ class PinnedMacroTerminalTest {
         }
         compose.waitUntil(8000) { controller.state.value?.running == false }
         compose.waitUntil(5000) {
-            listOf(firstName, secondName).all { File(sessions.localProjectPath(it), "broadcast.txt").exists() }
+            listOf(firstName, secondName).all {
+                val result = File(sessions.localProjectPath(it), "broadcast.txt")
+                result.exists() && result.readText() == "broadcast-ok"
+            }
         }
         listOf(firstName, secondName).forEach { assertEquals("broadcast-ok", File(sessions.localProjectPath(it), "broadcast.txt").readText()) }
         assertEquals("Completed in 2 projects", controller.state.value?.message)

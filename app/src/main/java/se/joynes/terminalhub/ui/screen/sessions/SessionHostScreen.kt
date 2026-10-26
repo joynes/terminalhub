@@ -484,7 +484,7 @@ fun SessionHostScreen(
                     textInputVisibleByProject[activeProjectId] = true
                 },
                 onSend = { action ->
-                    val windowChanging = activeTab?.usesTmux == true && (tmuxWindowsViewModel.state.value.busy || tmuxWindowsViewModel.state.value.loading)
+                    val windowChanging = activeTab?.usesTmux == true && tmuxWindowsViewModel.state.value.busy
                     val inputPending = action.isMacro && activeId in pendingInputSessions
                     val sent = if (windowChanging || inputPending) false else if (action.isMacro) viewModel.runPinnedMacro(action)
                         else viewModel.sendTextInputToActive(action.text, action.sendEnter)
@@ -505,12 +505,13 @@ fun SessionHostScreen(
                 onSave = { viewModel.savePinnedAction(it) },
                 openProjects = projectTabs,
                 onSendToProjects = { action, ids ->
-                    val windowsBusy = tmuxWindowsViewModel.state.value.let { it.projectId in ids && (it.busy || it.loading) }
-                    val sent = !windowsBusy && viewModel.sendPinnedToProjects(action, ids)
+                    val windowsBusy = tmuxWindowsViewModel.state.value.let { it.projectId in ids && it.busy }
+                    val error = if (windowsBusy) "Wait for terminal switching to finish." else viewModel.sendPinnedToProjects(action, ids)
+                    val sent = error == null
                     if (sent) {
                         showPinnedActions = false
                         Toast.makeText(context, "Sending to ${ids.size} projects", Toast.LENGTH_SHORT).show()
-                    } else Toast.makeText(context, "Connect selected projects and wait for input or switching to finish", Toast.LENGTH_LONG).show()
+                    } else Toast.makeText(context, error, Toast.LENGTH_LONG).show()
                     sent
                 },
                 onDeletePin = { viewModel.deletePinnedAction(it) },

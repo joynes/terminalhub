@@ -191,27 +191,30 @@ class SessionHostViewModel @Inject constructor(
         return started
     }
 
-    fun sendPinnedToProjects(action: se.joynes.terminalhub.data.db.entity.PinnedActionEntity, projectIds: Set<Long>): Boolean {
-        if (projectIds.isEmpty()) return false
+    /** Null means started; otherwise return the specific reason no input was sent. */
+    fun sendPinnedToProjects(action: se.joynes.terminalhub.data.db.entity.PinnedActionEntity, projectIds: Set<Long>): String? {
+        if (projectIds.isEmpty()) return "Select at least one project."
+        if (pinnedMacro.state.value?.running == true) return "A macro is already running. Tap STOP before starting another."
         val open = projectTabs.value.associateBy { it.projectId }
         val destinations = projectIds.map { id ->
-            val tab = open[id] ?: return false
-            val sessionId = tab.sessionId ?: return false
-            if (!tab.isConnected || sessionId in pendingSubmissions) return false
-            val target = sessionManager.macroTargetForSession(sessionId) ?: return false
+            val tab = open[id] ?: return "A selected project was closed. Select projects again."
+            val sessionId = tab.sessionId ?: return "Reconnect ${tab.projectName} before sending."
+            if (!tab.isConnected) return "Reconnect ${tab.projectName} before sending."
+            if (sessionId in pendingSubmissions) return "Wait for pending input in ${tab.projectName} to finish."
+            val target = sessionManager.macroTargetForSession(sessionId) ?: return "Terminal for ${tab.projectName} is unavailable. Reconnect this project."
             se.joynes.terminalhub.domain.MacroDestination(id, tab.projectName, target)
         }
         val steps = if (action.isMacro) runCatching {
             se.joynes.terminalhub.data.model.PinnedMacroCodec.decode(action.macroJson)
-        }.getOrNull() ?: return false else buildList {
+        }.getOrNull() ?: return "This action contains invalid keyboard macro steps. Edit the action before sending." else buildList {
             if (action.text.isNotEmpty()) add(se.joynes.terminalhub.domain.MacroStep.Text(action.text))
             if (action.sendEnter) add(se.joynes.terminalhub.domain.MacroStep.Key("ENTER"))
         }
-        if (steps.isEmpty()) return false
-        if (runCatching { se.joynes.terminalhub.domain.TerminalMacro.validate(steps) }.isFailure) return false
+        if (steps.isEmpty()) return "This action has no text or keys to send."
+        if (runCatching { se.joynes.terminalhub.domain.TerminalMacro.validate(steps) }.isFailure) return "This action exceeds the macro limits or contains invalid keys. Edit it before sending."
         val started = pinnedMacro.startMany(action.name, steps, destinations)
         if (started) usePinnedAction(action.id)
-        return started
+        return if (started) null else "A selected terminal became unavailable. Check its connection before sending again."
     }
 
     private val prefs = context.getSharedPreferences("session_host", Context.MODE_PRIVATE)
