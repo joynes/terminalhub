@@ -205,6 +205,7 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                item { se.joynes.terminalhub.ui.components.AppUpdatesCard() }
                 item {
                     ExpandableSettingsSection(
                         title = "CONNECTION & RECOVERY",

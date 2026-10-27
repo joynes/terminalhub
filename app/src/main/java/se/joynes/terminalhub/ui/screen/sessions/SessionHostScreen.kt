@@ -1058,6 +1058,10 @@ fun SessionHostScreen(
                                 showAboutDialog = true
                             }
                         )
+                        DropdownMenuItem(text = { Text("Check for updates") }, onClick = {
+                            showSettingsMenu = false
+                            se.joynes.terminalhub.ui.components.openAppUpdates(context)
+                        })
                     }
                 }
             }
