@@ -20,11 +20,10 @@ class RemoteDirectoryNavigationTest {
     }
 
     @Test
-    fun `download panel stops above keybar even after dragging or resizing`() {
-        assertEquals(52f, clampDownloadPanelTop(400f, 300f, 240, 8f))
-        assertEquals(0f, clampDownloadPanelTop(80f, 200f, 200, 8f))
-        assertEquals(20f, clampDownloadPanelTop(20f, 300f, 240, 8f))
-        assertEquals(0f, clampDownloadPanelTop(-50f, 300f, 240, 8f))
+    fun `breadcrumbs retain exact ancestor paths including spaces and unicode`() {
+        assertEquals(listOf(RemoteBreadcrumb("Project", ""), RemoteBreadcrumb("my files", "my files"),
+            RemoteBreadcrumb("åäö", "my files/åäö")), remoteBreadcrumbs("my files/åäö"))
+        assertEquals(listOf(RemoteBreadcrumb("Project", "")), remoteBreadcrumbs(""))
     }
 
     @Test

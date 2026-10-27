@@ -24,6 +24,9 @@ internal fun restoredRemoteScroll(saved: RemoteBrowseViewState, entries: List<Re
 internal class RemoteBrowserUiState(saved: RemoteBrowseViewState, entries: List<RemoteFileEntry>) {
     private val restored = restoredRemoteScroll(saved, entries)
     val list = LazyListState(restored.first, restored.second)
+    val filteredList = LazyListState()
+    var query by mutableStateOf("")
+    var searching by mutableStateOf(false)
     val panel = ScrollState(saved.panelScroll.coerceAtLeast(0))
     var selectedFiles by mutableStateOf(saved.selectedFiles.intersect(entries.filterNot { it.isDirectory }.map { it.name }.toSet()))
 

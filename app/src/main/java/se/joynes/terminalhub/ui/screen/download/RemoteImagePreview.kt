@@ -3,7 +3,6 @@ package se.joynes.terminalhub.ui.screen.download
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
@@ -16,8 +15,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import se.joynes.terminalhub.ui.components.RetroButton
@@ -48,13 +45,11 @@ internal fun RemoteImagePreviewDialog(fileName: String, bytes: ByteArray, onDism
     }
     var scale by remember(bytes) { mutableFloatStateOf(1f) }
     var offset by remember(bytes) { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Column(Modifier.fillMaxWidth(.96f).fillMaxHeight(.92f).background(MegaDriveSurface).padding(12.dp)) {
-            Text(fileName, color = MegaDrivePrimary, maxLines = 2)
+    RemoteBrowserFrame(fileName, onDismiss) {
+        Column(Modifier.fillMaxSize().padding(12.dp)) {
             Text("Pinch to zoom · drag to move · GIF shows a still frame", color = MegaDriveDim)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RetroButton(text = "RESET ZOOM", onClick = { scale = 1f; offset = androidx.compose.ui.geometry.Offset.Zero })
-                RetroButton(text = "CLOSE", onClick = onDismiss)
             }
             val bitmap = result?.getOrNull()
             if (bitmap != null) {

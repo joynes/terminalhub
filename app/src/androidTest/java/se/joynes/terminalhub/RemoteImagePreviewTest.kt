@@ -65,7 +65,7 @@ class RemoteImagePreviewTest {
         }
         compose.onNodeWithContentDescription("Preview of photo.png").assertExists()
         compose.onNodeWithText("RESET ZOOM").performClick()
-        compose.onNodeWithText("CLOSE").performClick()
+        compose.onNodeWithContentDescription("Close file browser").performClick()
         compose.runOnIdle { assertTrue(closed) }
     }
 
@@ -76,6 +76,6 @@ class RemoteImagePreviewTest {
         compose.waitUntil(10_000) {
             compose.onAllNodes(androidx.compose.ui.test.hasText("Cannot preview this image.", substring = true)).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithText("CLOSE").assertExists()
+        compose.onNodeWithContentDescription("Close file browser").assertExists()
     }
 }

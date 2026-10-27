@@ -3,9 +3,6 @@ package se.joynes.terminalhub.ui.screen.download
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,10 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -29,15 +23,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import se.joynes.terminalhub.ui.components.RetroButton
 import se.joynes.terminalhub.ui.theme.MegaDriveAccent
 import se.joynes.terminalhub.ui.theme.MegaDriveBg
 import se.joynes.terminalhub.ui.theme.MegaDriveDim
 import se.joynes.terminalhub.ui.theme.MegaDriveOnSurface
 import se.joynes.terminalhub.ui.theme.MegaDrivePrimary
-import se.joynes.terminalhub.ui.theme.MegaDriveSurface
 import se.joynes.terminalhub.ui.theme.MonoFontFamily
 
 internal const val MAX_REMOTE_TEXT_PREVIEW_BYTES = 512L * 1024L
@@ -168,63 +158,14 @@ internal fun RemoteTextPreviewDialog(
     markdown: Boolean,
     onDismiss: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.96f)
-                .fillMaxHeight(0.92f)
-                .clip(RoundedCornerShape(8.dp))
-                .background(MegaDriveSurface)
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "PREVIEW",
-                        color = MegaDriveAccent,
-                        fontSize = 11.sp,
-                        fontFamily = MonoFontFamily
-                    )
-                    Text(
-                        fileName,
-                        color = MegaDrivePrimary,
-                        fontSize = 14.sp,
-                        fontFamily = MonoFontFamily,
-                        maxLines = 2
-                    )
-                }
-                RetroButton(text = "CLOSE", onClick = onDismiss)
-            }
-
-            SelectionContainer(modifier = Modifier.weight(1f)) {
-                if (markdown) {
-                    MarkdownPreview(content)
-                } else {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("remote-text-preview")
-                            .background(MegaDriveBg, RoundedCornerShape(4.dp))
-                            .padding(12.dp)
-                    ) {
-                        item {
-                            Text(
-                                content.ifEmpty { "(empty file)" },
-                                color = MegaDriveOnSurface,
-                                fontSize = 13.sp,
-                                lineHeight = 19.sp,
-                                fontFamily = MonoFontFamily
-                            )
-                        }
-                    }
+    RemoteBrowserFrame(fileName, onDismiss) {
+        SelectionContainer(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            if (markdown) MarkdownPreview(content)
+            else {
+                val lines = androidx.compose.runtime.remember(content) { content.ifEmpty { "(empty file)" }.lines() }
+                LazyColumn(Modifier.fillMaxSize().testTag("remote-text-preview").background(MegaDriveBg).padding(12.dp)) {
+                    itemsIndexed(lines) { _, line -> Text(line.ifEmpty { " " }, color = MegaDriveOnSurface,
+                        fontSize = 14.sp, lineHeight = 21.sp, fontFamily = MonoFontFamily) }
                 }
             }
         }
@@ -238,7 +179,7 @@ private fun MarkdownPreview(content: String) {
         modifier = Modifier
             .fillMaxSize()
             .testTag("remote-text-preview")
-            .background(Color(0xFF11111E), RoundedCornerShape(4.dp))
+            .background(MegaDriveBg, RoundedCornerShape(4.dp))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {

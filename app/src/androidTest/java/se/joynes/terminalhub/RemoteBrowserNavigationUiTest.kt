@@ -55,7 +55,7 @@ class RemoteBrowserNavigationUiTest {
                 }
             }
         }
-        compose.onNodeWithText("[DIR]  images").performClick()
+        compose.onNodeWithText("images").performClick()
         compose.onNodeWithText("↑  PROJECT / images").assertExists()
         fun reopen() {
             compose.runOnIdle { visible = false }
@@ -67,7 +67,7 @@ class RemoteBrowserNavigationUiTest {
         compose.onNodeWithText("↑  PROJECT / images").performClick()
         reopen()
         compose.onNodeWithText("PROJECT /").assertExists()
-        compose.onNodeWithText("[DIR]  images").assertExists()
+        compose.onNodeWithText("images").assertExists()
         assertEquals("", RemoteBrowseLocationStore(context).lastDirectory(server, project, root))
     }
 }

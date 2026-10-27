@@ -62,9 +62,10 @@ sealed interface DownloadState {
         val fileName: String,
         val content: String,
         val markdown: Boolean,
-        val imageBytes: ByteArray? = null
+        val imageBytes: ByteArray? = null,
+        val pdfBytes: ByteArray? = null
     ) : DownloadState
-    data class Error(val message: String, val directory: String = "") : DownloadState
+    data class Error(val message: String, val directory: String = "", val previousListing: Listed? = null) : DownloadState
 }
 
 data class DownloadedRemoteFile(val fileName: String, val bytes: Long, val uri: Uri)
@@ -161,19 +162,21 @@ class FileDownloadViewModel @Inject constructor(
     ) {
         val listed = states.value[projectId] as? DownloadState.Listed ?: return
         val image = isPreviewableImageFile(entry.name)
-        if ((!isPreviewableTextFile(entry.name) && !image) || entry.isDirectory) return
-        val limit = if (image) MAX_REMOTE_IMAGE_PREVIEW_BYTES else MAX_REMOTE_TEXT_PREVIEW_BYTES
+        val pdf = isPreviewablePdfFile(entry.name)
+        if (!isRemotePreviewSupported(entry.name) || entry.isDirectory) return
+        val limit = when { pdf -> MAX_REMOTE_PDF_PREVIEW_BYTES; image -> MAX_REMOTE_IMAGE_PREVIEW_BYTES; else -> MAX_REMOTE_TEXT_PREVIEW_BYTES }
         if (entry.size > limit) {
             setState(
                 projectId,
                 DownloadState.Error(
-                    "Preview supports ${if (image) "images" else "text files"} up to ${limit / 1024} KB.",
-                    listed.directory
+                    "Preview supports ${if (pdf) "PDF files" else if (image) "images" else "text files"} up to ${limit / 1024} KB.",
+                    listed.directory, listed
                 )
             )
             return
         }
 
+        setState(projectId, DownloadState.PreviewLoading(listed.directory, listed.entries, entry.name))
         previewJobs[projectId] = viewModelScope.launch {
             val output = LimitedPreviewOutputStream(limit.toInt())
             try {
@@ -201,9 +204,10 @@ class FileDownloadViewModel @Inject constructor(
                         )
                     )
                 }
+                currentCoroutineContext().ensureActive()
                 val bytes = output.toByteArray()
-                if (!image) check(bytes.none { it == 0.toByte() }) { "This file appears to be binary and cannot be previewed." }
-                val content = if (image) "" else bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
+                if (!image && !pdf) check(bytes.none { it == 0.toByte() }) { "This file appears to be binary and cannot be previewed." }
+                val content = if (image || pdf) "" else bytes.toString(Charsets.UTF_8).removePrefix("\uFEFF")
                 setState(
                     projectId,
                     DownloadState.PreviewReady(
@@ -212,7 +216,8 @@ class FileDownloadViewModel @Inject constructor(
                         fileName = entry.name,
                         content = content,
                         markdown = isMarkdownFile(entry.name),
-                        imageBytes = if (image) bytes else null
+                        imageBytes = if (image) bytes else null,
+                        pdfBytes = if (pdf) bytes else null
                     )
                 )
             } catch (cancelled: CancellationException) {
@@ -220,19 +225,24 @@ class FileDownloadViewModel @Inject constructor(
             } catch (error: Exception) {
                 setState(
                     projectId,
-                    DownloadState.Error(error.message ?: "Could not preview file", listed.directory)
+                    DownloadState.Error(error.message ?: "Could not preview file", listed.directory, listed)
                 )
             } finally {
-                previewJobs.remove(projectId)
+                if (previewJobs[projectId] === currentCoroutineContext()[Job]) previewJobs.remove(projectId)
             }
         }
     }
 
     fun closePreview(projectId: Long) {
         val current = states.value[projectId]
-        if (current is DownloadState.PreviewReady) {
-            setState(projectId, DownloadState.Listed(current.directory, current.entries))
-        }
+        val listing = when (current) {
+            is DownloadState.PreviewReady -> DownloadState.Listed(current.directory, current.entries)
+            is DownloadState.PreviewLoading -> DownloadState.Listed(current.directory, current.entries)
+            is DownloadState.Error -> current.previousListing
+            else -> null
+        } ?: return
+        previewJobs.remove(projectId)?.cancel()
+        setState(projectId, listing)
     }
 
     fun startDownloads(

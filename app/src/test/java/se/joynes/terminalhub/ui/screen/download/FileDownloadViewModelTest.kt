@@ -342,6 +342,71 @@ class FileDownloadViewModelTest {
         assertEquals(DownloadState.Listed("images", listOf(entry)), viewModel.downloadState(project.id).first())
     }
 
+    @Test fun pdfPreviewPreservesBinaryBytesWithoutADownloadDestination() = runTest(dispatcher) {
+        val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11L, serverId = server.id, name = "music")
+        val bytes = byteArrayOf(0, 1, 2, -1, 0)
+        val entry = RemoteFileEntry("report.PDF", bytes.size.toLong())
+        whenever(serverRepo.getById(server.id)).thenReturn(server)
+        whenever(projectRepo.getById(project.id)).thenReturn(project)
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), eq("~/terminalhub/music/images")))
+            .thenReturn(listOf(entry))
+        whenever(downloader.download(eq(server), isNull(), isNull(), eq("~/terminalhub/music/images"), eq(entry.name), any()))
+            .thenAnswer { invocation ->
+                val output = invocation.getArgument<OutputStream>(5)
+                flow { output.write(bytes); emit(ScpDownloadProgress(entry.name, bytes.size.toLong(), bytes.size.toLong())) }
+            }
+        val viewModel = createViewModel()
+        viewModel.loadRemoteFiles(server.id, project.id, "images")
+        advanceUntilIdle()
+        viewModel.previewRemoteFile(server.id, project.id, entry)
+        advanceUntilIdle()
+        val preview = viewModel.downloadState(project.id).first() as DownloadState.PreviewReady
+        org.junit.Assert.assertArrayEquals(bytes, preview.pdfBytes)
+        assertEquals("", preview.content)
+        assertEquals(false, preview.markdown)
+        viewModel.closePreview(project.id)
+        assertEquals(DownloadState.Listed("images", listOf(entry)), viewModel.downloadState(project.id).first())
+    }
+
+    @Test fun cancellingPreviewReturnsToListingAndIgnoresDoubleTap() = runTest(dispatcher) {
+        val server = Server(id = 7, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11, serverId = 7, name = "music")
+        val entry = RemoteFileEntry("README.md", 10)
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(project)
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), any())).thenReturn(listOf(entry))
+        whenever(downloader.download(eq(server), isNull(), isNull(), any(), eq(entry.name), any()))
+            .thenReturn(flow { kotlinx.coroutines.awaitCancellation() })
+        val vm = createViewModel()
+        vm.loadRemoteFiles(7, 11, "docs")
+        advanceUntilIdle()
+        vm.previewRemoteFile(7, 11, entry)
+        vm.previewRemoteFile(7, 11, entry)
+        runCurrent()
+        vm.closePreview(11)
+        advanceUntilIdle()
+        assertEquals(DownloadState.Listed("docs", listOf(entry)), vm.downloadState(11).first())
+        verify(downloader, org.mockito.kotlin.times(1)).download(eq(server), isNull(), isNull(), any(), eq(entry.name), any())
+    }
+
+    @Test fun oversizedPreviewReturnsToOriginalListingWithoutNetworkReload() = runTest(dispatcher) {
+        val server = Server(id = 7, name = "prod", host = "example.com", username = "demo")
+        val project = Project(id = 11, serverId = 7, name = "music")
+        val entry = RemoteFileEntry("huge.pdf", MAX_REMOTE_PDF_PREVIEW_BYTES + 1)
+        whenever(serverRepo.getById(7)).thenReturn(server)
+        whenever(projectRepo.getById(11)).thenReturn(project)
+        whenever(downloader.listFiles(eq(server), isNull(), isNull(), any())).thenReturn(listOf(entry))
+        val vm = createViewModel()
+        vm.loadRemoteFiles(7, 11, "docs")
+        advanceUntilIdle()
+        vm.previewRemoteFile(7, 11, entry)
+        assertTrue(vm.downloadState(11).first() is DownloadState.Error)
+        vm.closePreview(11)
+        assertEquals(DownloadState.Listed("docs", listOf(entry)), vm.downloadState(11).first())
+        verify(downloader, never()).download(any(), any(), any(), any(), any(), any())
+    }
+
     @Test fun imageTransferIsBoundedEvenIfRemoteSizeIsIncorrect() = runTest(dispatcher) {
         val server = Server(id = 7L, name = "prod", host = "example.com", username = "demo")
         val project = Project(id = 11L, serverId = server.id, name = "music")

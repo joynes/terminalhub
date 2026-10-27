@@ -10,16 +10,11 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -30,25 +25,24 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.terminalhub.data.ssh.RemoteFileEntry
@@ -58,12 +52,10 @@ import se.joynes.terminalhub.ui.theme.MegaDriveAccent
 import se.joynes.terminalhub.ui.theme.MegaDriveBg
 import se.joynes.terminalhub.ui.theme.MegaDriveDim
 import se.joynes.terminalhub.ui.theme.MegaDrivePrimary
-import se.joynes.terminalhub.ui.theme.MegaDriveSurface
 import se.joynes.terminalhub.ui.theme.MonoFontFamily
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,21 +68,17 @@ fun FloatingFileDownloadDialog(
     downloadState: DownloadState,
     onDismiss: () -> Unit
 ) {
-    val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
     val context = LocalContext.current
     val destinationDirectoryStore = remember(context) { RemoteDownloadDirectoryStore(context) }
-
-    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
-    val panelWidthDp = (configuration.screenWidthDp * 0.92f).dp
-    val panelWidthPx = with(density) { panelWidthDp.toPx() }
-
-    var offsetX by remember { mutableFloatStateOf(screenWidthPx * 0.04f) }
-    var offsetY by remember { mutableFloatStateOf(with(density) { 80.dp.toPx() }) }
-    var panelHeightPx by remember { mutableIntStateOf(0) }
     val settings by viewModel.settings.collectAsState()
     val sortSelection = RemoteFileSortSelection(RemoteFileSort.valueOf(settings.remoteDownloadSort), settings.remoteDownloadSortAscending)
-    val listed = downloadState as? DownloadState.Listed
+    val listed = when (downloadState) {
+        is DownloadState.Listed -> downloadState
+        is DownloadState.PreviewLoading -> DownloadState.Listed(downloadState.directory, downloadState.entries)
+        is DownloadState.PreviewReady -> DownloadState.Listed(downloadState.directory, downloadState.entries)
+        is DownloadState.Error -> downloadState.previousListing
+        else -> null
+    }
     val sortedEntries = listed?.let { sortRemoteFileEntries(it.entries, sortSelection) }.orEmpty()
     val identity = viewModel.browseIdentity(projectId)
     val browserState = if (listed != null) rememberRemoteBrowserUiState(
@@ -169,6 +157,10 @@ fun FloatingFileDownloadDialog(
     )
 
     if (downloadState is DownloadState.PreviewReady) {
+        if (downloadState.pdfBytes != null) {
+            RemotePdfPreviewDialog(downloadState.fileName, downloadState.pdfBytes) { viewModel.closePreview(projectId) }
+            return
+        }
         if (downloadState.imageBytes != null) {
             RemoteImagePreviewDialog(downloadState.fileName, downloadState.imageBytes) { viewModel.closePreview(projectId) }
             return
@@ -182,326 +174,160 @@ fun FloatingFileDownloadDialog(
         return
     }
 
-    BoxWithConstraints(
-        modifier = Modifier
-            .fillMaxSize()
-            .clickable { }
-    ) {
-        val availableHeightPx = constraints.maxHeight.toFloat()
-        val panelMarginPx = with(density) { 8.dp.toPx() }
-        val panelMaxHeight = (maxHeight - 8.dp).coerceAtLeast(1.dp)
-        val listMaxHeight = (maxHeight * 0.42f).coerceAtLeast(80.dp)
-        Column(
-            modifier = Modifier
-                .offset {
-                    IntOffset(
-                        offsetX.roundToInt(),
-                        clampDownloadPanelTop(
-                            offsetY,
-                            availableHeightPx,
-                            panelHeightPx,
-                            panelMarginPx
-                        ).roundToInt()
+    fun close() { viewModel.reset(projectId); onDismiss() }
+    fun back() {
+        when (downloadState) {
+            is DownloadState.PreviewLoading -> viewModel.closePreview(projectId)
+            is DownloadState.Error -> if (downloadState.previousListing != null) viewModel.closePreview(projectId)
+                else if (downloadState.directory.isNotEmpty()) viewModel.loadRemoteFiles(serverId, projectId, parentRemoteDirectory(downloadState.directory)) else close()
+            is DownloadState.Listed -> if (downloadState.directory.isNotEmpty()) viewModel.loadRemoteFiles(serverId, projectId, parentRemoteDirectory(downloadState.directory)) else close()
+            else -> close()
+        }
+    }
+    RemoteBrowserFrame("Remote files", onBack = ::back, onClose = ::close) {
+        if (downloadState is DownloadState.Listed) {
+            RemoteBrowserListing(downloadState.directory, sortedEntries, browserState!!, sortSelection,
+                onSort = { viewModel.setSort(nextRemoteFileSortSelection(sortSelection, it)) },
+                onNavigate = { viewModel.loadRemoteFiles(serverId, projectId, it) },
+                onRefresh = { viewModel.loadRemoteFiles(serverId, projectId, downloadState.directory) },
+                onPreview = { viewModel.previewRemoteFile(serverId, projectId, it) },
+                destination = destination?.let { "Save to: " + runCatching { DocumentsContract.getTreeDocumentId(it).substringAfterLast('/') }.getOrDefault(it.toString()) }
+                    ?: "Choose a folder when downloading",
+                destinationMessage = destinationMessage, checkingDestination = checkingDestination,
+                onChangeDestination = { folderController.changeFolder() },
+                onDownload = {
+                    if (selectedFileNames.isNotEmpty() && !checkingDestination) {
+                        val request = PendingFolderDownload(serverId, projectId, downloadState.directory, selectedFileNames.toList())
+                        checkingDestination = true
+                        scope.launch { try { folderController.download(request) } finally { checkingDestination = false } }
+                    }
+                })
+        } else Column(Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            when (downloadState) {
+                is DownloadState.Idle, is DownloadState.LoadingList -> {
+                    androidx.compose.material3.CircularProgressIndicator()
+                    Text("Loading remote files…", color = MegaDrivePrimary)
+                }
+                is DownloadState.Listed -> Unit
+                is DownloadState.Downloading -> {
+                    Text(
+                        "FILE ${downloadState.currentFile} OF ${downloadState.totalFiles}: ${downloadState.fileName}",
+                        color = MegaDrivePrimary,
+                        fontSize = 11.sp,
+                        fontFamily = MonoFontFamily,
+                        maxLines = 2
+                    )
+                    PixelProgressBar(
+                        progress = downloadState.progress,
+                        label = "DOWNLOADING...",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Text(downloadState.estimate.label(), color = MegaDrivePrimary, fontSize = 12.sp)
+                    if (downloadState.queuedFiles > 0) Text("${downloadState.queuedFiles} file(s) waiting",
+                        color = MegaDrivePrimary, fontSize = 12.sp)
+                    Text("You can close this panel and keep working.", color = MegaDrivePrimary, fontSize = 12.sp)
+                    RetroButton("CANCEL QUEUE", onClick = { viewModel.cancelDownloads(projectId) })
+                }
+                is DownloadState.Paused -> {
+                    Text("TRANSFER PAUSED: ${downloadState.fileName}", color = MegaDrivePrimary, fontSize = 12.sp)
+                    Text(downloadState.message, color = MegaDrivePrimary, fontSize = 12.sp)
+                    Text("Retry resumes partial files when the server's size and modification time still match. Otherwise it restarts the file.",
+                        color = MegaDrivePrimary, fontSize = 12.sp)
+                    RetroButton("RETRY QUEUE", onClick = { viewModel.retryDownloads(projectId) })
+                    RetroButton("CANCEL QUEUE", onClick = { viewModel.cancelDownloads(projectId) })
+                }
+                is DownloadState.PreviewLoading -> {
+                    Text(
+                        "PREPARING PREVIEW: ${downloadState.fileName}",
+                        color = MegaDrivePrimary,
+                        fontSize = 11.sp,
+                        fontFamily = MonoFontFamily,
+                        maxLines = 2
+                    )
+                    PixelProgressBar(
+                        progress = downloadState.progress,
+                        label = "LOADING PREVIEW...",
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
-                .width(panelWidthDp)
-                .heightIn(max = panelMaxHeight)
-                .onSizeChanged { panelHeightPx = it.height }
-                .background(MegaDriveSurface, RoundedCornerShape(4.dp))
-                .verticalScroll(browserState?.panel ?: rememberScrollState())
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(32.dp)
-                    .background(MegaDrivePrimary, RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
-                    .pointerInput(availableHeightPx, panelMarginPx) {
-                        detectDragGestures { change, drag ->
-                            change.consume()
-                            offsetX = (offsetX + drag.x).coerceIn(0f, screenWidthPx - panelWidthPx)
-                            val visibleTop = clampDownloadPanelTop(
-                                offsetY,
-                                availableHeightPx,
-                                panelHeightPx,
-                                panelMarginPx
-                            )
-                            offsetY = clampDownloadPanelTop(
-                                visibleTop + drag.y,
-                                availableHeightPx,
-                                panelHeightPx,
-                                panelMarginPx
-                            )
-                        }
-                    }
-                    .padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("REMOTE DOWNLOAD", color = MegaDriveBg, fontSize = 11.sp, fontFamily = MonoFontFamily)
-                Text(
-                    "x",
-                    color = MegaDriveBg,
-                    fontSize = 13.sp,
-                    fontFamily = MonoFontFamily,
-                    modifier = Modifier.clickable { viewModel.reset(projectId); onDismiss() }
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                when (downloadState) {
-                    is DownloadState.Idle,
-                    is DownloadState.LoadingList -> {
-                        Text("Loading remote files...", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
-                    }
-                    is DownloadState.Listed -> {
-                        RemoteDirectoryHeader(
-                            directory = downloadState.directory,
-                            onNavigateUp = {
-                                viewModel.loadRemoteFiles(
-                                    serverId,
-                                    projectId,
-                                    parentRemoteDirectory(downloadState.directory)
-                                )
-                            }
-                        )
-                        RemoteFileSortControls(
-                            selection = sortSelection,
-                            onSelect = { property ->
-                                viewModel.setSort(nextRemoteFileSortSelection(sortSelection, property))
-                            }
-                        )
-                        RemoteFileList(
-                            entries = sortedEntries,
-                            listState = browserState!!.list,
-                            selectedFileNames = selectedFileNames,
-                            modifier = Modifier.heightIn(min = 140.dp, max = listMaxHeight),
-                            onOpenDirectory = { directory ->
-                                viewModel.loadRemoteFiles(
-                                    serverId,
-                                    projectId,
-                                    childRemoteDirectory(downloadState.directory, directory.name)
-                                )
-                            },
-                            onToggleFile = { file ->
-                                browserState.selectedFiles = toggleRemoteFileSelection(
-                                    selectedFileNames,
-                                    file.name
-                                )
-                            },
-                            onPreviewFile = { file ->
-                                viewModel.previewRemoteFile(serverId, projectId, file)
-                            }
-                        )
-                        val files = downloadState.entries.filterNot(RemoteFileEntry::isDirectory)
-                        if (files.isNotEmpty()) {
+                is DownloadState.PreviewReady -> Unit
+                is DownloadState.BatchDone -> {
+                    Text(
+                        "DONE - ${downloadState.files.size} FILE(S)",
+                        color = MegaDrivePrimary,
+                        fontSize = 11.sp,
+                        fontFamily = MonoFontFamily
+                    )
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(downloadState.files, key = { it.uri.toString() }) { file ->
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MegaDriveBg, RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 8.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "SELECT ALL",
+                                    file.fileName,
                                     color = MegaDrivePrimary,
                                     fontSize = 10.sp,
                                     fontFamily = MonoFontFamily,
-                                    modifier = Modifier
-                                        .clickable { browserState.selectedFiles = files.map { it.name }.toSet() }
-                                        .padding(vertical = 6.dp)
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    "CLEAR",
-                                    color = MegaDriveDim,
+                                    "OPEN",
+                                    color = MegaDriveAccent,
                                     fontSize = 10.sp,
                                     fontFamily = MonoFontFamily,
                                     modifier = Modifier
-                                        .clickable { browserState.selectedFiles = emptySet() }
-                                        .padding(vertical = 6.dp)
+                                        .clickable {
+                                            openDownloadedFile(context, file.fileName, file.uri)
+                                        }
+                                        .padding(6.dp)
                                 )
                             }
-                            RetroButton(
-                                text = if (selectedFileNames.isEmpty()) {
-                                    "SELECT FILES TO DOWNLOAD"
-                                } else {
-                                    "DOWNLOAD SELECTED (${selectedFileNames.size})"
-                                },
-                                onClick = {
-                                    if (selectedFileNames.isNotEmpty() && !checkingDestination) {
-                                        val request = PendingFolderDownload(serverId, projectId, downloadState.directory, selectedFileNames.toList())
-                                        checkingDestination = true
-                                        scope.launch {
-                                            try {
-                                                folderController.download(request)
-                                            } finally { checkingDestination = false }
-                                        }
-                                    }
-                                },
-                                enabled = selectedFileNames.isNotEmpty() && !checkingDestination,
-                                modifier = Modifier.fillMaxWidth()
-                            )
                         }
-                        Text(
-                            if (checkingDestination) "Checking download folder…" else destination?.let {
-                                "SAVE TO: " + runCatching { DocumentsContract.getTreeDocumentId(it).substringAfterLast('/') }.getOrDefault(it.toString())
-                            } ?: "Choose a folder on your first download.",
-                            color = MegaDriveDim, fontSize = 10.sp, fontFamily = MonoFontFamily, maxLines = 2
-                        )
-                        destinationMessage?.let { Text(it, color = MegaDriveAccent, fontSize = 11.sp) }
-                        RetroButton(text = "CHANGE FOLDER", enabled = !checkingDestination, onClick = {
-                            folderController.changeFolder()
-                        }, modifier = Modifier.fillMaxWidth())
-                        if (downloadState.directory.isNotEmpty()) {
-                            RetroButton(
-                                text = "UP ONE LEVEL",
-                                onClick = {
-                                    viewModel.loadRemoteFiles(
-                                        serverId,
-                                        projectId,
-                                        parentRemoteDirectory(downloadState.directory)
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                    }
+                    RetroButton(
+                        text = "CLOSE",
+                        onClick = { viewModel.reset(projectId); onDismiss() },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                is DownloadState.Error -> {
+                    if (downloadState.previousListing != null) RetroButton("BACK TO FILES", onClick = { viewModel.closePreview(projectId) })
+                    Text(
+                        "ERROR: ${downloadState.message}",
+                        color = MegaDriveAccent,
+                        fontSize = 11.sp,
+                        fontFamily = MonoFontFamily
+                    )
+                    RetroButton(
+                        text = "TRY AGAIN",
+                        onClick = {
+                            viewModel.loadRemoteFiles(serverId, projectId, downloadState.directory)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    if (downloadState.directory.isNotEmpty()) {
                         RetroButton(
-                            text = "REFRESH",
-                            onClick = {
-                                viewModel.loadRemoteFiles(serverId, projectId, downloadState.directory)
-                            },
+                            text = "PROJECT ROOT",
+                            onClick = { viewModel.loadRemoteFiles(serverId, projectId, "") },
                             modifier = Modifier.fillMaxWidth()
                         )
-                    }
-                    is DownloadState.Downloading -> {
-                        Text(
-                            "FILE ${downloadState.currentFile} OF ${downloadState.totalFiles}: ${downloadState.fileName}",
-                            color = MegaDrivePrimary,
-                            fontSize = 11.sp,
-                            fontFamily = MonoFontFamily,
-                            maxLines = 2
-                        )
-                        PixelProgressBar(
-                            progress = downloadState.progress,
-                            label = "DOWNLOADING...",
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(downloadState.estimate.label(), color = MegaDrivePrimary, fontSize = 12.sp)
-                        if (downloadState.queuedFiles > 0) Text("${downloadState.queuedFiles} file(s) waiting",
-                            color = MegaDrivePrimary, fontSize = 12.sp)
-                        Text("You can close this panel and keep working.", color = MegaDrivePrimary, fontSize = 12.sp)
-                        RetroButton("CANCEL QUEUE", onClick = { viewModel.cancelDownloads(projectId) })
-                    }
-                    is DownloadState.Paused -> {
-                        Text("TRANSFER PAUSED: ${downloadState.fileName}", color = MegaDrivePrimary, fontSize = 12.sp)
-                        Text(downloadState.message, color = MegaDrivePrimary, fontSize = 12.sp)
-                        Text("Retry resumes partial files when the server's size and modification time still match. Otherwise it restarts the file.",
-                            color = MegaDrivePrimary, fontSize = 12.sp)
-                        RetroButton("RETRY QUEUE", onClick = { viewModel.retryDownloads(projectId) })
-                        RetroButton("CANCEL QUEUE", onClick = { viewModel.cancelDownloads(projectId) })
-                    }
-                    is DownloadState.PreviewLoading -> {
-                        Text(
-                            "PREPARING PREVIEW: ${downloadState.fileName}",
-                            color = MegaDrivePrimary,
-                            fontSize = 11.sp,
-                            fontFamily = MonoFontFamily,
-                            maxLines = 2
-                        )
-                        PixelProgressBar(
-                            progress = downloadState.progress,
-                            label = "LOADING PREVIEW...",
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    is DownloadState.PreviewReady -> Unit
-                    is DownloadState.BatchDone -> {
-                        Text(
-                            "DONE - ${downloadState.files.size} FILE(S)",
-                            color = MegaDrivePrimary,
-                            fontSize = 11.sp,
-                            fontFamily = MonoFontFamily
-                        )
-                        LazyColumn(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = listMaxHeight),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            items(downloadState.files, key = { it.uri.toString() }) { file ->
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MegaDriveBg, RoundedCornerShape(4.dp))
-                                        .padding(horizontal = 8.dp, vertical = 7.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        file.fileName,
-                                        color = MegaDrivePrimary,
-                                        fontSize = 10.sp,
-                                        fontFamily = MonoFontFamily,
-                                        maxLines = 1,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Text(
-                                        "OPEN",
-                                        color = MegaDriveAccent,
-                                        fontSize = 10.sp,
-                                        fontFamily = MonoFontFamily,
-                                        modifier = Modifier
-                                            .clickable {
-                                                openDownloadedFile(context, file.fileName, file.uri)
-                                            }
-                                            .padding(6.dp)
-                                    )
-                                }
-                            }
-                        }
-                        RetroButton(
-                            text = "CLOSE",
-                            onClick = { viewModel.reset(projectId); onDismiss() },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                    is DownloadState.Error -> {
-                        Text(
-                            "ERROR: ${downloadState.message}",
-                            color = MegaDriveAccent,
-                            fontSize = 11.sp,
-                            fontFamily = MonoFontFamily
-                        )
-                        RetroButton(
-                            text = "TRY AGAIN",
-                            onClick = {
-                                viewModel.loadRemoteFiles(serverId, projectId, downloadState.directory)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        if (downloadState.directory.isNotEmpty()) {
-                            RetroButton(
-                                text = "PROJECT ROOT",
-                                onClick = { viewModel.loadRemoteFiles(serverId, projectId, "") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
                     }
                 }
             }
         }
     }
 }
-
-internal fun clampDownloadPanelTop(
-    requestedTopPx: Float,
-    availableHeightPx: Float,
-    panelHeightPx: Int,
-    bottomMarginPx: Float
-): Float = requestedTopPx.coerceIn(
-    0f,
-    (availableHeightPx - panelHeightPx - bottomMarginPx).coerceAtLeast(0f)
-)
 
 private fun openDownloadedFile(context: Context, fileName: String, uri: Uri) {
     val reportedType = context.contentResolver.getType(uri)
@@ -571,10 +397,13 @@ internal fun RemoteFileList(
     onOpenDirectory: (RemoteFileEntry) -> Unit,
     onToggleFile: (RemoteFileEntry) -> Unit,
     onPreviewFile: (RemoteFileEntry) -> Unit = {},
-    listState: LazyListState = rememberLazyListState()
+    listState: LazyListState = rememberLazyListState(),
+    previewOnTap: Boolean = false
 ) {
     if (entries.isEmpty()) {
-        Text("This remote folder is empty.", color = MegaDriveDim, fontSize = 11.sp, fontFamily = MonoFontFamily)
+        androidx.compose.foundation.layout.Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Text("No files to show.", color = MegaDriveDim, fontSize = 14.sp)
+        }
         return
     }
 
@@ -589,25 +418,32 @@ internal fun RemoteFileList(
                     .fillMaxWidth()
                     .background(MegaDriveBg, RoundedCornerShape(4.dp))
                     .clickable {
-                        if (entry.isDirectory) onOpenDirectory(entry) else onToggleFile(entry)
+                        if (entry.isDirectory) onOpenDirectory(entry)
+                        else if (previewOnTap && isRemotePreviewSupported(entry.name)) onPreviewFile(entry)
+                        else onToggleFile(entry)
                     }
                     .padding(horizontal = 8.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                Icon(if (entry.isDirectory) BrowserFolderIcon else BrowserFileIcon,
+                    contentDescription = if (entry.isDirectory) "Folder" else null,
+                    tint = if (entry.isDirectory) MegaDrivePrimary else MegaDriveDim, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        if (entry.isDirectory) "[DIR]  ${entry.name}" else entry.name,
+                        entry.name,
                         color = MegaDrivePrimary,
-                        fontSize = 11.sp,
+                        fontSize = 14.sp,
                         fontFamily = MonoFontFamily,
-                        maxLines = 2
+                        maxLines = 2, overflow = TextOverflow.Ellipsis
                     )
+                    if (!entry.isDirectory) Text(formatBytes(entry.size), color = MegaDriveDim, fontSize = 11.sp)
                     if (entry.modifiedAtEpochSeconds > 0L) {
                         Text(
                             formatRemoteModifiedTime(entry.modifiedAtEpochSeconds),
                             color = MegaDriveDim,
-                            fontSize = 9.sp,
+                            fontSize = 11.sp,
                             fontFamily = MonoFontFamily,
                             maxLines = 1
                         )
@@ -616,9 +452,9 @@ internal fun RemoteFileList(
                 if (entry.isDirectory) {
                     Text(">", color = MegaDrivePrimary, fontSize = 11.sp, fontFamily = MonoFontFamily)
                 } else {
-                    if (isPreviewableTextFile(entry.name) || isPreviewableImageFile(entry.name)) {
+                    if (isRemotePreviewSupported(entry.name) && !previewOnTap) {
                         Text(
-                            "PREVIEW",
+                            if (previewOnTap) "VIEW" else "PREVIEW",
                             color = MegaDriveAccent,
                             fontSize = 9.sp,
                             fontFamily = MonoFontFamily,
@@ -629,14 +465,8 @@ internal fun RemoteFileList(
                     }
                     Checkbox(
                         checked = entry.name in selectedFileNames,
-                        onCheckedChange = { onToggleFile(entry) }
-                    )
-                    Text(
-                        formatBytes(entry.size),
-                        color = MegaDriveDim,
-                        fontSize = 10.sp,
-                        fontFamily = MonoFontFamily,
-                        modifier = Modifier.padding(start = 8.dp)
+                        onCheckedChange = { onToggleFile(entry) },
+                        modifier = Modifier.semantics { contentDescription = "Select ${entry.name}" }
                     )
                 }
             }
