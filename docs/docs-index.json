@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "product": "TerminalHub: SSH Project Tabs",
-  "snapshot_date": "2026-10-01",
+  "snapshot_date": "2026-10-27",
   "canonical_url": "https://joynes.github.io/terminalhub/",
   "repository": "https://github.com/joynes/terminalhub",
   "package": "se.joynes.terminalhub",
@@ -30,10 +30,15 @@
     {"id": "guide-starting-git-projects", "url": "https://joynes.github.io/terminalhub/guides/starting-git-projects.html", "format": "html", "purpose": "End-to-end phone-created remote Git project workflow"},
     {"id": "implementation-handoff", "url": "https://joynes.github.io/terminalhub/AI_IMPLEMENTATION_HANDOFF.md", "format": "markdown", "purpose": "Ordered implementation plan and acceptance criteria for launch-readiness work"},
     {"id": "background-ssh-plan", "url": "https://joynes.github.io/terminalhub/POLICY_COMPLIANT_BACKGROUND_SSH_PLAN.md", "format": "markdown", "purpose": "Policy-compliant background SSH design and Play submission plan"},
-    {"id": "privacy", "url": "https://joynes.github.io/terminalhub/privacy-policy.html", "format": "html", "purpose": "User-facing privacy policy"}
+    {"id": "privacy", "url": "https://joynes.github.io/terminalhub/privacy-policy.html", "format": "html", "purpose": "User-facing privacy policy"},
+    {"id": "project-terminals", "url": "https://joynes.github.io/terminalhub/PROJECT_TERMINALS.md", "format": "markdown", "purpose": "Terminal windows, layout recovery, program hints and tab appearance"},
+    {"id": "pinned-keyboard-macros", "url": "https://joynes.github.io/terminalhub/PINNED_KEYBOARD_MACROS.md", "format": "markdown", "purpose": "Macro editing, execution and multi-project sending"},
+    {"id": "git-review", "url": "https://joynes.github.io/terminalhub/GIT_REVIEW.md", "format": "markdown", "purpose": "Read-only remote Git comparisons and limits"},
+    {"id": "remote-file-browser-development", "url": "https://joynes.github.io/terminalhub/REMOTE_FILE_BROWSER.md", "format": "markdown", "purpose": "Uncommitted expanded remote browser behavior and preview limits"}
   ],
   "topics": [
     {"id": "overview", "url": "https://joynes.github.io/terminalhub/#overview", "keywords": ["product", "overview", "android", "ssh"]},
+    {"id": "recent-features", "url": "https://joynes.github.io/terminalhub/#recent-features", "keywords": ["terminal windows", "layout recovery", "program hints", "tab appearance", "keyboard macros", "send to multiple projects", "git diff", "PDF development"]},
     {"id": "feature-inventory", "url": "https://joynes.github.io/terminalhub/#feature-inventory", "keywords": ["all features", "capabilities", "feature list", "status", "git history"]},
     {"id": "mental-model", "url": "https://joynes.github.io/terminalhub/#mental-model", "keywords": ["server", "project", "tab", "tmux", "architecture"]},
     {"id": "requirements", "url": "https://joynes.github.io/terminalhub/#requirements", "keywords": ["android", "linux", "macos", "ssh", "tmux", "tailscale"]},
@@ -70,6 +75,14 @@
     "terminal_selection_actions": "terminal-view/src/main/java/com/termux/view/textselection/TextSelectionCursorController.java",
     "security": "app/src/main/java/se/joynes/terminalhub/data/security/",
     "database": "app/src/main/java/se/joynes/terminalhub/data/db/",
-    "settings": "app/src/main/java/se/joynes/terminalhub/data/settings/AppSettingsRepository.kt"
-  }
+    "settings": "app/src/main/java/se/joynes/terminalhub/data/settings/AppSettingsRepository.kt",
+    "project_terminals": "docs/PROJECT_TERMINALS.md",
+    "pinned_keyboard_macros": "docs/PINNED_KEYBOARD_MACROS.md",
+    "git_review": "app/src/main/java/se/joynes/terminalhub/ui/screen/git/"
+  },
+  "feature_source_commit": "4018674",
+  "release_availability": "Not verified against current Google Play production",
+  "development_features": [
+    "Expanded full-screen remote file browser with image/PDF previews (uncommitted working tree)"
+  ]
 }

@@ -20,6 +20,10 @@ The files in this directory are published at
   claims synchronized.
 - `guides/` contains task-focused, search-friendly workflows with HowTo metadata
   and stable routes for people and AI agents.
+- `PROJECT_TERMINALS.md` covers tmux windows, saved layouts, program hints and tab appearance.
+- `PINNED_KEYBOARD_MACROS.md` covers ordered input sequences and explicit multi-project sending.
+- `GIT_REVIEW.md` covers remote read-only comparisons and viewer limits.
+- `REMOTE_FILE_BROWSER.md` currently describes uncommitted development work, not a verified release.
 - `assets/screenshots/` contains real Android emulator captures used in Google
   Play. Do not replace them with mockups without labeling them.
 

@@ -35,6 +35,7 @@
       </div>
       <nav class="section-nav">
         <a href="#overview">Overview</a>
+        <a href="#recent-features">Latest features</a>
         <a href="#feature-inventory">Complete feature inventory</a>
         <a href="#mental-model">Mental model</a>
         <a href="#requirements">Requirements</a>
@@ -89,6 +90,23 @@
         </figure>
       </section>
 
+      <section class="doc-section" id="recent-features" data-search-title="Latest features terminals recovery macros Git diff tab appearance PDF">
+        <p class="eyebrow">SOURCE REVIEW · 27 OCTOBER 2026</p>
+        <h2>Latest features</h2>
+        <p>These features are verified against the repository through commit <code>4018674</code>. Availability in Google Play depends on the installed version; this documentation update does not announce a new app release.</p>
+        <div class="card-grid">
+          <article class="card"><h4>Several terminals per project</h4><p>Keep a coding tool, shell and logs in separate tmux windows inside the same project. Hold the project tab and choose <em>New terminal</em>, or use the session menu. When two or more terminals exist, a TERMINALS row lets you switch between them. Hold a terminal to rename or close it; closing stops its programs after confirmation. The last terminal is protected.</p></article>
+          <article class="card"><h4>Restore terminal structure</h4><p>Window names, order and the selected terminal are saved on this device. Reconnect reuses a surviving tmux session. If it has disappeared, TerminalHub recreates the saved windows as shells in the project folder and skips automatic startup commands. Running processes, conversations, scrollback, pane splits and previous shell directories cannot be recovered this way.</p></article>
+          <article class="card"><h4>Program recovery hints</h4><p>Open <em>Terminal information</em> from the session menu or hold a terminal. While the foreground project is active, the app samples tmux every three seconds and remembers the last observed non-shell program and its directory for single-pane windows. Names such as <code>node</code> may identify a wrapper. Arguments and full launch commands are not captured, and programs are not restarted automatically.</p></article>
+          <article class="card"><h4>Independent tab appearance</h4><p>Open Settings → Terminal &amp; input → Project &amp; terminal tabs. Set width, minimum height and label size independently for project tabs and terminal tabs, or reset either group. Preferences survive restarts and are included in settings YAML and full backups. Large system fonts can increase the displayed height.</p></article>
+          <article class="card"><h4>Editable keyboard macros</h4><p>Open ★ Pinned → New → <em>Keyboard macro</em>. Combine Key, Text and Pause steps, reorder or duplicate them, and choose global or project scope. A Ctrl+C → text → Enter template is included. Execution stays bound to its original terminal; STOP cancels remaining steps. Completion means input was sent, not that the remote command finished.</p></article>
+          <article class="card"><h4>Send to multiple projects</h4><p>Hold a pinned action and choose <em>Send to multiple projects</em>. Review the selected open projects and confirm. Each project's current terminal receives the action concurrently without switching tabs. Disconnected projects must be reconnected or excluded. STOP cancels remaining steps; failures are listed and never retried automatically. Some input may already have arrived.</p></article>
+          <article class="card"><h4>Read remote Git changes</h4><p>Choose <em>Git changes</em> in an SSH project's session menu, or add GIT DIFF to the key bar. Compare all, unstaged or staged changes, or the latest commit. The read-only viewer offers full-screen/windowed display, syntax colors, line numbers, wrapping and adjustable code size. Refresh fetches new changes; Git must be installed on your server.</p></article>
+        </div>
+        <p>Detailed references: <a href="PROJECT_TERMINALS.md">project terminals, recovery and appearance</a> · <a href="PINNED_KEYBOARD_MACROS.md">keyboard macros and sending to multiple projects</a> · <a href="GIT_REVIEW.md">Git review and limits</a>.</p>
+        <div class="callout warning"><strong>In development: expanded remote file browser</strong><p>The current uncommitted working tree adds a full-screen browser with clickable folder ancestors, filename filtering, folders-first sorting by name/date/type/size, and separate preview and download selection. Text/Markdown previews are joined by native image and PDF previews. This work is not part of the source commit reviewed above, and its release availability has not been verified. See <a href="REMOTE_FILE_BROWSER.md">development behavior and preview limits</a>.</p></div>
+      </section>
+
       <section class="doc-section" id="feature-inventory" data-search-title="Complete feature inventory">
         <p class="eyebrow">CURRENT USER-VISIBLE CAPABILITIES</p>
         <h2>Complete feature inventory</h2>
@@ -100,6 +118,7 @@
               <li>Open projects from one or many servers in a shared tab bar.</li>
               <li>Persist open tabs, their order, active project and per-project tab colors.</li>
               <li>Wrap tabs across rows when the workspace grows.</li>
+              <li>Multiple tmux terminal windows per project, saved window layouts, program recovery hints and independent project/terminal tab appearance. See <a href="#recent-features">latest features</a>.</li>
               <li>Tap to switch; swipe the key bar for previous/next connected tab.</li>
               <li>Long-press a tab, choose <em>Reorder tabs</em>, and freely drag tabs into a preview. Tap <em>Done</em> to save or <em>Cancel</em> to restore the original order.</li>
               <li>Restart a stuck tmux session from the tab's long-press menu while keeping the project tab and profile.</li>
@@ -139,8 +158,10 @@
               <li>Adapted Termux terminal emulator/view with ANSI/VT behavior and scrollback.</li>
               <li>Software and hardware keyboards, clipboard paste and touch focus.</li>
               <li>Configurable multi-row special-key bar with modifier and navigation keys.</li>
-              <li>Multiline input panel, adjustable opacity and per-project history.</li>
-              <li>Optional Send-and-Enter mode, plus voice-dictation-safe text handling.</li>
+              <li>Multiline input panel, adjustable opacity and optional per-project input history (off by default).</li>
+              <li>Optional Send-and-Enter mode and microphone dictation through Android speech recognition, into the terminal or open input editor.</li>
+              <li>Sticky shortcuts (Pinned actions): reusable text or ordered keyboard macros, global or project-scoped, with an explicit send-to-multiple-projects action.</li>
+              <li>Project notes beside the terminal, with local saving and SFTP sync to your own server for SSH projects, pending offline edits and conflict handling.</li>
               <li>Text selection, Copy, Paste, Search and Open actions.</li>
               <li>Search with highlighted matches and previous/next navigation.</li>
               <li>Touch scroll, alternate-screen/tmux scrolling, Page Up/Down and jump to bottom.</li>
@@ -368,7 +389,8 @@ tmux -V</code></pre></details>
             <li>Server and project profiles.</li>
             <li>Which project tabs are open.</li>
             <li>Tab order and active project.</li>
-            <li>Per-project text-input history. A draft stays associated with its tab while the current app UI remains alive, but is not promised across an Android process restart.</li>
+            <li>Optional per-project text-input history (off by default). A draft stays associated with its tab while the current app UI remains alive, but is not promised across an Android process restart.</li>
+            <li>Per-project terminal window names, order, selection and program recovery hints on this device. Window layouts are cleared by full configuration import and are not in settings-only exports; recovery restores shells, not lost process state.</li>
           </ul>
           <h3>What tmux persists</h3>
           <ul class="check-list">
@@ -387,7 +409,10 @@ tmux -V</code></pre></details>
         <div class="card-grid">
           <article class="card"><h4>Configurable key bar</h4><p>Add, remove and arrange rows containing Esc, Tab, Enter, Backspace, Ctrl, Alt, Shift, arrows, Home, End, Page Up/Down, paste and input actions.</p></article>
           <article class="card"><h4>Modifier handling</h4><p>Ctrl, Alt and Shift can modify the next printable or navigation key. Common terminal escape sequences are sent directly.</p></article>
-          <article class="card"><h4>Multiline input</h4><p>Compose commands or pasted text in a larger panel, adjust panel opacity, recall recent per-project entries and choose whether Send also executes with Enter.</p></article>
+          <article class="card"><h4>Multiline input</h4><p>Compose commands or pasted text in a larger panel, adjust panel opacity and choose whether Send also executes with Enter. Input history is optional and disabled by default; enabling it saves potentially sensitive input locally.</p></article>
+          <article class="card"><h4>Sticky shortcuts and macros</h4><p>Save recurring text or keyboard macros in Pinned actions, globally or for one project. Text can be prepared for editing or sent with Enter; macros run ordered Key, Text and Pause steps directly. Hold an action to edit, delete or explicitly send to selected open projects. <a href="PINNED_KEYBOARD_MACROS.md">Read the controls and cancellation limits</a>.</p></article>
+          <article class="card"><h4>Microphone dictation</h4><p>Use the microphone key to dictate text through Android's speech-recognition service. With Text Input open, recognized text goes into the editor; otherwise it is pasted into the original terminal session without automatically pressing Enter. A compatible recognition service is required; offline availability and data processing depend on that service.</p></article>
+          <article class="card"><h4>Project notes</h4><p>Keep reminders beside each project's terminal. Notes are saved locally; SSH project notes sync to your own server over SFTP. Offline edits wait for sync and conflicts are shown for resolution. Sync requires compatible SFTP support, including OpenSSH atomic rename for updates. Local-only notes need an exported backup before uninstalling.</p></article>
           <article class="card"><h4>Search and scroll</h4><p>Search terminal buffer text, move among matches and jump back to the bottom after reviewing earlier output.</p></article>
           <article class="card"><h4>Tab gestures</h4><p>Tap tabs directly, or long-press one and choose <em>Reorder tabs</em> to enter a preview mode. Drag tabs freely, including across wrapped rows. Tap <em>Done</em> to save the complete arrangement or <em>Cancel</em> to discard it. Swipe horizontally on the key bar to move to the previous or next connected tab.</p></article>
           <article class="card"><h4>Clipboard and keyboard</h4><p>Select and copy terminal text, paste clipboard content, show or hide the Android keyboard, and use hardware-key mappings including function keys.</p></article>
@@ -435,6 +460,8 @@ tmux -V</code></pre></details>
             <tr><td>Battery optimization</td><td>Open Android battery settings, choose Unrestricted or Don't optimize, then return to see whether the Doze exemption was detected. Recommended with background SSH; some manufacturers add controls Android cannot report.</td><td>Controlled by Android</td></tr>
             <tr><td>Keepalive profile</td><td>Aggressive, Balanced, Battery Saver or Ultra Battery Saver.</td><td>Balanced</td></tr>
             <tr><td>Keepalive scope</td><td>Active tab only or all current sessions.</td><td>Active tab only</td></tr>
+            <tr><td>Input history</td><td>Opt in to local per-project input history; saved input may contain sensitive text.</td><td>Disabled</td></tr>
+            <tr><td>Project &amp; terminal tabs</td><td>Separate width, minimum height and label size controls, with independent resets.</td><td>Project: 70/28/9 dp/dp/sp; terminal: 100/28/12</td></tr>
             <tr><td>Terminal key bar</td><td>Edit rows and actions, then persist the layout.</td><td>Two-row touch layout</td></tr>
             <tr><td>Biometric gate</td><td>Startup authentication when Android biometric authentication is available; bypassed on unsupported devices.</td><td>Availability controlled</td></tr>
             <tr><td>Export/import</td><td>Move server, open server-linked project, and key-bar configuration through YAML. Passwords and private keys are excluded.</td><td>Manual action</td></tr>
@@ -602,7 +629,7 @@ cd terminalhub
             <tr><th>AI dependency</th><td>None; terminal AI tools are optional server-side use cases</td></tr>
           </tbody>
         </table></div>
-        <p class="updated">Documentation snapshot: 2026-10-01 · <a href="https://github.com/joynes/terminalhub/edit/main/docs/index.html">Edit this page on GitHub</a></p>
+        <p class="updated">Documentation snapshot: 2026-10-27 · <a href="https://github.com/joynes/terminalhub/edit/main/docs/index.html">Edit this page on GitHub</a></p>
       </section>
     </main>
   </div>

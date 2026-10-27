@@ -13,6 +13,7 @@ License: GPL-3.0-only
 - [Overview and complete human documentation](https://joynes.github.io/terminalhub/): Product model, setup, workflows, settings, security boundaries, troubleshooting, architecture, and build instructions.
 - [Manage multiple tmux projects from Android](https://joynes.github.io/terminalhub/guides/multiple-tmux-projects.html): End-to-end multi-server tab setup, persistence model, reconnect behavior, and troubleshooting.
 - [Start remote Git projects from Android](https://joynes.github.io/terminalhub/guides/starting-git-projects.html): Server-side Git authentication, project creation, clone behavior, startup commands, and troubleshooting.
+- [Latest features](https://joynes.github.io/terminalhub/#recent-features): Multiple terminals per project, layout recovery, program hints, tab appearance, keyboard macros, multi-project sending and Git review; development status for the expanded file browser.
 - [Complete feature inventory](https://joynes.github.io/terminalhub/#feature-inventory): Current user-visible capabilities plus internal/dormant routes.
 - [Full plain-text context](https://joynes.github.io/terminalhub/llms-full.txt): Consolidated facts and operating instructions without visual layout.
 - [Machine-readable documentation index](https://joynes.github.io/terminalhub/docs-index.json): Topic routing, stable anchors, keywords, and source paths.
@@ -23,6 +24,12 @@ License: GPL-3.0-only
 - [Agent instructions](https://github.com/joynes/terminalhub/blob/main/AGENTS.md): Rules that apply before changing this repository.
 - [Termux integration](https://github.com/joynes/terminalhub/blob/main/TERMUX_INTEGRATION.md): Origin and adaptation of terminal components.
 - [Third-party notices](https://github.com/joynes/terminalhub/blob/main/THIRD_PARTY_NOTICES.md): Attribution and licensing.
+
+## Documentation snapshot
+
+2026-10-27; latest feature review through source commit 4018674. Google Play
+availability has not been verified. Expanded image/PDF file browsing is documented
+as uncommitted development work, not a released capability.
 
 ## Canonical product facts
 
@@ -38,6 +45,10 @@ License: GPL-3.0-only
 - Multi-file upload from Android into the active remote project is supported, including Android Share-to-TerminalHub.
 - Remote file browsing supports subfolders and sorting by name, size or date. Select one or several files in the current folder for download; completed downloads can be opened in compatible Android apps. Supported remote text and Markdown files can be previewed in the app up to 512 KB.
 - HTTP(S) and www links in terminal output can be tapped to open in Android's browser or a compatible app. Selected URL text also provides an Open action.
+- SSH/tmux projects support multiple terminal windows. Saved window layouts can recreate shells after tmux loss, but cannot restore lost programs or process memory.
+- Pinned actions support ordered keyboard macros and explicit concurrent sending to selected open projects, with cancellation and no automatic retry.
+- The SSH Git changes viewer is read-only and requires Git on the server.
+- Input history is optional and disabled by default.
 - AI tools are optional server-side terminal programs. No model is included.
 - A local target exists but uses a plain device shell without tmux; remote projects are the primary product workflow.
 - Terminal rendering/input uses adapted open-source Termux components. TerminalHub is independent and is not endorsed by Termux.
