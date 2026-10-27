@@ -10,6 +10,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
@@ -22,6 +24,7 @@ import se.joynes.terminalhub.ui.theme.*
 internal data class QuickSwitchTarget(val id: String, val name: String, val detail: String)
 
 @Composable
+@OptIn(ExperimentalComposeUiApi::class)
 internal fun QuickSwitchDialog(title: String, targets: List<QuickSwitchTarget>, onChoose: (String) -> Unit,
     onDismiss: () -> Unit, onCreateProject: (() -> Unit)? = null) {
     var query by remember { mutableStateOf("") }
@@ -50,7 +53,14 @@ internal fun QuickSwitchDialog(title: String, targets: List<QuickSwitchTarget>, 
         }
         Column {
             OutlinedTextField(query, { query = it; selected = 0 }, label = { Text("Type part of a name") },
-                singleLine = true, modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("quick-switch-query"))
+                singleLine = true, modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("quick-switch-query")
+                    .onPreInterceptKeyBeforeSoftKeyboard { key ->
+                        val event = key.nativeKeyEvent
+                        if (event.keyCode == KeyEvent.KEYCODE_ESCAPE && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed) {
+                            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) onDismiss()
+                            true
+                        } else false
+                    })
             Text("↑ ↓ to choose · Enter to open · Escape to cancel", style = MaterialTheme.typography.bodySmall, color = MegaDriveDim)
             if (results.isEmpty()) Text("No matches", modifier = Modifier.padding(16.dp))
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp).testTag("quick-switch-results"), state = list) {

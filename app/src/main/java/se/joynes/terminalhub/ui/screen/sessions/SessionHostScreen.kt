@@ -454,7 +454,7 @@ fun SessionHostScreen(
                 if (index == null) shortcutMessage("No open projects. Use Find / open project.")
                 else { viewModel.openProject(tabs[index].projectId); terminalViewRef.value?.requestFocus() }
             }
-            ShortcutAction.FIND_PROJECT -> { quickFind = action; quickFindProjectId = null }
+            ShortcutAction.FIND_PROJECT -> { quickFind = ShortcutAction.FIND_PROJECT; quickFindProjectId = tab?.projectId }
             ShortcutAction.NEW_PROJECT -> onAddProject(serverId)
             ShortcutAction.CLOSE_PROJECT -> {
                 if (tab == null) shortcutMessage("No project is open.")
@@ -465,7 +465,6 @@ fun SessionHostScreen(
                 if (!readyForWindowAction(tab?.projectId)) return
                 val windows = tmuxWindowsViewModel.state.value.snapshot!!.windows
                 when (action) {
-                    ShortcutAction.FIND_WINDOW -> { quickFindProjectId = tab?.projectId; quickFind = action }
                     ShortcutAction.NEW_WINDOW -> { focusShortcutTerminal(); tmuxWindowsViewModel.create("") }
                     ShortcutAction.CLOSE_WINDOW -> if (windows.size <= 1) shortcutMessage("Keep one terminal in the project. Use Restart session to restart it.")
                         else closeTerminalProjectId = tab?.projectId
@@ -481,21 +480,21 @@ fun SessionHostScreen(
     }
     HardwareShortcutHandler(tabAppearance.keyboardShortcuts, ::performShortcut)
     quickFind?.let { mode ->
-        val targets = if (mode == ShortcutAction.FIND_PROJECT) shortcutProjects.map { project ->
+        val targets = shortcutProjects.map { project ->
             val server = shortcutServers.firstOrNull { it.id == project.serverId }
-            QuickSwitchTarget(project.id.toString(), project.name,
-                (if (project.isLocal) "Local" else server?.name ?: "SSH") +
+            QuickSwitchTarget("project:${project.id}", project.name,
+                "Project · " + (if (project.isLocal) "Local" else server?.name ?: "SSH") +
                     if (projectTabs.any { it.projectId == project.id }) " · Open" else " · Closed")
-        } else tmuxWindows.snapshot?.windows.orEmpty().takeIf { tmuxWindows.projectId == quickFindProjectId }.orEmpty().map {
-            QuickSwitchTarget(it.id, it.name.ifBlank { "Terminal ${it.index + 1}" },
-                "Terminal ${it.index + 1}" + if (it.active) " · Current" else "")
+        } + tmuxWindows.snapshot?.windows.orEmpty().takeIf { tmuxWindows.projectId == quickFindProjectId }.orEmpty().map {
+            QuickSwitchTarget("window:${it.id}", it.name.ifBlank { "Terminal ${it.index + 1}" },
+                "Window · ${activeTab?.projectName.orEmpty()} · Terminal ${it.index + 1}" + if (it.active) " · Current" else "")
         }
-        QuickSwitchDialog(if (mode == ShortcutAction.FIND_PROJECT) "Find project" else "Find terminal window", targets,
+        QuickSwitchDialog("Find", targets,
             onChoose = { id ->
                 val project = quickFindProjectId
                 quickFind = null
-                if (mode == ShortcutAction.FIND_PROJECT) { viewModel.openProject(id.toLong()); terminalViewRef.value?.requestFocus() }
-                else chooseShortcutWindow(id, project)
+                if (id.startsWith("project:")) { viewModel.openProject(id.removePrefix("project:").toLong()); terminalViewRef.value?.requestFocus() }
+                else chooseShortcutWindow(id.removePrefix("window:"), project)
             }, onDismiss = { quickFind = null },
             onCreateProject = if (mode == ShortcutAction.FIND_PROJECT) ({ quickFind = null; onAddProject(serverId) }) else null)
     }
@@ -962,9 +961,7 @@ fun SessionHostScreen(
                         expanded = showSettingsMenu,
                         onDismissRequest = { showSettingsMenu = false }
                     ) {
-                        DropdownMenuItem(text = { Text("Find project…") }, onClick = { performShortcut(ShortcutAction.FIND_PROJECT) })
-                        if (activeTab?.usesTmux == true) DropdownMenuItem(text = { Text("Find terminal window…") },
-                            onClick = { performShortcut(ShortcutAction.FIND_WINDOW) })
+                        DropdownMenuItem(text = { Text("Find…") }, onClick = { performShortcut(ShortcutAction.FIND_PROJECT) })
                         if (activeTab?.usesTmux == true) DropdownMenuItem(
                             text = { Text("New terminal") },
                             enabled = activeTab.isConnected,

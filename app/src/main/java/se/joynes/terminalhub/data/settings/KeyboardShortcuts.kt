@@ -5,7 +5,7 @@ import android.view.KeyEvent
 enum class ShortcutAction(val label: String) {
     NEXT_PROJECT("Next project"), PREVIOUS_PROJECT("Previous project"),
     NEXT_WINDOW("Next terminal window"), PREVIOUS_WINDOW("Previous terminal window"),
-    FIND_PROJECT("Find / open project"), FIND_WINDOW("Find terminal window"),
+    FIND_PROJECT("Find project or terminal window"),
     NEW_PROJECT("Create project"), CLOSE_PROJECT("Close project"),
     NEW_WINDOW("Create terminal window"), CLOSE_WINDOW("Close terminal window")
 }
@@ -59,11 +59,15 @@ object KeyboardShortcuts {
         return ShortcutChord(key, modifiers).also(::validate)
     }
     fun parse(rows: List<String>): Map<ShortcutAction, ShortcutChord> {
-        require(rows.size <= ShortcutAction.entries.size) { "Too many keyboard shortcuts." }
+        require(rows.size <= ShortcutAction.entries.size + 1) { "Too many keyboard shortcuts." }
         val result = linkedMapOf<ShortcutAction, ShortcutChord>()
+        val hasProjectFind = rows.any { it.startsWith("FIND_PROJECT=") }
         rows.forEach { row ->
             val parts = row.split('='); require(parts.size == 2) { "Use ACTION=CTRL+ALT+KEY." }
-            val action = requireNotNull(ShortcutAction.entries.firstOrNull { it.name == parts[0] }) { "Unknown shortcut action: ${parts[0]}" }
+            // Older exports had two find actions. Prefer the project binding when both exist.
+            if (parts[0] == "FIND_WINDOW" && hasProjectFind) { parseChord(parts[1]); return@forEach }
+            val name = if (parts[0] == "FIND_WINDOW") "FIND_PROJECT" else parts[0]
+            val action = requireNotNull(ShortcutAction.entries.firstOrNull { it.name == name }) { "Unknown shortcut action: ${parts[0]}" }
             require(action !in result) { "Duplicate shortcut action: ${action.label}" }
             val chord = parseChord(parts[1])
             require(chord !in result.values) { "The same shortcut cannot control two actions." }
@@ -79,9 +83,10 @@ object KeyboardShortcuts {
         if (chord != null) bindings[action] = chord
         return ShortcutAction.entries.mapNotNull { key -> bindings[key]?.let { "${key.name}=${it.encode()}" } }
     }
+    fun normalize(rows: List<String>): List<String> = parse(rows).map { (action, chord) -> "${action.name}=${chord.encode()}" }
     val suggestions = listOf("NEXT_PROJECT=CTRL+ALT+RIGHT", "PREVIOUS_PROJECT=CTRL+ALT+LEFT",
         "NEXT_WINDOW=CTRL+ALT+DOWN", "PREVIOUS_WINDOW=CTRL+ALT+UP", "FIND_PROJECT=CTRL+ALT+P",
-        "FIND_WINDOW=CTRL+ALT+O", "NEW_PROJECT=CTRL+ALT+N", "CLOSE_PROJECT=CTRL+ALT+Q",
+        "NEW_PROJECT=CTRL+ALT+N", "CLOSE_PROJECT=CTRL+ALT+Q",
         "NEW_WINDOW=CTRL+ALT+T", "CLOSE_WINDOW=CTRL+ALT+W")
 }
 

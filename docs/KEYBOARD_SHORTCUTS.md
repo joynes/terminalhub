@@ -9,16 +9,17 @@ take over existing terminal commands. “Use suggested shortcuts” assigns all 
 | --- | --- |
 | Ctrl+Alt+Right / Left | Next / previous open project |
 | Ctrl+Alt+Down / Up | Next / previous terminal window |
-| Ctrl+Alt+P | Find / open project |
-| Ctrl+Alt+O | Find terminal window in current project |
+| Ctrl+Alt+P | Find projects and terminal windows together |
 | Ctrl+Alt+N / Q | Create / close project |
 | Ctrl+Alt+T / W | Create / close terminal window |
 
-Find project and Find terminal window are also available from the terminal menu.
+One Find action is also available from the terminal menu.
 Search accepts nonconsecutive letters, like `trm` for TerminalHub, and multiple
 words. Project search includes closed projects and server names. Use arrows and
 Enter, or tap a result. Escape cancels. Window search lists the current project's
-tmux windows, using their stable IDs even when names are identical.
+tmux windows in the same result list, using their stable IDs even when names are identical.
+Results identify projects and windows separately. Existing project-find bindings are
+preserved; a former window-find binding becomes Find if no project-find binding existed.
 
 Shortcuts work on the terminal screen, including when text input has focus.
 Configured combinations take priority over terminal input. Native dialogs keep
@@ -37,7 +38,6 @@ Example under `settings:`:
 ```yaml
 keyboardShortcuts:
   - FIND_PROJECT=CTRL+ALT+P
-  - FIND_WINDOW=CTRL+ALT+O
 ```
 
 An empty list disables all bindings. Omitted settings preserve existing bindings

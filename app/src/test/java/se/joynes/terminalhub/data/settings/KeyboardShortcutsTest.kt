@@ -4,6 +4,11 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class KeyboardShortcutsTest {
+    @Test fun oldFindBindingsMergeAndWindowOnlyBindingIsPreserved() {
+        assertEquals(listOf("FIND_PROJECT=CTRL+P"), KeyboardShortcuts.normalize(listOf("FIND_WINDOW=CTRL+O", "FIND_PROJECT=CTRL+P")))
+        assertEquals(listOf("FIND_PROJECT=CTRL+O"), KeyboardShortcuts.normalize(listOf("FIND_WINDOW=CTRL+O")))
+        assertEquals(1, KeyboardShortcuts.suggestions.count { it.startsWith("FIND_") })
+    }
     @Test fun defaultsDoNotStealTerminalKeysAndSuggestionsCoverEveryAction() {
         assertTrue(AppSettings().keyboardShortcuts.isEmpty())
         val bindings = KeyboardShortcuts.parse(KeyboardShortcuts.suggestions)
@@ -21,7 +26,7 @@ class KeyboardShortcutsTest {
     @Test fun assignmentsCanBeChangedAndRemovedButNotDuplicated() {
         val chord = KeyboardShortcuts.parseChord("CTRL+P")
         val rows = KeyboardShortcuts.assign(emptyList(), ShortcutAction.FIND_PROJECT, chord)
-        assertTrue(runCatching { KeyboardShortcuts.assign(rows, ShortcutAction.FIND_WINDOW, chord) }.isFailure)
+        assertTrue(runCatching { KeyboardShortcuts.assign(rows, ShortcutAction.NEW_WINDOW, chord) }.isFailure)
         assertTrue(runCatching { KeyboardShortcuts.parse(rows + rows) }.isFailure)
         assertTrue(KeyboardShortcuts.assign(rows, ShortcutAction.FIND_PROJECT, null).isEmpty())
         assertEquals(rows, KeyboardShortcuts.assign(rows, ShortcutAction.FIND_PROJECT, chord))

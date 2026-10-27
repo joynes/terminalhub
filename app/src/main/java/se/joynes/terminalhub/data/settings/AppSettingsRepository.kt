@@ -72,7 +72,7 @@ class AppSettingsRepository @Inject constructor(
         AppSettings(
             keyboardShortcuts = runCatching {
                 prefs.getString("keyboard_shortcuts", "").orEmpty().split('\n').filter(String::isNotBlank)
-                    .also { KeyboardShortcuts.parse(it) }
+                    .let(KeyboardShortcuts::normalize)
             }.getOrDefault(emptyList()),
             projectTabWidth = prefs.getInt("projectTabWidth", 70).coerceIn(48, 200),
             projectTabHeight = prefs.getInt("projectTabHeight", 28).coerceIn(24, 64),

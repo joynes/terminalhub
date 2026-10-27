@@ -138,7 +138,7 @@ object SettingsYaml {
             keyboardShortcuts = if ("keyboardShortcuts" !in values) current.keyboardShortcuts else {
                 val rows = values["keyboardShortcuts"]
                 require(rows is List<*> && rows.all { it is String }) { "keyboardShortcuts must be a list of ACTION=MODIFIER+KEY strings." }
-                rows.map { it as String }.also { KeyboardShortcuts.parse(it) }
+                KeyboardShortcuts.normalize(rows.map { it as String })
             },
             projectTabWidth = integer(values, "projectTabWidth", current.projectTabWidth, 48, 200),
             projectTabHeight = integer(values, "projectTabHeight", current.projectTabHeight, 24, 64),

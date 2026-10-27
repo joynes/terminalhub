@@ -105,6 +105,20 @@ class KeyboardShortcutsUiTest {
         press(KeyEvent.KEYCODE_ENTER)
         compose.runOnIdle { assertNull(chosen) }
     }
+    @Test fun unifiedFindShowsProjectsAndWindowsTogetherAndSelectsDistinctTargets() {
+        var chosen: String? = null
+        content { QuickSwitchDialog("Find", listOf(
+            QuickSwitchTarget("project:1", "Build", "Project · Production"),
+            QuickSwitchTarget("window:@1", "Build", "Window · TerminalHub")), { chosen = it }, {}) }
+        compose.onNodeWithTag("quick-switch-query").performTextInput("bld")
+        compose.onNodeWithText("Project · Production").assertIsDisplayed()
+        compose.onNodeWithText("Window · TerminalHub").assertIsDisplayed()
+        press(KeyEvent.KEYCODE_ENTER)
+        compose.runOnIdle { assertEquals("project:1", chosen) }
+        press(KeyEvent.KEYCODE_DPAD_DOWN)
+        press(KeyEvent.KEYCODE_ENTER)
+        compose.runOnIdle { assertEquals("window:@1", chosen) }
+    }
     @Test fun shortcutBindingsUpdateAndWindowCallbackRestoresWhenLeavingScreen() {
         var enabled by mutableStateOf(true)
         var rows by mutableStateOf(listOf("FIND_PROJECT=CTRL+P"))
@@ -112,9 +126,9 @@ class KeyboardShortcutsUiTest {
         val previous = compose.activity.window.callback
         content { if (enabled) HardwareShortcutHandler(rows) { calls += it } }
         press(KeyEvent.KEYCODE_P, KeyEvent.META_CTRL_ON)
-        compose.runOnIdle { rows = listOf("FIND_WINDOW=CTRL+P") }
+        compose.runOnIdle { rows = listOf("NEW_WINDOW=CTRL+P") }
         press(KeyEvent.KEYCODE_P, KeyEvent.META_CTRL_ON)
-        compose.runOnIdle { assertEquals(listOf(ShortcutAction.FIND_PROJECT, ShortcutAction.FIND_WINDOW), calls); enabled = false }
+        compose.runOnIdle { assertEquals(listOf(ShortcutAction.FIND_PROJECT, ShortcutAction.NEW_WINDOW), calls); enabled = false }
         compose.runOnIdle { assertSame(previous, compose.activity.window.callback) }
     }
 }
