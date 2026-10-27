@@ -23,6 +23,7 @@ internal fun normalizeKeyBarHighlightIntensity(value: Float): Float =
     value.coerceIn(MIN_KEY_BAR_HIGHLIGHT_INTENSITY, MAX_KEY_BAR_HIGHLIGHT_INTENSITY)
 
 data class AppSettings(
+    val keyboardShortcuts: List<String> = emptyList(),
     val projectTabWidth: Int = 70,
     val projectTabHeight: Int = 28,
     val projectTabTextSize: Int = 9,
@@ -69,6 +70,10 @@ class AppSettingsRepository @Inject constructor(
 
     private val _settings = MutableStateFlow(
         AppSettings(
+            keyboardShortcuts = runCatching {
+                prefs.getString("keyboard_shortcuts", "").orEmpty().split('\n').filter(String::isNotBlank)
+                    .also { KeyboardShortcuts.parse(it) }
+            }.getOrDefault(emptyList()),
             projectTabWidth = prefs.getInt("projectTabWidth", 70).coerceIn(48, 200),
             projectTabHeight = prefs.getInt("projectTabHeight", 28).coerceIn(24, 64),
             projectTabTextSize = prefs.getInt("projectTabTextSize", 9).coerceIn(8, 24),
@@ -109,6 +114,11 @@ class AppSettingsRepository @Inject constructor(
         )
     )
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    fun setKeyboardShortcuts(rows: List<String>) {
+        KeyboardShortcuts.parse(rows)
+        update(_settings.value.copy(keyboardShortcuts = rows.toList()))
+    }
 
     fun setInputHistoryEnabled(enabled: Boolean) {
         update(_settings.value.copy(inputHistoryEnabled = enabled))
@@ -203,9 +213,11 @@ class AppSettingsRepository @Inject constructor(
     }
 
     private fun update(next: AppSettings) {
+        KeyboardShortcuts.parse(next.keyboardShortcuts)
         _settings.value = next
         historyConsentPrefs.edit().putBoolean(KEY_INPUT_HISTORY_ENABLED, next.inputHistoryEnabled).apply()
         prefs.edit()
+            .putString("keyboard_shortcuts", next.keyboardShortcuts.joinToString("\n"))
             .putInt("projectTabWidth", next.projectTabWidth)
             .putInt("projectTabHeight", next.projectTabHeight)
             .putInt("projectTabTextSize", next.projectTabTextSize)

@@ -43,7 +43,9 @@ fun TmuxWindowBar(
     createRequested: Boolean = false,
     onCreateRequestHandled: () -> Unit = {},
     infoRequested: Boolean = false,
-    onInfoRequestHandled: () -> Unit = {}
+    onInfoRequestHandled: () -> Unit = {},
+    closeRequested: Boolean = false,
+    onCloseRequestHandled: () -> Unit = {}
 ) {
     var creating by remember(state.projectId) { mutableStateOf(false) }
     var selectedMenu by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
@@ -59,6 +61,9 @@ fun TmuxWindowBar(
     }
     LaunchedEffect(infoRequested) {
         if (infoRequested) { selectedMenu = windows.firstOrNull { it.active }; onInfoRequestHandled() }
+    }
+    LaunchedEffect(closeRequested) {
+        if (closeRequested) { closing = windows.firstOrNull { it.active }; onCloseRequestHandled() }
     }
     LaunchedEffect(state.projectId, activeIndex) { if (activeIndex >= 0) listState.animateScrollToItem(activeIndex) }
 

@@ -42,8 +42,10 @@ class HardwareKeyboardDispatchTest {
 
     private fun verifyWindowDispatch(deviceId: Int) {
         val output = ByteArrayOutputStream()
+        var shortcutCount = 0
         lateinit var terminal: TerminalView
         compose.setContent {
+            se.joynes.terminalhub.ui.components.HardwareShortcutHandler(listOf("FIND_PROJECT=CTRL+P")) { shortcutCount++ }
             AndroidView(modifier = Modifier.fillMaxSize(), factory = { context ->
                 lateinit var session: TerminalSession
                 session = TerminalSession.createRemoteSession(100, TerminalSessionClientImpl(context), object : TerminalInputListener {
@@ -69,6 +71,12 @@ class HardwareKeyboardDispatchTest {
         compose.waitForIdle()
         compose.runOnIdle { assertTrue(terminal.hasFocus()) }
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val shortcutTime = SystemClock.uptimeMillis()
+        instrumentation.sendKeySync(KeyEvent(shortcutTime, shortcutTime, KeyEvent.ACTION_DOWN,
+            KeyEvent.KEYCODE_P, 0, KeyEvent.META_CTRL_ON, deviceId, 0, 0, InputDevice.SOURCE_KEYBOARD))
+        instrumentation.sendKeySync(KeyEvent(shortcutTime, shortcutTime + 1, KeyEvent.ACTION_UP,
+            KeyEvent.KEYCODE_P, 0, 0, deviceId, 0, 0, InputDevice.SOURCE_KEYBOARD))
+        compose.runOnIdle { assertEquals(1, shortcutCount); assertEquals(0, output.size()) }
         for (code in listOf(KeyEvent.KEYCODE_A, KeyEvent.KEYCODE_B, KeyEvent.KEYCODE_B, KeyEvent.KEYCODE_A)) {
             val time = SystemClock.uptimeMillis()
             instrumentation.sendKeySync(KeyEvent(time, time, KeyEvent.ACTION_DOWN, code, 0, 0,

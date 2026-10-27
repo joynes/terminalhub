@@ -228,6 +228,8 @@ class SessionHostViewModel @Inject constructor(
     // Projects represented by currently open, connecting, or recovery tabs.
     private val _dbProjects = MutableStateFlow<List<Project>>(emptyList())
     private val _allDbProjects = MutableStateFlow<List<Project>>(emptyList())
+    val shortcutProjects = _allDbProjects.asStateFlow()
+    val shortcutServers = serverRepo.getAll()
     private val _projectOrder = MutableStateFlow(loadProjectOrder())
     private val connectingProjectIds = MutableStateFlow<Set<Long>>(emptySet())
     private val connectionErrors = MutableStateFlow<Map<Long, String>>(emptyMap())

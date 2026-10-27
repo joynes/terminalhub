@@ -20,6 +20,18 @@ class TmuxWindowBarTest {
     private val second = TmuxWindow("@2", 1, "Tests", false, 1)
     private fun state() = TmuxWindowsState(projectId = 1, connected = true, snapshot = TmuxWindowsSnapshot("\$1", listOf(first, second)))
 
+    @Test fun shortcutCloseRequestRequiresConfirmationAndDoesNotCloseAutomatically() {
+        var requested by mutableStateOf(false)
+        var closed: TmuxWindow? = null
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(state(), false, {}, {}, { _, _ -> }, { closed = it }, {},
+            closeRequested = requested, onCloseRequestHandled = { requested = false }) } }
+        compose.runOnIdle { requested = true }
+        compose.onNodeWithText("CLOSE TERMINAL").assertIsDisplayed()
+        compose.runOnIdle { assertNull(closed); assertFalse(requested) }
+        compose.onNodeWithText("CLOSE TERMINAL").performClick()
+        compose.runOnIdle { assertEquals(first, closed) }
+    }
+
     @Test fun longPressShowsProgramAndFolderWithoutOfferingToExecuteInteractiveInput() {
         val remembered = first.copy(key = "stable-key", currentProgram = "zsh", directory = "/work/project",
             lastProgram = TmuxProgram("codex", "/work/project/src"))

@@ -31,6 +31,7 @@ class SettingsViewModel @Inject constructor(
     private val settingsFiles: SettingsFileManager
 ) : ViewModel() {
     val settings = settingsRepository.settings
+    fun setKeyboardShortcuts(rows: List<String>) = settingsRepository.setKeyboardShortcuts(rows)
     val settingsPreview = MutableStateFlow<SettingsImportPreview?>(null)
     val settingsFileBusy = MutableStateFlow(false)
     val settingsFileMessage = MutableStateFlow<String?>(null)

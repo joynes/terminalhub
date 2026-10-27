@@ -16,6 +16,7 @@ object SettingsYaml {
     const val MAX_BYTES = 64 * 1024
     private data class Field(val key: String, val explanation: String, val read: (AppSettings) -> Any)
     private val fields = listOf(
+        Field("keyboardShortcuts", "list of ACTION=MODIFIER+KEY strings; default [] (disabled). External Bluetooth/USB shortcuts take priority over terminal input on the terminal screen. Use CTRL, ALT, SHIFT, META plus a key, or bare F1..F12. No duplicate actions/combinations. Actions: ${ShortcutAction.entries.joinToString { it.name }}. Keys: ${KeyboardShortcuts.keys.keys.joinToString()}. Example: [\"NEXT_PROJECT=CTRL+ALT+RIGHT\", \"FIND_PROJECT=CTRL+ALT+P\"]. CLOSE actions retain confirmation; windows refer to the current project's tmux windows. Some combinations are reserved by Android.") { it.keyboardShortcuts },
         Field("projectTabWidth", "integer 48..200 dp; default 70. Width of each project tab. Narrower fits more projects per row; long names are truncated.") { it.projectTabWidth },
         Field("projectTabHeight", "integer 24..64 dp; default 28. Minimum project tab height. Larger text or Android font scaling may increase the actual height to keep labels readable.") { it.projectTabHeight },
         Field("projectTabTextSize", "integer 8..24 sp; default 9. Project tab label size, also affected by Android font scaling. Does not change terminal content font size.") { it.projectTabTextSize },
@@ -134,6 +135,11 @@ object SettingsYaml {
         val remoteSort = if ("remoteDownloadSort" in values) values["remoteDownloadSort"] else current.remoteDownloadSort
         require(remoteSort is String && remoteSort in setOf("NAME", "DATE", "TYPE", "SIZE")) { "remoteDownloadSort must be NAME, DATE, TYPE or SIZE." }
         val next = current.copy(
+            keyboardShortcuts = if ("keyboardShortcuts" !in values) current.keyboardShortcuts else {
+                val rows = values["keyboardShortcuts"]
+                require(rows is List<*> && rows.all { it is String }) { "keyboardShortcuts must be a list of ACTION=MODIFIER+KEY strings." }
+                rows.map { it as String }.also { KeyboardShortcuts.parse(it) }
+            },
             projectTabWidth = integer(values, "projectTabWidth", current.projectTabWidth, 48, 200),
             projectTabHeight = integer(values, "projectTabHeight", current.projectTabHeight, 24, 64),
             projectTabTextSize = integer(values, "projectTabTextSize", current.projectTabTextSize, 8, 24),

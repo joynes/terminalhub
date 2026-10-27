@@ -328,6 +328,10 @@ fun SettingsScreen(
                             TabAppearanceEditor(settings, viewModel::setTabAppearance)
                         }
                         SettingsSeparator()
+                        SettingsSubgroup("Keyboard shortcuts", "Bluetooth / USB navigation and quick find") {
+                            KeyboardShortcutsEditor(settings.keyboardShortcuts, viewModel::setKeyboardShortcuts)
+                        }
+                        SettingsSeparator()
                         SettingsSubgroup("Key bar", "Rows, buttons, highlights and accent strength") {
                         SettingsSubheading(
                             title = "KEY BAR LAYOUT",

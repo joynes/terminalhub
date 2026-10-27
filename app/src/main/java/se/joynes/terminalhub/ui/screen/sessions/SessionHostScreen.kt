@@ -1,5 +1,11 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
+import se.joynes.terminalhub.data.settings.ShortcutAction
+import se.joynes.terminalhub.data.settings.cyclicShortcutIndex
+import se.joynes.terminalhub.ui.components.HardwareShortcutHandler
+import se.joynes.terminalhub.ui.components.QuickSwitchDialog
+import se.joynes.terminalhub.ui.components.QuickSwitchTarget
+
 import se.joynes.terminalhub.data.settings.applyTo
 
 import android.Manifest
@@ -144,6 +150,11 @@ fun SessionHostScreen(
     var showSessionHistory by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     var newTerminalProjectId by remember { mutableStateOf<Long?>(null) }
+    var closeTerminalProjectId by remember { mutableStateOf<Long?>(null) }
+    var quickFind by remember { mutableStateOf<ShortcutAction?>(null) }
+    var quickFindProjectId by remember { mutableStateOf<Long?>(null) }
+    val shortcutProjects by viewModel.shortcutProjects.collectAsState()
+    val shortcutServers by viewModel.shortcutServers.collectAsState(initial = emptyList())
     var terminalInfoProjectId by remember { mutableStateOf<Long?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTabClose by remember { mutableStateOf<PendingTabClose?>(null) }
@@ -399,6 +410,95 @@ fun SessionHostScreen(
 
     // Reference to the live TerminalView for direct IMM calls
     val terminalViewRef = remember { mutableStateOf<TerminalView?>(null) }
+
+    fun shortcutMessage(message: String) { Toast.makeText(context, message, Toast.LENGTH_SHORT).show() }
+    fun readyForWindowAction(expectedProject: Long?): Boolean {
+        val state = tmuxWindowsViewModel.state.value
+        val currentId = viewModel.activeId.value
+        val tab = viewModel.projectTabs.value.firstOrNull { it.sessionId == currentId }
+        val macro = viewModel.pinnedMacro.state.value
+        return when {
+            tab?.usesTmux != true || tab.projectId != expectedProject -> { shortcutMessage("Open a project that uses tmux first."); false }
+            currentId in viewModel.pendingInputSessions.value || (macro?.running == true && macro.affectsProject(expectedProject)) -> {
+                shortcutMessage("Wait for the current input or macro to finish."); false
+            }
+            state.projectId != expectedProject || !state.connected || state.snapshot == null || state.busy || state.loading -> {
+                shortcutMessage("Terminals are not ready yet. Connect the project or wait for the current operation."); false
+            }
+            else -> true
+        }
+    }
+    fun focusShortcutTerminal() {
+        activeProjectId?.let {
+            textInputVisibleByProject[it] = false
+            fileUploadVisibleByProject[it] = false
+            fileDownloadVisibleByProject[it] = false
+        }
+        showProjectNotes = false; searchVisible = false
+        terminalViewRef.value?.requestFocus()
+    }
+    fun chooseShortcutWindow(id: String, expectedProject: Long?) {
+        if (!readyForWindowAction(expectedProject)) return
+        val window = tmuxWindowsViewModel.state.value.snapshot?.windows?.firstOrNull { it.id == id }
+        if (window == null) shortcutMessage("That terminal was closed. Search again.")
+        else { focusShortcutTerminal(); if (!window.active) tmuxWindowsViewModel.select(window) }
+    }
+    fun performShortcut(action: ShortcutAction) {
+        showSettingsMenu = false
+        val tabs = viewModel.projectTabs.value
+        val currentIndex = tabs.indexOfFirst { it.sessionId == viewModel.activeId.value }
+        val tab = tabs.getOrNull(currentIndex)
+        when (action) {
+            ShortcutAction.NEXT_PROJECT, ShortcutAction.PREVIOUS_PROJECT -> {
+                val index = cyclicShortcutIndex(tabs.size, currentIndex, action == ShortcutAction.NEXT_PROJECT)
+                if (index == null) shortcutMessage("No open projects. Use Find / open project.")
+                else { viewModel.openProject(tabs[index].projectId); terminalViewRef.value?.requestFocus() }
+            }
+            ShortcutAction.FIND_PROJECT -> { quickFind = action; quickFindProjectId = null }
+            ShortcutAction.NEW_PROJECT -> onAddProject(serverId)
+            ShortcutAction.CLOSE_PROJECT -> {
+                if (tab == null) shortcutMessage("No project is open.")
+                else if (tab.usesTmux && tab.sessionId != null) pendingTabClose = PendingTabClose(tab.projectId, tab.projectName, tab.sessionId)
+                else viewModel.closeSession(tab.projectId, tab.sessionId)
+            }
+            else -> {
+                if (!readyForWindowAction(tab?.projectId)) return
+                val windows = tmuxWindowsViewModel.state.value.snapshot!!.windows
+                when (action) {
+                    ShortcutAction.FIND_WINDOW -> { quickFindProjectId = tab?.projectId; quickFind = action }
+                    ShortcutAction.NEW_WINDOW -> { focusShortcutTerminal(); tmuxWindowsViewModel.create("") }
+                    ShortcutAction.CLOSE_WINDOW -> if (windows.size <= 1) shortcutMessage("Keep one terminal in the project. Use Restart session to restart it.")
+                        else closeTerminalProjectId = tab?.projectId
+                    ShortcutAction.NEXT_WINDOW, ShortcutAction.PREVIOUS_WINDOW -> {
+                        cyclicShortcutIndex(windows.size, windows.indexOfFirst { it.active }, action == ShortcutAction.NEXT_WINDOW)?.let {
+                            chooseShortcutWindow(windows[it].id, tab?.projectId)
+                        }
+                    }
+                    else -> Unit
+                }
+            }
+        }
+    }
+    HardwareShortcutHandler(tabAppearance.keyboardShortcuts, ::performShortcut)
+    quickFind?.let { mode ->
+        val targets = if (mode == ShortcutAction.FIND_PROJECT) shortcutProjects.map { project ->
+            val server = shortcutServers.firstOrNull { it.id == project.serverId }
+            QuickSwitchTarget(project.id.toString(), project.name,
+                (if (project.isLocal) "Local" else server?.name ?: "SSH") +
+                    if (projectTabs.any { it.projectId == project.id }) " · Open" else " · Closed")
+        } else tmuxWindows.snapshot?.windows.orEmpty().takeIf { tmuxWindows.projectId == quickFindProjectId }.orEmpty().map {
+            QuickSwitchTarget(it.id, it.name.ifBlank { "Terminal ${it.index + 1}" },
+                "Terminal ${it.index + 1}" + if (it.active) " · Current" else "")
+        }
+        QuickSwitchDialog(if (mode == ShortcutAction.FIND_PROJECT) "Find project" else "Find terminal window", targets,
+            onChoose = { id ->
+                val project = quickFindProjectId
+                quickFind = null
+                if (mode == ShortcutAction.FIND_PROJECT) { viewModel.openProject(id.toLong()); terminalViewRef.value?.requestFocus() }
+                else chooseShortcutWindow(id, project)
+            }, onDismiss = { quickFind = null },
+            onCreateProject = if (mode == ShortcutAction.FIND_PROJECT) ({ quickFind = null; onAddProject(serverId) }) else null)
+    }
 
     // Refresh scroll-to-bottom button visibility whenever the view's top row changes.
     LaunchedEffect(terminalViewRef.value) {
@@ -862,6 +962,9 @@ fun SessionHostScreen(
                         expanded = showSettingsMenu,
                         onDismissRequest = { showSettingsMenu = false }
                     ) {
+                        DropdownMenuItem(text = { Text("Find project…") }, onClick = { performShortcut(ShortcutAction.FIND_PROJECT) })
+                        if (activeTab?.usesTmux == true) DropdownMenuItem(text = { Text("Find terminal window…") },
+                            onClick = { performShortcut(ShortcutAction.FIND_WINDOW) })
                         if (activeTab?.usesTmux == true) DropdownMenuItem(
                             text = { Text("New terminal") },
                             enabled = activeTab.isConnected,
@@ -990,7 +1093,9 @@ fun SessionHostScreen(
                     createRequested = newTerminalProjectId == activeProjectId,
                     onCreateRequestHandled = { newTerminalProjectId = null },
                     infoRequested = terminalInfoProjectId == activeProjectId,
-                    onInfoRequestHandled = { terminalInfoProjectId = null })
+                    onInfoRequestHandled = { terminalInfoProjectId = null },
+                    closeRequested = closeTerminalProjectId == activeProjectId,
+                    onCloseRequestHandled = { closeTerminalProjectId = null })
             }
 
             if (projectTabs.isEmpty()) {

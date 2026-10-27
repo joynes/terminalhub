@@ -14,6 +14,16 @@ import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
 
 @RunWith(AndroidJUnit4::class)
 class AppSettingsPersistenceTest {
+    @Test fun keyboardShortcutsSurviveRestartAndInvalidImportDoesNotMutateSettings() {
+        val rows = se.joynes.terminalhub.data.settings.KeyboardShortcuts.suggestions
+        val repository = AppSettingsRepository(context)
+        repository.setKeyboardShortcuts(rows)
+        assertEquals(rows, AppSettingsRepository(context).settings.value.keyboardShortcuts)
+        org.junit.Assert.assertTrue(runCatching { repository.setKeyboardShortcuts(listOf("NEXT_PROJECT=P")) }.isFailure)
+        assertEquals(rows, AppSettingsRepository(context).settings.value.keyboardShortcuts)
+        repository.setKeyboardShortcuts(emptyList())
+        assertEquals(emptyList<String>(), AppSettingsRepository(context).settings.value.keyboardShortcuts)
+    }
     @Test fun independentTabSizesSurviveRestartAndYamlImport() {
         val repository = AppSettingsRepository(context)
         repository.setTabAppearance(true, 100, 40, 16)
