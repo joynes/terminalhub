@@ -480,11 +480,11 @@ fun SessionHostScreen(
     }
     HardwareShortcutHandler(tabAppearance.keyboardShortcuts, ::performShortcut)
     quickFind?.let { mode ->
-        val targets = shortcutProjects.map { project ->
+        val openProjectIds = projectTabs.map { it.projectId }.toSet()
+        val targets = shortcutProjects.filter { it.id in openProjectIds }.map { project ->
             val server = shortcutServers.firstOrNull { it.id == project.serverId }
             QuickSwitchTarget("project:${project.id}", project.name,
-                "Project · " + (if (project.isLocal) "Local" else server?.name ?: "SSH") +
-                    if (projectTabs.any { it.projectId == project.id }) " · Open" else " · Closed")
+                "Project · " + (if (project.isLocal) "Local" else server?.name ?: "SSH") + " · Open")
         } + tmuxWindows.snapshot?.windows.orEmpty().takeIf { tmuxWindows.projectId == quickFindProjectId }.orEmpty().map {
             QuickSwitchTarget("window:${it.id}", it.name.ifBlank { "Terminal ${it.index + 1}" },
                 "Window · ${activeTab?.projectName.orEmpty()} · Terminal ${it.index + 1}" + if (it.active) " · Current" else "")

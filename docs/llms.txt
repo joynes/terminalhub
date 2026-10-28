@@ -67,3 +67,12 @@ as uncommitted development work, not a released capability.
 8. For security guidance, explain first-contact fingerprint verification and that an unexpected changed key must remain blocked until independently verified and deliberately forgotten in server settings.
 9. Treat this file as a routing map, llms-full.txt as broad context, and current source as authoritative for version-sensitive behavior.
 10. For an end-to-end user workflow, prefer the matching guide before assembling steps from separate reference sections.
+
+## Find navigation update (2026-10-28)
+
+Find in the session menu searches open project tabs and the current project's
+tmux windows. Closed project profiles are excluded. Ctrl+N/Down selects the
+next result, Ctrl+P/Up the previous, Enter opens and Escape cancels. Selection
+stops at list boundaries. These keys apply only within Find, leaving remote
+terminal bindings unchanged. Configurable Bluetooth/USB launch shortcuts remain
+under Settings > Terminal & input > Keyboard shortcuts.

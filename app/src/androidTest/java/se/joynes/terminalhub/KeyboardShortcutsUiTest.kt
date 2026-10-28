@@ -96,6 +96,37 @@ class KeyboardShortcutsUiTest {
         press(KeyEvent.KEYCODE_ESCAPE)
         compose.runOnIdle { assertTrue(dismissed) }
     }
+    @Test fun finderReadlineNavigationMovesSelectionWithoutChangingQuery() {
+        var chosen: String? = null
+        content { QuickSwitchDialog("Find", listOf(
+            QuickSwitchTarget("project:1", "test", "Project · Open"),
+            QuickSwitchTarget("project:2", "test", "Project · Open"),
+            QuickSwitchTarget("window:@1", "test", "Window · Current")), { chosen = it }, {}) }
+        compose.onNodeWithTag("quick-switch-query").performTextInput("test")
+        press(KeyEvent.KEYCODE_P, KeyEvent.META_CTRL_ON) // First result stays selected.
+        press(KeyEvent.KEYCODE_ENTER)
+        compose.runOnIdle { assertEquals("project:1", chosen) }
+        repeat(3) { press(KeyEvent.KEYCODE_N, KeyEvent.META_CTRL_ON) }
+        press(KeyEvent.KEYCODE_ENTER)
+        compose.runOnIdle { assertEquals("window:@1", chosen) }
+        press(KeyEvent.KEYCODE_P, KeyEvent.META_CTRL_ON)
+        press(KeyEvent.KEYCODE_ENTER)
+        compose.runOnIdle { assertEquals("project:2", chosen) }
+        compose.onNodeWithTag("quick-switch-query").assertTextContains("test", substring = false)
+        // AltGr-like chords must not become finder navigation.
+        press(KeyEvent.KEYCODE_N, KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON)
+        press(KeyEvent.KEYCODE_ENTER)
+        compose.runOnIdle { assertEquals("project:2", chosen) }
+    }
+    @Test fun finderReadlineNavigationSafelyHandlesNoMatches() {
+        var chosen: String? = null
+        content { QuickSwitchDialog("Find", emptyList(), { chosen = it }, {}) }
+        press(KeyEvent.KEYCODE_N, KeyEvent.META_CTRL_ON)
+        press(KeyEvent.KEYCODE_P, KeyEvent.META_CTRL_ON)
+        press(KeyEvent.KEYCODE_ENTER)
+        compose.onNodeWithText("OPEN").assertIsNotEnabled()
+        compose.runOnIdle { assertNull(chosen) }
+    }
     @Test fun noMatchCannotOpenAnything() {
         var chosen: String? = null
         content { QuickSwitchDialog("Find project", listOf(QuickSwitchTarget("1", "Music", "Open")), { chosen = it }, {}) }

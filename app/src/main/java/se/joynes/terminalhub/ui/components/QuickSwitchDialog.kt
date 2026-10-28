@@ -39,10 +39,19 @@ internal fun QuickSwitchDialog(title: String, targets: List<QuickSwitchTarget>, 
     LaunchedEffect(results, index) { if (results.isNotEmpty()) list.animateScrollToItem(index) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = {
         WindowKeyHandler { event ->
-            if (!isShortcutKeyboardEvent(event) || event.isCtrlPressed || event.isAltPressed || event.isMetaPressed ||
-                event.keyCode !in setOf(KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_ESCAPE)) false
+            val navigationKey = when {
+                event.isAltPressed || event.isMetaPressed || event.isShiftPressed -> null
+                event.isCtrlPressed -> when (event.keyCode) {
+                    KeyEvent.KEYCODE_N -> KeyEvent.KEYCODE_DPAD_DOWN
+                    KeyEvent.KEYCODE_P -> KeyEvent.KEYCODE_DPAD_UP
+                    else -> null
+                }
+                else -> event.keyCode.takeIf { it in setOf(KeyEvent.KEYCODE_DPAD_DOWN,
+                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_ESCAPE) }
+            }
+            if (!isShortcutKeyboardEvent(event) || navigationKey == null) false
             else {
-                if (event.action == KeyEvent.ACTION_DOWN) when (event.keyCode) {
+                if (event.action == KeyEvent.ACTION_DOWN) when (navigationKey) {
                     KeyEvent.KEYCODE_DPAD_DOWN -> selected = (index + 1).coerceAtMost((results.size - 1).coerceAtLeast(0))
                     KeyEvent.KEYCODE_DPAD_UP -> selected = (index - 1).coerceAtLeast(0)
                     KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> if (event.repeatCount == 0) results.getOrNull(index)?.let { onChoose(it.id) }
@@ -61,7 +70,7 @@ internal fun QuickSwitchDialog(title: String, targets: List<QuickSwitchTarget>, 
                             true
                         } else false
                     })
-            Text("↑ ↓ to choose · Enter to open · Escape to cancel", style = MaterialTheme.typography.bodySmall, color = MegaDriveDim)
+            Text("↑ ↓ / Ctrl+P Ctrl+N to choose · Enter to open · Escape to cancel", style = MaterialTheme.typography.bodySmall, color = MegaDriveDim)
             if (results.isEmpty()) Text("No matches", modifier = Modifier.padding(16.dp))
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp).testTag("quick-switch-results"), state = list) {
                 itemsIndexed(results, key = { _, item -> item.id }) { position, target ->

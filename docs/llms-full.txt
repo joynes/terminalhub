@@ -1,6 +1,6 @@
 # TerminalHub full product and support context
 
-Documentation snapshot: 2026-10-27
+Documentation snapshot: 2026-10-28
 Canonical page: https://joynes.github.io/terminalhub/
 Repository: https://github.com/joynes/terminalhub
 
@@ -378,3 +378,12 @@ Canonical identity:
 - Primary workflow: Android control surface plus user-controlled SSH server
 - Persistence: saved Android tabs plus server-side tmux
 - AI dependency: none
+
+## Find navigation update (2026-10-28)
+
+Find in the session menu searches open project tabs and the current project's
+tmux windows. Closed project profiles are excluded. Ctrl+N/Down selects the
+next result, Ctrl+P/Up the previous, Enter opens and Escape cancels. Selection
+stops at list boundaries. These keys apply only within Find, leaving remote
+terminal bindings unchanged. Configurable Bluetooth/USB launch shortcuts remain
+under Settings > Terminal & input > Keyboard shortcuts.

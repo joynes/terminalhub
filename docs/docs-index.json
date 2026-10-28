@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "product": "TerminalHub: SSH Project Tabs",
-  "snapshot_date": "2026-10-27",
+  "snapshot_date": "2026-10-28",
   "canonical_url": "https://joynes.github.io/terminalhub/",
   "repository": "https://github.com/joynes/terminalhub",
   "package": "se.joynes.terminalhub",
@@ -48,7 +48,7 @@
     {"id": "servers", "url": "https://joynes.github.io/terminalhub/#servers", "keywords": ["host", "port", "username", "password", "private key", "authorized_keys"]},
     {"id": "projects", "url": "https://joynes.github.io/terminalhub/#projects", "keywords": ["git", "clone", "folder", "script", "command", "placeholder"]},
     {"id": "sessions", "url": "https://joynes.github.io/terminalhub/#sessions", "keywords": ["tabs", "restore", "reconnect", "tmux", "persistence"]},
-    {"id": "terminal", "url": "https://joynes.github.io/terminalhub/#terminal", "keywords": ["keyboard", "key bar", "ctrl", "alt", "multiline", "search", "scroll", "URL", "link", "browser", "open"]},
+    {"id": "terminal", "url": "https://joynes.github.io/terminalhub/#terminal", "keywords": ["Find", "open projects", "Ctrl+N", "Ctrl+P", "keyboard", "key bar", "ctrl", "alt", "multiline", "search", "scroll", "URL", "link", "browser", "open"]},
     {"id": "files", "url": "https://joynes.github.io/terminalhub/#files", "keywords": ["file", "multi-file upload", "multi-file download", "remote folder", "sort", "Markdown preview", "text preview", "open downloaded file", "android picker", "share intent", "scp"]},
     {"id": "configuration", "url": "https://joynes.github.io/terminalhub/#configuration", "keywords": ["settings", "keepalive", "biometric", "export", "import", "logs", "data"]},
     {"id": "ai-workflows", "url": "https://joynes.github.io/terminalhub/#ai-workflows", "keywords": ["codex", "claude", "gemini", "agent", "parallel sessions"]},
