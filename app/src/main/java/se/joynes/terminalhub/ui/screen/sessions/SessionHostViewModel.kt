@@ -178,6 +178,7 @@ class SessionHostViewModel @Inject constructor(
     private val remoteWindows: se.joynes.terminalhub.data.ssh.RemoteTmuxWindows
 ) : ViewModel() {
     val pinnedMacro = se.joynes.terminalhub.domain.PinnedMacroController(viewModelScope)
+    fun setFindIncludeClosedProjects(enabled: Boolean) = settingsRepository.setFindIncludeClosedProjects(enabled)
     val tabAppearance = settingsRepository.settings
     private val pendingSubmissions = mutableMapOf<TerminalSessionId, Int>()
     private val _pendingInputSessions = MutableStateFlow<Set<TerminalSessionId>>(emptySet())

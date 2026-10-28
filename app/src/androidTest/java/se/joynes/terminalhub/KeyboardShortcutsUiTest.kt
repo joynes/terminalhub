@@ -152,6 +152,7 @@ class KeyboardShortcutsUiTest {
         compose.onNodeWithTag("quick-switch-query").performTextInput("bld")
         compose.onNodeWithText("Project · Production").assertIsDisplayed()
         compose.onNodeWithText("Window · TerminalHub").assertIsDisplayed()
+        screenshot("find-project-window-colors.png")
         press(KeyEvent.KEYCODE_ENTER)
         compose.runOnIdle { assertEquals("project:1", chosen) }
         press(KeyEvent.KEYCODE_DPAD_DOWN)

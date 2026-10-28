@@ -14,6 +14,18 @@ import se.joynes.terminalhub.data.settings.DEFAULT_TEXT_INPUT_PANEL_OPACITY
 
 @RunWith(AndroidJUnit4::class)
 class AppSettingsPersistenceTest {
+    @Test fun findScopePersistsAndCanBeExportedAndImported() {
+        val repository = AppSettingsRepository(context)
+        assertEquals(false, repository.settings.value.findIncludeClosedProjects)
+        repository.setFindIncludeClosedProjects(true)
+        val recreated = AppSettingsRepository(context)
+        assertEquals(true, recreated.settings.value.findIncludeClosedProjects)
+        val yaml = se.joynes.terminalhub.data.settings.SettingsYaml.export(recreated.settings.value)
+        repository.setFindIncludeClosedProjects(false)
+        val base = repository.settings.value
+        repository.applySettingsImport(base, se.joynes.terminalhub.data.settings.SettingsYaml.preview(yaml, base).next)
+        assertEquals(true, AppSettingsRepository(context).settings.value.findIncludeClosedProjects)
+    }
     @Test fun keyboardShortcutsSurviveRestartAndInvalidImportDoesNotMutateSettings() {
         val rows = se.joynes.terminalhub.data.settings.KeyboardShortcuts.suggestions
         val repository = AppSettingsRepository(context)

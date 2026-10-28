@@ -4,6 +4,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SettingsYamlTest {
+    @Test fun everyUserPreferenceHasAnExportFieldIncludingFindScope() {
+        val settings = AppSettings(findIncludeClosedProjects = true)
+        val yaml = SettingsYaml.export(settings)
+        val root = org.yaml.snakeyaml.Yaml().load<Map<String, Any>>(yaml)
+        val keys = (root["settings"] as Map<*, *>).keys
+        val properties = AppSettings::class.java.declaredFields.filter {
+            !java.lang.reflect.Modifier.isStatic(it.modifiers) && !it.isSynthetic
+        }.map { it.name }.toSet() - "backgroundSshRecommendationHandled"
+        assertEquals(properties, keys)
+        assertEquals(settings, SettingsYaml.preview(yaml, AppSettings()).next)
+        assertTrue(runCatching { SettingsYaml.preview(file("  findIncludeClosedProjects: 1"), settings) }.isFailure)
+    }
     @Test fun tabAppearanceRoundTripsWithDescriptionsAndPartialImportPreservesOtherSizes() {
         val settings = AppSettings(projectTabWidth = 110, projectTabHeight = 42, projectTabTextSize = 16,
             terminalTabWidth = 180, terminalTabHeight = 36, terminalTabTextSize = 14)

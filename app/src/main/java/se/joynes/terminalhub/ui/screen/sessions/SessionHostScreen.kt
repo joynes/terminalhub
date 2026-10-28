@@ -153,7 +153,7 @@ fun SessionHostScreen(
     var closeTerminalProjectId by remember { mutableStateOf<Long?>(null) }
     var quickFind by remember { mutableStateOf<ShortcutAction?>(null) }
     var quickFindProjectId by remember { mutableStateOf<Long?>(null) }
-    var includeClosedInFind by rememberSaveable { mutableStateOf(false) }
+    val includeClosedInFind = tabAppearance.findIncludeClosedProjects
     var pendingFindWindow by remember { mutableStateOf<Pair<Long, String>?>(null) }
     val shortcutProjects by viewModel.shortcutProjects.collectAsState()
     val shortcutServers by viewModel.shortcutServers.collectAsState(initial = emptyList())
@@ -530,7 +530,7 @@ fun SessionHostScreen(
                 terminalViewRef.value?.requestFocus()
             }, onDismiss = { quickFind = null },
             onCreateProject = { quickFind = null; onAddProject(serverId) },
-            includeClosed = includeClosedInFind, onIncludeClosedChange = { includeClosedInFind = it }, status = findStatus)
+            includeClosed = includeClosedInFind, onIncludeClosedChange = viewModel::setFindIncludeClosedProjects, status = findStatus)
     }
 
     // Refresh scroll-to-bottom button visibility whenever the view's top row changes.

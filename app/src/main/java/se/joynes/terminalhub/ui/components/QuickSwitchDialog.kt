@@ -3,6 +3,7 @@ package se.joynes.terminalhub.ui.components
 import android.view.KeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -10,6 +11,8 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.input.key.onPreInterceptKeyBeforeSoftKeyboard
 import androidx.compose.ui.focus.FocusRequester
@@ -82,9 +85,16 @@ internal fun QuickSwitchDialog(title: String, targets: List<QuickSwitchTarget>, 
             if (results.isEmpty()) Text("No matches", modifier = Modifier.padding(16.dp))
             LazyColumn(Modifier.fillMaxWidth().heightIn(max = 320.dp).testTag("quick-switch-results"), state = list) {
                 itemsIndexed(results, key = { _, item -> item.id }) { position, target ->
-                    Column(Modifier.fillMaxWidth().background(if (position == index) MegaDrivePrimary.copy(alpha = .15f) else MegaDriveSurface)
+                    val isWindow = target.id.startsWith("window:")
+                    val typeColor = if (isWindow) Color(0xFFC6B5FF) else MegaDrivePrimary
+                    val isCurrent = position == index
+                    Column(Modifier.fillMaxWidth()
+                        .background(typeColor.copy(alpha = if (isCurrent) .16f else .05f))
+                        .border(if (isCurrent) 2.dp else 0.dp, if (isCurrent) typeColor else Color.Transparent)
                         .clickable { onChoose(target.id) }.semantics { this.selected = position == index }
                         .padding(12.dp)) {
+                        Text(if (isWindow) "WINDOW" else "PROJECT", color = typeColor,
+                            style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         Text(target.name, color = MegaDriveOnSurface)
                         Text(target.detail, color = MegaDriveDim, style = MaterialTheme.typography.bodySmall)
                     }

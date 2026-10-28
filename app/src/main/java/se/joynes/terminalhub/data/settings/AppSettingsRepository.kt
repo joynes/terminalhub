@@ -23,6 +23,7 @@ internal fun normalizeKeyBarHighlightIntensity(value: Float): Float =
     value.coerceIn(MIN_KEY_BAR_HIGHLIGHT_INTENSITY, MAX_KEY_BAR_HIGHLIGHT_INTENSITY)
 
 data class AppSettings(
+    val findIncludeClosedProjects: Boolean = false,
     val keyboardShortcuts: List<String> = emptyList(),
     val projectTabWidth: Int = 70,
     val projectTabHeight: Int = 28,
@@ -70,6 +71,7 @@ class AppSettingsRepository @Inject constructor(
 
     private val _settings = MutableStateFlow(
         AppSettings(
+            findIncludeClosedProjects = prefs.getBoolean("find_include_closed_projects", false),
             keyboardShortcuts = runCatching {
                 prefs.getString("keyboard_shortcuts", "").orEmpty().split('\n').filter(String::isNotBlank)
                     .let(KeyboardShortcuts::normalize)
@@ -212,11 +214,14 @@ class AppSettingsRepository @Inject constructor(
         )
     }
 
+    fun setFindIncludeClosedProjects(enabled: Boolean) = update(_settings.value.copy(findIncludeClosedProjects = enabled))
+
     private fun update(next: AppSettings) {
         KeyboardShortcuts.parse(next.keyboardShortcuts)
         _settings.value = next
         historyConsentPrefs.edit().putBoolean(KEY_INPUT_HISTORY_ENABLED, next.inputHistoryEnabled).apply()
         prefs.edit()
+            .putBoolean("find_include_closed_projects", next.findIncludeClosedProjects)
             .putString("keyboard_shortcuts", next.keyboardShortcuts.joinToString("\n"))
             .putInt("projectTabWidth", next.projectTabWidth)
             .putInt("projectTabHeight", next.projectTabHeight)
