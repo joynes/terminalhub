@@ -816,6 +816,13 @@ public final class TerminalView extends View {
     public boolean onKeyPreIme(int keyCode, KeyEvent event) {
         if (TERMINAL_VIEW_KEY_LOGGING_ENABLED)
             mClient.logInfo(LOG_TAG, "onKeyPreIme(keyCode=" + keyCode + ", event=" + event + ")");
+        // Escape belongs to the focused terminal. IMEs may otherwise consume it to
+        // dismiss their UI, preventing interactive remote programs from receiving ESC.
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && mEmulator != null &&
+            !event.isCtrlPressed() && !event.isAltPressed() && !event.isMetaPressed()) {
+            if (event.getAction() == KeyEvent.ACTION_DOWN) return onKeyDown(keyCode, event);
+            if (event.getAction() == KeyEvent.ACTION_UP) return true;
+        }
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             cancelRequestAutoFill();
             if (isSelectingText()) {

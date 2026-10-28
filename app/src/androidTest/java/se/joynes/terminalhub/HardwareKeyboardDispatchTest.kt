@@ -70,7 +70,26 @@ class HardwareKeyboardDispatchTest {
         }
         compose.waitForIdle()
         compose.runOnIdle { assertTrue(terminal.hasFocus()) }
+        compose.runOnIdle {
+            val now = SystemClock.uptimeMillis()
+            assertTrue(terminal.onKeyPreIme(KeyEvent.KEYCODE_ESCAPE,
+                KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE, 0)))
+            assertTrue(terminal.onKeyPreIme(KeyEvent.KEYCODE_ESCAPE,
+                KeyEvent(now, now + 1, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE, 0)))
+            assertArrayEquals(byteArrayOf(27), output.toByteArray())
+            output.reset()
+        }
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        compose.runOnIdle {
+            val ime = compose.activity.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            ime.showSoftInput(terminal, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+        val escapeTime = SystemClock.uptimeMillis()
+        instrumentation.sendKeySync(KeyEvent(escapeTime, escapeTime, KeyEvent.ACTION_DOWN,
+            KeyEvent.KEYCODE_ESCAPE, 0, 0, deviceId, 0, 0, InputDevice.SOURCE_KEYBOARD))
+        instrumentation.sendKeySync(KeyEvent(escapeTime, escapeTime + 1, KeyEvent.ACTION_UP,
+            KeyEvent.KEYCODE_ESCAPE, 0, 0, deviceId, 0, 0, InputDevice.SOURCE_KEYBOARD))
+        compose.runOnIdle { assertArrayEquals(byteArrayOf(27), output.toByteArray()); output.reset() }
         val shortcutTime = SystemClock.uptimeMillis()
         instrumentation.sendKeySync(KeyEvent(shortcutTime, shortcutTime, KeyEvent.ACTION_DOWN,
             KeyEvent.KEYCODE_P, 0, KeyEvent.META_CTRL_ON, deviceId, 0, 0, InputDevice.SOURCE_KEYBOARD))
