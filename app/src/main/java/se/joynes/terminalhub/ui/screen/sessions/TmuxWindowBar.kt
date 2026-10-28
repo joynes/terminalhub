@@ -14,6 +14,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
@@ -45,7 +50,9 @@ fun TmuxWindowBar(
     infoRequested: Boolean = false,
     onInfoRequestHandled: () -> Unit = {},
     closeRequested: Boolean = false,
-    onCloseRequestHandled: () -> Unit = {}
+    onCloseRequestHandled: () -> Unit = {},
+    renameRequested: Boolean = false,
+    onRenameRequestHandled: () -> Unit = {}
 ) {
     var creating by remember(state.projectId) { mutableStateOf(false) }
     var selectedMenu by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
@@ -64,6 +71,12 @@ fun TmuxWindowBar(
     }
     LaunchedEffect(closeRequested) {
         if (closeRequested) { closing = windows.firstOrNull { it.active }; onCloseRequestHandled() }
+    }
+    LaunchedEffect(renameRequested) {
+        if (renameRequested) {
+            if (enabled) renaming = windows.firstOrNull { it.active }
+            onRenameRequestHandled()
+        }
     }
     LaunchedEffect(state.projectId, activeIndex) { if (activeIndex >= 0) listState.animateScrollToItem(activeIndex) }
 
@@ -147,15 +160,26 @@ fun TmuxWindowBar(
 
 @Composable
 private fun TerminalNameDialog(title: String, initial: String, optional: Boolean, enabled: Boolean, onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var name by rememberSaveable { mutableStateOf(initial) }
+    var input by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(initial, TextRange(0, initial.length))) }
+    val name = input.text
+    val focus = remember { FocusRequester() }
     val error = runCatching { TmuxWindowCommands.validateName(name) }.exceptionOrNull()?.message
+    val canSave = enabled && error == null && (optional || name.isNotBlank())
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = {
         Column {
-            OutlinedTextField(name, { name = it }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+            OutlinedTextField(input, { input = it }, singleLine = true, modifier = Modifier.fillMaxWidth().focusRequester(focus)
+                .onPreviewKeyEvent { key ->
+                    val event = key.nativeKeyEvent
+                    if (event.keyCode == android.view.KeyEvent.KEYCODE_ENTER && !event.isCtrlPressed && !event.isAltPressed && !event.isMetaPressed) {
+                        if (event.action == android.view.KeyEvent.ACTION_DOWN && event.repeatCount == 0 && canSave) onSave(name)
+                        true
+                    } else false
+                },
                 label = { Text(if (optional) "Name (optional)" else "Terminal name") }, isError = error != null)
             if (optional) Text("Opens a new shell in this project's folder.", style = MaterialTheme.typography.bodySmall)
             error?.let { Text(it, color = MegaDriveWarning, style = MaterialTheme.typography.bodySmall) }
         }
-    }, confirmButton = { TextButton(enabled = enabled && error == null && (optional || name.isNotBlank()), onClick = { onSave(name) }) { Text("SAVE") } },
+        LaunchedEffect(Unit) { focus.requestFocus() }
+    }, confirmButton = { TextButton(enabled = canSave, onClick = { onSave(name) }) { Text("SAVE") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } })
 }

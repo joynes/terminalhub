@@ -2,6 +2,7 @@ package se.joynes.terminalhub
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -14,7 +15,35 @@ import se.joynes.terminalhub.ui.screen.sessions.*
 import se.joynes.terminalhub.ui.theme.TerminalHubTheme
 
 @RunWith(AndroidJUnit4::class)
+@OptIn(ExperimentalTestApi::class)
 class TmuxWindowBarTest {
+    @Test fun renameShortcutWorksForHiddenSingleWindowAndEnterSavesOnce() {
+        var requested by mutableStateOf(false)
+        var renamed: Pair<TmuxWindow, String>? = null
+        var calls = 0
+        val single = state().copy(snapshot = TmuxWindowsSnapshot("\$1", listOf(first)))
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(single, false, {}, {},
+            { window, name -> renamed = window to name; calls++ }, {}, {},
+            renameRequested = requested, onRenameRequestHandled = { requested = false }) } }
+        compose.onNodeWithTag("project-terminal-bar").assertDoesNotExist()
+        compose.runOnIdle { requested = true }
+        compose.onNodeWithText("Terminal name").assertIsFocused().performTextReplacement("Build logs")
+        compose.onNodeWithText("Terminal name").performKeyInput { pressKey(Key.Enter) }
+        compose.runOnIdle { assertEquals(first to "Build logs", renamed); assertEquals(1, calls); assertFalse(requested) }
+        compose.onNodeWithText("Rename terminal").assertDoesNotExist()
+    }
+
+    @Test fun renameShortcutCancelDoesNotChangeWindowAndBusyInputBlocksRequest() {
+        var requested by mutableStateOf(false)
+        var busy by mutableStateOf(false)
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(state(), busy, {}, {},
+            { _, _ -> fail("Must not rename") }, {}, {}, renameRequested = requested, onRenameRequestHandled = { requested = false }) } }
+        compose.runOnIdle { requested = true }
+        compose.onNodeWithText("Terminal name").performTextReplacement("Other")
+        compose.onNodeWithText("CANCEL").performClick()
+        compose.runOnIdle { busy = true; requested = true }
+        compose.onNodeWithText("Rename terminal").assertDoesNotExist()
+    }
     @get:Rule val compose = createComposeRule()
     private val first = TmuxWindow("@1", 0, "Codex", true, 1)
     private val second = TmuxWindow("@2", 1, "Tests", false, 1)

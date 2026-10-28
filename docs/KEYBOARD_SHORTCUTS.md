@@ -12,6 +12,7 @@ take over existing terminal commands. “Use suggested shortcuts” assigns all 
 | Ctrl+Alt+P | Find projects and terminal windows together |
 | Ctrl+Alt+N / Q | Create / close project |
 | Ctrl+Alt+T / W | Create / close terminal window |
+| Ctrl+Alt+R | Rename the active terminal window |
 
 One Find action is also available from the terminal menu.
 Search accepts nonconsecutive letters, like `trm` for TerminalHub, and multiple

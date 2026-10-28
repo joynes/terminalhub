@@ -151,6 +151,7 @@ fun SessionHostScreen(
     var showSettingsMenu by remember { mutableStateOf(false) }
     var newTerminalProjectId by remember { mutableStateOf<Long?>(null) }
     var closeTerminalProjectId by remember { mutableStateOf<Long?>(null) }
+    var renameTerminalProjectId by remember { mutableStateOf<Long?>(null) }
     var quickFind by remember { mutableStateOf<ShortcutAction?>(null) }
     var quickFindProjectId by remember { mutableStateOf<Long?>(null) }
     val includeClosedInFind = tabAppearance.findIncludeClosedProjects
@@ -468,6 +469,7 @@ fun SessionHostScreen(
                 val windows = tmuxWindowsViewModel.state.value.snapshot!!.windows
                 when (action) {
                     ShortcutAction.NEW_WINDOW -> { focusShortcutTerminal(); tmuxWindowsViewModel.create("") }
+                    ShortcutAction.RENAME_WINDOW -> renameTerminalProjectId = tab?.projectId
                     ShortcutAction.CLOSE_WINDOW -> if (windows.size <= 1) shortcutMessage("Keep one terminal in the project. Use Restart session to restart it.")
                         else closeTerminalProjectId = tab?.projectId
                     ShortcutAction.NEXT_WINDOW, ShortcutAction.PREVIOUS_WINDOW -> {
@@ -1130,7 +1132,9 @@ fun SessionHostScreen(
                     infoRequested = terminalInfoProjectId == activeProjectId,
                     onInfoRequestHandled = { terminalInfoProjectId = null },
                     closeRequested = closeTerminalProjectId == activeProjectId,
-                    onCloseRequestHandled = { closeTerminalProjectId = null })
+                    onCloseRequestHandled = { closeTerminalProjectId = null },
+                    renameRequested = renameTerminalProjectId == activeProjectId,
+                    onRenameRequestHandled = { renameTerminalProjectId = null })
             }
 
             if (projectTabs.isEmpty()) {

@@ -7,7 +7,8 @@ enum class ShortcutAction(val label: String) {
     NEXT_WINDOW("Next terminal window"), PREVIOUS_WINDOW("Previous terminal window"),
     FIND_PROJECT("Find project or terminal window"),
     NEW_PROJECT("Create project"), CLOSE_PROJECT("Close project"),
-    NEW_WINDOW("Create terminal window"), CLOSE_WINDOW("Close terminal window")
+    NEW_WINDOW("Create terminal window"), CLOSE_WINDOW("Close terminal window"),
+    RENAME_WINDOW("Rename terminal window")
 }
 
 data class ShortcutChord(val keyCode: Int, val modifiers: Int) {
@@ -87,7 +88,7 @@ object KeyboardShortcuts {
     val suggestions = listOf("NEXT_PROJECT=CTRL+ALT+RIGHT", "PREVIOUS_PROJECT=CTRL+ALT+LEFT",
         "NEXT_WINDOW=CTRL+ALT+DOWN", "PREVIOUS_WINDOW=CTRL+ALT+UP", "FIND_PROJECT=CTRL+ALT+P",
         "NEW_PROJECT=CTRL+ALT+N", "CLOSE_PROJECT=CTRL+ALT+Q",
-        "NEW_WINDOW=CTRL+ALT+T", "CLOSE_WINDOW=CTRL+ALT+W")
+        "NEW_WINDOW=CTRL+ALT+T", "CLOSE_WINDOW=CTRL+ALT+W", "RENAME_WINDOW=CTRL+ALT+R")
 }
 
 /** Stable subsequence ranking, so 'trm' matches 'terminal'; contiguous and word-prefix matches rank first. */
