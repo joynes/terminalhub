@@ -24,6 +24,14 @@ import se.joynes.terminalhub.ui.components.*
 import se.joynes.terminalhub.ui.screen.settings.KeyboardShortcutsEditor
 
 class KeyboardShortcutsUiTest {
+    @Test fun closedProjectToggleStartsOffAndCanBeEnabled() {
+        var includeClosed by mutableStateOf(false)
+        content { QuickSwitchDialog("Find", emptyList(), {}, {}, includeClosed = includeClosed,
+            onIncludeClosedChange = { includeClosed = it }) }
+        compose.onNode(isToggleable()).assertIsOff()
+        compose.onNodeWithText("Include closed projects").performClick()
+        compose.onNode(isToggleable()).assertIsOn()
+    }
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private fun content(body: @Composable () -> Unit) {
         compose.setContent { TerminalHubTheme { Surface { body() } } }

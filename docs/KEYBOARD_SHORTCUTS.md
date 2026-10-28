@@ -15,8 +15,8 @@ take over existing terminal commands. “Use suggested shortcuts” assigns all 
 
 One Find action is also available from the terminal menu.
 Search accepts nonconsecutive letters, like `trm` for TerminalHub, and multiple
-words. Project search includes closed projects and server names. Use arrows and
-Enter, or tap a result. Escape cancels. Window search lists the current project's
+words. Project search includes server names. Closed projects are excluded by default; the Include closed projects toggle adds them and their windows. Use arrows and
+Enter, or tap a result. Escape cancels. Window search lists all open projects'
 tmux windows in the same result list, using their stable IDs even when names are identical.
 Results identify projects and windows separately. Existing project-find bindings are
 preserved; a former window-find binding becomes Find if no project-find binding existed.
@@ -42,3 +42,5 @@ keyboardShortcuts:
 
 An empty list disables all bindings. Omitted settings preserve existing bindings
 on partial import. Invalid actions, keys and duplicate combinations reject import.
+
+Find discovers windows concurrently (up to four projects at a time), without selecting them. Loading and partial failures are shown. Results include project and server names. Selecting a window opens its project and selects the logical window key after the live window list is ready; unavailable windows produce a message.

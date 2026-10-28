@@ -26,7 +26,8 @@ internal data class QuickSwitchTarget(val id: String, val name: String, val deta
 @Composable
 @OptIn(ExperimentalComposeUiApi::class)
 internal fun QuickSwitchDialog(title: String, targets: List<QuickSwitchTarget>, onChoose: (String) -> Unit,
-    onDismiss: () -> Unit, onCreateProject: (() -> Unit)? = null) {
+    onDismiss: () -> Unit, onCreateProject: (() -> Unit)? = null,
+    includeClosed: Boolean = false, onIncludeClosedChange: ((Boolean) -> Unit)? = null, status: String? = null) {
     var query by remember { mutableStateOf("") }
     var selected by remember { mutableIntStateOf(0) }
     val results = remember(query, targets) {
@@ -61,6 +62,13 @@ internal fun QuickSwitchDialog(title: String, targets: List<QuickSwitchTarget>, 
             }
         }
         Column {
+            onIncludeClosedChange?.let { change ->
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                    Checkbox(checked = includeClosed, onCheckedChange = change)
+                    Text("Include closed projects", modifier = Modifier.clickable { change(!includeClosed) })
+                }
+            }
+            status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MegaDriveDim) }
             OutlinedTextField(query, { query = it; selected = 0 }, label = { Text("Type part of a name") },
                 singleLine = true, modifier = Modifier.fillMaxWidth().focusRequester(focus).testTag("quick-switch-query")
                     .onPreInterceptKeyBeforeSoftKeyboard { key ->

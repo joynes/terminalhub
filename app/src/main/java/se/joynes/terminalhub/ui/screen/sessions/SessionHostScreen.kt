@@ -153,6 +153,8 @@ fun SessionHostScreen(
     var closeTerminalProjectId by remember { mutableStateOf<Long?>(null) }
     var quickFind by remember { mutableStateOf<ShortcutAction?>(null) }
     var quickFindProjectId by remember { mutableStateOf<Long?>(null) }
+    var includeClosedInFind by rememberSaveable { mutableStateOf(false) }
+    var pendingFindWindow by remember { mutableStateOf<Pair<Long, String>?>(null) }
     val shortcutProjects by viewModel.shortcutProjects.collectAsState()
     val shortcutServers by viewModel.shortcutServers.collectAsState(initial = emptyList())
     var terminalInfoProjectId by remember { mutableStateOf<Long?>(null) }
@@ -479,24 +481,56 @@ fun SessionHostScreen(
         }
     }
     HardwareShortcutHandler(tabAppearance.keyboardShortcuts, ::performShortcut)
-    quickFind?.let { mode ->
-        val openProjectIds = projectTabs.map { it.projectId }.toSet()
-        val targets = shortcutProjects.filter { it.id in openProjectIds }.map { project ->
+    val discoveredWindows by tmuxWindowsViewModel.findWindows.collectAsState()
+    LaunchedEffect(pendingFindWindow) {
+        if (pendingFindWindow != null) {
+            kotlinx.coroutines.delay(30000)
+            pendingFindWindow = null
+            shortcutMessage("Could not open that window. Reconnect the project and try again.")
+        }
+    }
+    val findStatus by tmuxWindowsViewModel.findStatus.collectAsState()
+    val findProjects = shortcutProjects.filter { includeClosedInFind || projectTabs.any { tab -> tab.projectId == it.id } }
+    LaunchedEffect(quickFind != null, findProjects.map { it.id }) {
+        if (quickFind != null) tmuxWindowsViewModel.discoverWindows(findProjects.map { it.id })
+        else tmuxWindowsViewModel.stopDiscovery()
+    }
+    LaunchedEffect(pendingFindWindow, activeProjectId, tmuxWindows) {
+        val pending = pendingFindWindow ?: return@LaunchedEffect
+        if (activeProjectId == pending.first && tmuxWindows.projectId == pending.first &&
+            tmuxWindows.connected && !tmuxWindows.loading && !tmuxWindows.busy && tmuxWindows.snapshot != null) {
+            val target = tmuxWindows.snapshot!!.windows.firstOrNull { it.key == pending.second }
+            pendingFindWindow = null
+            if (target == null) shortcutMessage("That window is no longer available. Search again.")
+            else chooseShortcutWindow(target.id, pending.first)
+        }
+    }
+    quickFind?.let {
+        val targets = findProjects.flatMap { project ->
             val server = shortcutServers.firstOrNull { it.id == project.serverId }
-            QuickSwitchTarget("project:${project.id}", project.name,
-                "Project · " + (if (project.isLocal) "Local" else server?.name ?: "SSH") + " · Open")
-        } + tmuxWindows.snapshot?.windows.orEmpty().takeIf { tmuxWindows.projectId == quickFindProjectId }.orEmpty().map {
-            QuickSwitchTarget("window:${it.id}", it.name.ifBlank { "Terminal ${it.index + 1}" },
-                "Window · ${activeTab?.projectName.orEmpty()} · Terminal ${it.index + 1}" + if (it.active) " · Current" else "")
+            val location = if (project.isLocal) "Local" else server?.name ?: "SSH"
+            listOf(QuickSwitchTarget("project:${project.id}", project.name,
+                "Project · $location" + if (projectTabs.any { it.projectId == project.id }) " · Open" else " · Closed")) +
+                discoveredWindows[project.id]?.windows.orEmpty().map { window ->
+                    QuickSwitchTarget("window:${project.id}:${window.key}", window.name.ifBlank { "Terminal ${window.index + 1}" },
+                        "Window · ${project.name} · $location · Terminal ${window.index + 1}")
+                }
         }
         QuickSwitchDialog("Find", targets,
             onChoose = { id ->
-                val project = quickFindProjectId
                 quickFind = null
-                if (id.startsWith("project:")) { viewModel.openProject(id.removePrefix("project:").toLong()); terminalViewRef.value?.requestFocus() }
-                else chooseShortcutWindow(id.removePrefix("window:"), project)
+                pendingFindWindow = null
+                if (id.startsWith("project:")) viewModel.openProject(id.removePrefix("project:").toLong())
+                else {
+                    val parts = id.split(':', limit = 3)
+                    val project = parts[1].toLong()
+                    pendingFindWindow = project to parts[2]
+                    viewModel.openProject(project)
+                }
+                terminalViewRef.value?.requestFocus()
             }, onDismiss = { quickFind = null },
-            onCreateProject = if (mode == ShortcutAction.FIND_PROJECT) ({ quickFind = null; onAddProject(serverId) }) else null)
+            onCreateProject = { quickFind = null; onAddProject(serverId) },
+            includeClosed = includeClosedInFind, onIncludeClosedChange = { includeClosedInFind = it }, status = findStatus)
     }
 
     // Refresh scroll-to-bottom button visibility whenever the view's top row changes.

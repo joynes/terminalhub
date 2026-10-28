@@ -43,6 +43,40 @@ class TmuxWindowsViewModel @Inject constructor(
     private var operation: Job? = null
     private val gate = Mutex()
     private val snapshots = mutableMapOf<Long, TmuxWindowsSnapshot>()
+    private val findMutable = MutableStateFlow<Map<Long, TmuxWindowsSnapshot>>(emptyMap())
+    val findWindows = findMutable.asStateFlow()
+    private val findStatusMutable = MutableStateFlow<String?>(null)
+    val findStatus = findStatusMutable.asStateFlow()
+    private var findJob: Job? = null
+
+    /** Discover without binding the UI or changing the selected project/window. */
+    fun discoverWindows(projectIds: List<Long>) {
+        findJob?.cancel()
+        findMutable.value = emptyMap()
+        findStatusMutable.value = "Loading windows…"
+        findJob = viewModelScope.launch {
+            var failures = 0
+            val limit = kotlinx.coroutines.sync.Semaphore(4)
+            coroutineScope {
+                projectIds.distinct().map { id -> launch {
+                    limit.acquire()
+                    try {
+                        val project = projects.getById(id) ?: return@launch
+                        if (project.isLocal || !project.useTmux) return@launch
+                        val server = servers.getById(project.serverId) ?: return@launch
+                        val snapshot = withTimeout(15000) { remote.list(server, project) }
+                        findMutable.value = findMutable.value + (id to snapshot)
+                    } catch (cancelled: CancellationException) {
+                        if (cancelled is TimeoutCancellationException) failures++ else throw cancelled
+                    } catch (_: Exception) { failures++ }
+                    finally { limit.release() }
+                } }.joinAll()
+            }
+            findStatusMutable.value = if (failures > 0) "Could not read windows for $failures project(s). Close Find and retry." else null
+        }
+    }
+
+    fun stopDiscovery() { findJob?.cancel() }
 
     fun bind(projectId: Long?, connectionToken: String?, connected: Boolean) {
         if (mutable.value.projectId == projectId && token == connectionToken && mutable.value.connected == connected) return

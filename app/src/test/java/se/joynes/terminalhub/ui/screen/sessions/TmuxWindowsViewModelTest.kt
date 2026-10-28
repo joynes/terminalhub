@@ -36,6 +36,29 @@ class TmuxWindowsViewModelTest {
     }
     @After fun cleanup() { vm.pause(); Dispatchers.resetMain() }
 
+    @Test fun `find discovers all requested projects without changing active binding`() = runTest(dispatcher) {
+        vm.bind(1, "one", true); runCurrent()
+        vm.discoverWindows(listOf(1, 2)); runCurrent()
+        assertEquals(setOf(1L, 2L), vm.findWindows.value.keys)
+        assertEquals("@9", vm.findWindows.value[2]!!.windows.single().id)
+        assertEquals(1L, vm.state.value.projectId)
+        verify(remote, never()).select(any(), any(), any())
+        assertNull(vm.findStatus.value)
+        vm.stopDiscovery(); vm.pause()
+    }
+
+    @Test fun `find keeps successful results when another project fails and removes excluded projects`() = runTest(dispatcher) {
+        whenever(remote.list(server, b)).thenThrow(IllegalStateException("offline"))
+        vm.discoverWindows(listOf(1, 2)); runCurrent()
+        assertEquals(setOf(1L), vm.findWindows.value.keys)
+        assertNotNull(vm.findStatus.value)
+        clearInvocations(remote)
+        vm.discoverWindows(listOf(1)); runCurrent()
+        verify(remote, never()).list(server, b)
+        assertNull(vm.findStatus.value)
+        vm.stopDiscovery()
+    }
+
     @Test fun `binding only lists and never creates or switches windows`() = runTest(dispatcher) {
         vm.bind(1, "connection-1", true); runCurrent()
         assertEquals(snapshot, vm.state.value.snapshot)
