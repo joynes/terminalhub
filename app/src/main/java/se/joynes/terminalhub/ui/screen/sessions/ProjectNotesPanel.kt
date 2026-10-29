@@ -1,5 +1,11 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
+import android.text.SpannableString
+import android.text.style.URLSpan
+import android.text.util.Linkify
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -14,6 +20,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import se.joynes.terminalhub.data.notes.*
 
+// A new active project resets visibility, including when returning to a previous project.
+@Composable
+internal fun rememberProjectNotesVisibility(projectId: Long?): MutableState<Boolean> =
+    rememberSaveable(projectId) { mutableStateOf(false) }
+
+internal fun projectNoteLinks(text: String): List<String> {
+    val linked = SpannableString(text)
+    Linkify.addLinks(linked, Linkify.WEB_URLS)
+    return linked.getSpans(0, linked.length, URLSpan::class.java)
+        .map { it.url }.filter { it.startsWith("https://") || it.startsWith("http://") }.distinct()
+}
+
 @Composable
 fun ProjectNotesPanel(
     projectName: String,
@@ -26,6 +44,9 @@ fun ProjectNotesPanel(
     modifier: Modifier = Modifier
 ) {
     val clipboard = LocalClipboardManager.current
+    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val links = remember(state.note?.text) { projectNoteLinks(state.note?.text.orEmpty()) }
     var confirmClear by rememberSaveable { mutableStateOf(false) }
     var viewBoth by rememberSaveable { mutableStateOf(false) }
     Surface(modifier.fillMaxWidth().heightIn(max = 440.dp), tonalElevation = 8.dp,
@@ -54,6 +75,20 @@ fun ProjectNotesPanel(
                 minLines = 4, maxLines = 8,
                 modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Project note" }
             )
+            if (links.isNotEmpty()) {
+                Text("OPEN LINK", style = MaterialTheme.typography.labelSmall)
+                links.forEach { url ->
+                    TextButton(onClick = {
+                        try {
+                            uriHandler.openUri(url)
+                        } catch (_: IllegalArgumentException) {
+                            Toast.makeText(context, "No browser available to open this link", Toast.LENGTH_SHORT).show()
+                        }
+                    }, modifier = Modifier.fillMaxWidth().semantics { contentDescription = "Open link: $url" }) {
+                        Text(url, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
             Text("Up to 256 KB · never sent to the terminal", style = MaterialTheme.typography.labelSmall)
             Row {
                 TextButton(onClick = { clipboard.setText(AnnotatedString(state.note?.text.orEmpty())) }) { Text("COPY") }

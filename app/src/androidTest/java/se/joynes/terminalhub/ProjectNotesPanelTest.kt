@@ -16,17 +16,21 @@ import org.junit.Test
 import se.joynes.terminalhub.data.db.entity.ProjectNoteEntity
 import se.joynes.terminalhub.data.notes.*
 import se.joynes.terminalhub.ui.screen.sessions.ProjectNotesPanel
+import se.joynes.terminalhub.ui.screen.sessions.rememberProjectNotesVisibility
+import se.joynes.terminalhub.ui.screen.sessions.projectNoteLinks
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.UriHandler
 import se.joynes.terminalhub.ui.screen.terminal.*
 import se.joynes.terminalhub.ui.theme.TerminalHubTheme
 
 class ProjectNotesPanelTest {
     @get:Rule val rule = createComposeRule()
 
-    @Test fun noteTogglesWithoutTerminalBytesAndSwitchingProjectsUpdatesHeaderAndContent() {
-        var visible by mutableStateOf(false)
+    @Test fun switchingProjectsClosesNotesAndReturningDoesNotReopenThem() {
         var id by mutableStateOf(1L)
         val notes = mutableStateMapOf(1L to "first", 2L to "second")
         rule.setContent {
+            var visible by rememberProjectNotesVisibility(id)
             TerminalHubTheme {
                 Column(Modifier.fillMaxSize().imePadding()) {
                     Box(Modifier.weight(1f)) {
@@ -43,6 +47,12 @@ class ProjectNotesPanelTest {
         rule.onNodeWithText("NOTES · project-1").assertExists()
         rule.onNodeWithText("first").performTextReplacement("edited first")
         rule.runOnIdle { id = 2 }
+        rule.onNodeWithText("NOTES · project-1").assertDoesNotExist()
+        rule.onNodeWithText("NOTES · project-2").assertDoesNotExist()
+        rule.runOnIdle { id = 1 }
+        rule.onNodeWithText("NOTES · project-1").assertDoesNotExist()
+        rule.runOnIdle { id = 2 }
+        rule.onNodeWithContentDescription("Project notes").performClick()
         rule.onNodeWithText("NOTES · project-2").assertExists()
         rule.onNodeWithText("second").assertExists()
         val noteBounds = rule.onNodeWithText("NOTES · project-2").fetchSemanticsNode().boundsInRoot
@@ -56,6 +66,28 @@ class ProjectNotesPanelTest {
         rule.onNodeWithContentDescription("Project notes").performClick()
         rule.onNodeWithText("NOTES · project-2").assertDoesNotExist()
         rule.runOnIdle { assertEquals("edited first", notes[1]) }
+    }
+
+    @Test fun linksOpenInBrowserIncludingLongWrappedUrlsWithoutEditingNote() {
+        val url = "https://example.com/" + "long-path/".repeat(12) + "?first=one&second=two#section"
+        var opened: String? = null
+        val text = "Read [guide](https://example.org/guide).\n$url\n$url"
+        rule.setContent {
+            CompositionLocalProvider(LocalUriHandler provides object : UriHandler {
+                override fun openUri(uri: String) { opened = uri }
+            }) {
+                TerminalHubTheme {
+                    ProjectNotesPanel("demo", ProjectNoteState(ProjectNoteEntity(1, text), true, NoteSyncStatus.SYNCED),
+                        onEdit = { error("Opening a link must not edit the note") }, onClear = {}, onRetry = {}, onResolve = {}, onClose = {})
+                }
+            }
+        }
+        rule.onNodeWithContentDescription("Open link: $url").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals(url, opened) }
+        rule.onNodeWithContentDescription("Open link: https://example.org/guide").performScrollTo().performClick()
+        rule.runOnIdle { assertEquals("https://example.org/guide", opened) }
+        assertEquals(2, projectNoteLinks(text).size)
+        assertTrue(projectNoteLinks("No links here; javascript:alert(1)").isEmpty())
     }
 
     @Test fun emptyNoteShowsPlaceholderAndPendingClearIsHonest() {

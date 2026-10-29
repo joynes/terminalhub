@@ -186,7 +186,6 @@ fun SessionHostScreen(
     val activeMacro by viewModel.pinnedMacro.state.collectAsState()
     val gitReviewViewModel: se.joynes.terminalhub.ui.screen.git.GitReviewViewModel = hiltViewModel()
     var gitReviewProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
-    var showProjectNotes by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.uiMessages.collect { message ->
@@ -348,6 +347,10 @@ fun SessionHostScreen(
             !activeTab.isConnecting &&
             activeTab.sessionId != null
     )
+    var showProjectNotes by rememberProjectNotesVisibility(activeProjectId)
+    DisposableEffect(activeProjectId) {
+        onDispose { notesViewModel.flush() }
+    }
     val activeTextInputVisible = activeProjectId?.let { textInputVisibleByProject[it] == true } ?: false
     val activeNoteState by remember(activeProjectId) {
         activeProjectId?.let(notesViewModel.notes::observe)
