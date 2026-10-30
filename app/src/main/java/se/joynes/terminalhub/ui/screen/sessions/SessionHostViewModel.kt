@@ -258,7 +258,7 @@ class SessionHostViewModel @Inject constructor(
             val session = sessionByProjectId[p.id]
             ProjectTabState(
                 projectId = p.id,
-                projectName = p.name,
+                projectName = p.displayTitle,
                 sessionId = session?.id,
                 isConnected = session?.isConnected ?: false,
                 isConnecting = p.id in connectingIds,
@@ -737,6 +737,19 @@ class SessionHostViewModel @Inject constructor(
         )
         if (autoSwitch) {
             sessionManager.sessions.value.firstOrNull { it.projectId == project.id }?.id?.let { sessionManager.switchTo(it) }
+        }
+    }
+
+    fun renameProject(projectId: Long, displayName: String) {
+        viewModelScope.launch {
+            try {
+                projectRepo.renameDisplayName(projectId, displayName)
+                _uiMessages.tryEmit("Project renamed")
+            } catch (error: kotlinx.coroutines.CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                _uiMessages.tryEmit(error.message ?: "Could not rename project")
+            }
         }
     }
 

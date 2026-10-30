@@ -77,13 +77,15 @@ class AddEditProjectScreenTest {
         viewModel.loadProject(initialServerId = null, id = existingId)
         assertTrue(waitUntil(5_000) { viewModel.state.value.name == "keep-color" })
 
-        viewModel.update { copy(name = "keep-color-renamed") }
+        viewModel.updateDisplayName("Mitt projekt åäö")
+        viewModel.update { copy(name = "must-not-change-directory") }
         viewModel.save()
 
         assertTrue(waitUntil(5_000) { viewModel.state.value.saved })
 
         val updated = projectRepo.getById(existingId)!!
-        assertEquals("keep-color-renamed", updated.name)
+        assertEquals("keep-color", updated.name)
+        assertEquals("Mitt projekt åäö", updated.displayTitle)
         assertEquals(123456789, updated.colorSeed)
     }
 

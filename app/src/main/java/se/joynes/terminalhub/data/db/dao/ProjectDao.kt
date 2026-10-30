@@ -27,6 +27,9 @@ interface ProjectDao {
     @Query("DELETE FROM projects WHERE serverId = :serverId")
     suspend fun deleteByServer(serverId: Long)
 
+    @Query("UPDATE projects SET displayName = :displayName WHERE id = :id")
+    suspend fun renameDisplayName(id: Long, displayName: String): Int
+
     @Query("DELETE FROM projects")
     suspend fun clearAll()
 

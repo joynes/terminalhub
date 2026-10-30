@@ -145,7 +145,7 @@ class LocalConnectionTest {
         screenshot("03_project_list")
 
         waitFor("[ ADD PROJECT ]").click()
-        typeInto("Project Name *", "test")
+        typeInto("Folder/session name *", "test")
         device.pressBack()
         Thread.sleep(400)
         screenshot("04_add_project_filled")

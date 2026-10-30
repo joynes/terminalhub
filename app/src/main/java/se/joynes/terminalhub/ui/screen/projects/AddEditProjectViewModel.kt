@@ -25,6 +25,8 @@ data class AddEditProjectState(
     val serverOptions: List<ProjectServerOption> = emptyList(),
     val name: String = "",
     val nameError: String? = null,
+    val displayName: String = "",
+    val displayNameError: String? = null,
     val useTmux: Boolean = !BuildConfig.IS_DIAGNOSTIC,
     val customScript: String = "cd {{PROJECT_PATH}}",
     val aiCommand: String = "",
@@ -41,6 +43,7 @@ class AddEditProjectViewModel @Inject constructor(
     private val _state = MutableStateFlow(AddEditProjectState())
     val state: StateFlow<AddEditProjectState> = _state.asStateFlow()
     private var editingId: Long? = null
+    private var originalProject: Project? = null
 
     fun loadProject(initialServerId: Long?, id: Long?) {
         viewModelScope.launch {
@@ -61,11 +64,13 @@ class AddEditProjectViewModel @Inject constructor(
             if (id == null) return@launch
             val p = repo.getById(id) ?: return@launch
             editingId = id
+            originalProject = p
             _state.value = AddEditProjectState(
                 targetType = p.targetType,
                 selectedServerId = p.serverId,
                 serverOptions = options,
                 name = p.name,
+                displayName = p.displayName,
                 nameError = projectNameValidationError(p.name),
                 useTmux = p.useTmux,
                 customScript = p.customScript,
@@ -81,6 +86,7 @@ class AddEditProjectViewModel @Inject constructor(
     }
 
     fun updateName(value: String) {
+        if (editingId != null) return
         val normalized = value.replace(" ", "-")
         _state.update {
             it.copy(
@@ -90,10 +96,21 @@ class AddEditProjectViewModel @Inject constructor(
         }
     }
 
+    fun updateDisplayName(value: String) {
+        _state.update { it.copy(displayName = value,
+            displayNameError = se.joynes.terminalhub.data.model.projectDisplayNameValidationError(value)) }
+    }
+
     fun save() {
         viewModelScope.launch {
             val s = _state.value
-            val nameError = projectNameValidationError(s.name)
+            val name = originalProject?.name ?: s.name
+            val displayError = se.joynes.terminalhub.data.model.projectDisplayNameValidationError(s.displayName)
+            if (displayError != null) {
+                _state.value = s.copy(displayNameError = displayError)
+                return@launch
+            }
+            val nameError = projectNameValidationError(name)
             if (nameError != null) {
                 _state.value = s.copy(nameError = nameError)
                 return@launch
@@ -107,7 +124,9 @@ class AddEditProjectViewModel @Inject constructor(
                 id = editingId ?: 0L,
                 serverId = selectedServerId,
                 targetType = s.targetType,
-                name = s.name,
+                name = name,
+                displayName = s.displayName.trim(),
+                lastOpenedAt = originalProject?.lastOpenedAt ?: 0L,
                 useTmux = s.useTmux,
                 customScript = s.customScript,
                 aiCommand = s.aiCommand,

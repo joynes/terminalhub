@@ -62,7 +62,7 @@ fun ProjectListScreen(
                     items(projects) { project ->
                         RetroCard(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(12.dp)) {
-                                Text(project.name, color = MegaDrivePrimary, fontFamily = MonoFontFamily, fontSize = 14.sp)
+                                Text(project.displayTitle, color = MegaDrivePrimary, fontFamily = MonoFontFamily, fontSize = 14.sp)
                                 Spacer(Modifier.height(8.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     RetroButton("CONNECT", { onConnect(project.id) }, Modifier.weight(1f))

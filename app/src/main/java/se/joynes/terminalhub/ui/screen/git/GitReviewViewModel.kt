@@ -53,7 +53,7 @@ class GitReviewViewModel @Inject constructor(
                 val source = GitReviewReader { executor.run(server, it) }
                 reader = source
                 val repos = source.repositories(templates.projectPath(server, project))
-                mutable.value = GitReviewState(projectName = project.name, repositories = repos,
+                mutable.value = GitReviewState(projectName = project.displayTitle, repositories = repos,
                     repository = repos.singleOrNull(), loading = repos.size == 1)
                 repos.singleOrNull()?.let { loadSnapshot(source, it, GitReviewMode.ALL) }
             }

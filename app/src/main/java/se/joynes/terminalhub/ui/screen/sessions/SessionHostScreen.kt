@@ -151,6 +151,7 @@ fun SessionHostScreen(
     var showSettingsMenu by remember { mutableStateOf(false) }
     var newTerminalProjectId by remember { mutableStateOf<Long?>(null) }
     var closeTerminalProjectId by remember { mutableStateOf<Long?>(null) }
+    var renameProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
     var renameTerminalProjectId by remember { mutableStateOf<Long?>(null) }
     var quickFind by remember { mutableStateOf<ShortcutAction?>(null) }
     var quickFindProjectId by remember { mutableStateOf<Long?>(null) }
@@ -514,11 +515,11 @@ fun SessionHostScreen(
         val targets = findProjects.flatMap { project ->
             val server = shortcutServers.firstOrNull { it.id == project.serverId }
             val location = if (project.isLocal) "Local" else server?.name ?: "SSH"
-            listOf(QuickSwitchTarget("project:${project.id}", project.name,
+            listOf(QuickSwitchTarget("project:${project.id}", project.displayTitle,
                 "Project · $location" + if (projectTabs.any { it.projectId == project.id }) " · Open" else " · Closed")) +
                 discoveredWindows[project.id]?.windows.orEmpty().map { window ->
                     QuickSwitchTarget("window:${project.id}:${window.key}", window.name.ifBlank { "Terminal ${window.index + 1}" },
-                        "Window · ${project.name} · $location · Terminal ${window.index + 1}")
+                        "Window · ${project.displayTitle} · $location · Terminal ${window.index + 1}")
                 }
         }
         QuickSwitchDialog("Find", targets,
@@ -916,6 +917,12 @@ fun SessionHostScreen(
             }
         )
     }
+    renameProjectId?.let { projectId ->
+        val project = projectTabs.firstOrNull { it.projectId == projectId }
+        if (project != null) ProjectRenameDialog(project.projectName,
+            onDismiss = { renameProjectId = null },
+            onSave = { viewModel.renameProject(projectId, it); renameProjectId = null })
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -951,6 +958,7 @@ fun SessionHostScreen(
                             }
                         },
                         onReconnect = viewModel::reconnectProject,
+                        onRenameProject = { renameProjectId = it },
                         onRestartTmux = { projectId ->
                             projectTabs.firstOrNull { it.projectId == projectId }?.let { tab ->
                                 pendingTmuxRestart = PendingTmuxRestart(

@@ -30,14 +30,14 @@ class PinnedMacroStorageTest {
 
     @Test fun upgradeFrom11PreservesPlainPinsAndMacroSurvivesReopeningDatabase() = runBlocking {
         val name = "macro-migration-${System.nanoTime()}.db"
-        fun open() = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_11_12).build()
+        fun open() = Room.databaseBuilder(context, AppDatabase::class.java, name).addMigrations(MIGRATION_11_12, se.joynes.terminalhub.data.db.MIGRATION_12_13).build()
         try {
             open().let { db ->
                 db.pinnedActionDao().save(PinnedActionEntity(name = "Existing", text = "git status", scope = "GLOBAL", usageCount = 7))
                 db.close()
             }
             SQLiteDatabase.openDatabase(context.getDatabasePath(name).path, null, SQLiteDatabase.OPEN_READWRITE).use {
-                restoreV11PinnedTable(it); it.version = 11
+                restoreV11PinnedTable(it); restoreV12ProjectsTable(it); it.version = 11
             }
             val steps = TerminalMacro.interruptAndSend("echo 'å😀'\n")
             open().let { db ->

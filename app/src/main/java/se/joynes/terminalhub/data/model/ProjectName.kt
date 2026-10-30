@@ -17,3 +17,10 @@ fun projectNameValidationError(name: String): String? = when {
 }
 
 fun isValidProjectName(name: String): Boolean = projectNameValidationError(name) == null
+
+/** Optional UI-only title; never interpolated into directory paths or shell commands. */
+fun projectDisplayNameValidationError(name: String): String? = when {
+    name.length > 120 -> "Use at most 120 characters."
+    name.any { it.isISOControl() } -> "Use a single line without control characters."
+    else -> null
+}

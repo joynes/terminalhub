@@ -112,6 +112,25 @@ class SessionTabOrderTest {
         )
     }
 
+    @Test
+    fun renamingUpdatesLiveTabsWithoutReplacingOrDisconnectingSession() = runBlocking {
+        val id = projectRepo.save(localProject("same-folder"))
+        viewModel.init()
+        assertEquals(true, waitUntil(10_000) {
+            viewModel.projectTabs.value.any { it.projectId == id && it.sessionId != null && it.isConnected }
+        })
+        val before = viewModel.projectTabs.value.first { it.projectId == id }
+        val activeBefore = viewModel.activeId.value
+        viewModel.renameProject(id, "Nytt namn åäö")
+        assertEquals(true, waitUntil(5_000) {
+            viewModel.projectTabs.value.first { it.projectId == id }.projectName == "Nytt namn åäö"
+        })
+        val after = viewModel.projectTabs.value.first { it.projectId == id }
+        assertEquals(before.copy(projectName = "Nytt namn åäö"), after)
+        assertEquals(activeBefore, viewModel.activeId.value)
+        assertEquals("same-folder", projectRepo.getById(id)?.name)
+    }
+
     private fun localProject(name: String) = Project(
         serverId = LOCAL_PROJECT_SERVER_ID,
         targetType = ProjectTargetType.LOCAL,

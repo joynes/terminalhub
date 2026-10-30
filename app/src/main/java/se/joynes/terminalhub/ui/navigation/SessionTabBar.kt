@@ -60,7 +60,8 @@ fun SessionTabBar(
     tabWidth: Int = 70,
     tabHeight: Int = 28,
     tabTextSize: Int = 9,
-    onNewTerminal: (Long) -> Unit = {}
+    onNewTerminal: (Long) -> Unit = {},
+    onRenameProject: (Long) -> Unit = {}
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var menuTabId by remember { mutableStateOf<Long?>(null) }
@@ -278,6 +279,10 @@ fun SessionTabBar(
                             expanded = menuTabId == tab.projectId,
                             onDismissRequest = { menuTabId = null }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text("Rename project", fontFamily = MonoFontFamily, fontSize = 12.sp) },
+                                onClick = { menuTabId = null; onRenameProject(tab.projectId) }
+                            )
                             if (tab.usesTmux) DropdownMenuItem(
                                 text = { Text("New terminal", fontFamily = MonoFontFamily, fontSize = 12.sp) },
                                 enabled = tab.isConnected && !tab.isConnecting,

@@ -15,7 +15,7 @@ import se.joynes.terminalhub.data.db.entity.*
         PinnedActionEntity::class,
         ProjectNoteEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

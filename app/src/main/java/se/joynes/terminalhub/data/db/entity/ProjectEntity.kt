@@ -1,5 +1,6 @@
 package se.joynes.terminalhub.data.db.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -15,5 +16,6 @@ data class ProjectEntity(
     val colorSeed: Int = (Math.random() * Int.MAX_VALUE).toInt(),
     val createdAt: Long = System.currentTimeMillis(),
     val gitUrl: String = "",
-    val lastOpenedAt: Long = 0L
+    val lastOpenedAt: Long = 0L,
+    @ColumnInfo(defaultValue = "''") val displayName: String = ""
 )

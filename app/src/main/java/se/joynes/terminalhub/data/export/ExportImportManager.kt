@@ -13,6 +13,7 @@ import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.data.model.LOCAL_PROJECT_SERVER_ID
 import se.joynes.terminalhub.data.model.projectNameValidationError
+import se.joynes.terminalhub.data.model.projectDisplayNameValidationError
 import se.joynes.terminalhub.data.db.entity.ProjectNoteEntity
 import se.joynes.terminalhub.data.notes.ProjectNotesRepository
 import se.joynes.terminalhub.data.notes.MAX_NOTE_BYTES
@@ -85,7 +86,7 @@ class ExportImportManager @Inject constructor(
         sb.appendLine("  globalPinnedActions: ${ys(encodePinnedActions(pinnedActions.filter { it.scope == "GLOBAL" }))}")
         val locals = JSONArray()
         for (project in localProjects) {
-            val item = JSONObject().put("name", project.name).put("customScript", project.customScript)
+            val item = JSONObject().put("name", project.name).put("displayName", project.displayName).put("customScript", project.customScript)
                 .put("aiCommand", project.aiCommand).put("colorSeed", project.colorSeed)
                 .put("gitUrl", project.gitUrl).put("useTmux", project.useTmux)
                 .put("pinnedActions", encodePinnedActions(pinnedActions.filter { it.scope == "PROJECT" && it.projectId == project.id }))
@@ -110,6 +111,7 @@ class ExportImportManager @Inject constructor(
                 sb.appendLine("  projects:")
                 for (project in projects) {
                     sb.appendLine("  - name: ${ys(project.name)}")
+                    sb.appendLine("    displayName: ${ys(project.displayName)}")
                     sb.appendLine("    useTmux: ${project.useTmux}")
                     sb.appendLine("    customScript: ${ys(project.customScript)}")
                     sb.appendLine("    aiCommand: ${ys(project.aiCommand)}")
@@ -150,6 +152,7 @@ class ExportImportManager @Inject constructor(
         val localProjects = JSONArray(extractSettingsValue(text, "localProjects") ?: "[]")
         for (index in 0 until localProjects.length()) {
             val local = localProjects.getJSONObject(index)
+            require(projectDisplayNameValidationError(local.optString("displayName")) == null) { "Invalid display name" }
             require(projectNameValidationError(local.getString("name")) == null) { "Invalid local project name" }
             require(local.optString("note").toByteArray(Charsets.UTF_8).size <= MAX_NOTE_BYTES) { "Note exceeds 256 KB" }
             decodePinnedActions(local.optString("pinnedActions", "[]"), 0L)
@@ -158,6 +161,7 @@ class ExportImportManager @Inject constructor(
         val globalPins = decodePinnedActions(extractSettingsValue(text, "globalPinnedActions"))
         servers.forEach { server ->
             parseProjectsBlock(server["__projects__"] ?: "").forEach { project ->
+                require(projectDisplayNameValidationError(project["displayName"].orEmpty()) == null) { "Invalid display name" }
                 decodePinnedActions(project["pinnedActions"], 0L)
             }
         }
@@ -217,6 +221,7 @@ class ExportImportManager @Inject constructor(
                         id = 0,
                         serverId = serverId,
                         name = projectMap["name"] ?: "",
+                        displayName = projectMap["displayName"].orEmpty(),
                         useTmux = projectMap["useTmux"] != "false",
                         customScript = projectMap["customScript"] ?: "cd {{PROJECT_PATH}}",
                         aiCommand = projectMap["aiCommand"] ?: "",
@@ -233,7 +238,7 @@ class ExportImportManager @Inject constructor(
             for (index in 0 until localProjects.length()) {
                 val item = localProjects.getJSONObject(index)
                 val id = projectRepo.save(Project(serverId = LOCAL_PROJECT_SERVER_ID, targetType = ProjectTargetType.LOCAL,
-                    name = item.getString("name"), customScript = item.optString("customScript", "cd {{PROJECT_PATH}}"),
+                    name = item.getString("name"), displayName = item.optString("displayName"), customScript = item.optString("customScript", "cd {{PROJECT_PATH}}"),
                     aiCommand = item.optString("aiCommand"), colorSeed = item.optInt("colorSeed"),
                     gitUrl = item.optString("gitUrl"), useTmux = item.optBoolean("useTmux", true)))
                 if (item.has("note")) db.projectNoteDao().save(ProjectNoteEntity(id, item.getString("note"), System.currentTimeMillis()))

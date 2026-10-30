@@ -17,7 +17,9 @@ data class Project(
     val aiCommand: String = "",
     val colorSeed: Int = 0,
     val gitUrl: String = "",
-    val lastOpenedAt: Long = 0L
+    val lastOpenedAt: Long = 0L,
+    val displayName: String = ""
 ) {
+    val displayTitle: String get() = displayName.ifBlank { name }
     val isLocal: Boolean get() = targetType == ProjectTargetType.LOCAL
 }

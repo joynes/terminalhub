@@ -7,6 +7,7 @@ import se.joynes.terminalhub.data.db.entity.ProjectEntity
 import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.ProjectTargetType
 import se.joynes.terminalhub.data.model.projectNameValidationError
+import se.joynes.terminalhub.data.model.projectDisplayNameValidationError
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,6 +32,12 @@ class ProjectRepository @Inject constructor(
         dao.update(project.withColorSeed().toEntity())
     }
 
+    suspend fun renameDisplayName(projectId: Long, displayName: String) {
+        require(displayName.isNotBlank()) { "Enter a project name." }
+        require(projectDisplayNameValidationError(displayName) == null) { "Invalid display name." }
+        check(dao.renameDisplayName(projectId, displayName.trim()) == 1) { "Project no longer exists." }
+    }
+
     suspend fun delete(project: Project) = dao.delete(project.toEntity())
 
     suspend fun clearAll() = dao.clearAll()
@@ -48,7 +55,8 @@ class ProjectRepository @Inject constructor(
         aiCommand = aiCommand,
         colorSeed = colorSeed,
         gitUrl = gitUrl,
-        lastOpenedAt = lastOpenedAt
+        lastOpenedAt = lastOpenedAt,
+        displayName = displayName
     )
 
     private fun Project.toEntity() = ProjectEntity(
@@ -61,7 +69,8 @@ class ProjectRepository @Inject constructor(
         aiCommand = aiCommand,
         colorSeed = colorSeed,
         gitUrl = gitUrl,
-        lastOpenedAt = lastOpenedAt
+        lastOpenedAt = lastOpenedAt,
+        displayName = displayName
     )
 
     private fun Project.withColorSeed(): Project {
@@ -71,6 +80,7 @@ class ProjectRepository @Inject constructor(
     }
 
     private fun requireValidProjectName(project: Project) {
+        require(projectDisplayNameValidationError(project.displayName) == null) { "Invalid display name." }
         val error = projectNameValidationError(project.name)
         require(error == null) { error ?: "Invalid project name." }
     }

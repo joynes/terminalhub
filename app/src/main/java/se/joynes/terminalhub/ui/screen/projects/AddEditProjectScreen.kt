@@ -113,19 +113,18 @@ fun AddEditProjectScreen(
             )
 
             // -- Project name ----------------------------------------------
-            RetroTextField(
-                state.name,
-                viewModel::updateName,
-                "Project Name *",
-                Modifier.fillMaxWidth()
-            )
-            Text(
-                state.nameError
-                    ?: "Use A-Z, a-z, 0-9, dots, dashes or underscores. Spaces become dashes.",
-                color = if (state.nameError == null) MegaDriveDim else MegaDriveError,
-                fontSize = 10.sp,
-                fontFamily = MonoFontFamily
-            )
+            if (projectId == null) {
+                RetroTextField(state.name, viewModel::updateName, "Folder/session name *", Modifier.fillMaxWidth())
+                Text(state.nameError ?: "Use A-Z, a-z, 0-9, dots, dashes or underscores. Spaces become dashes.",
+                    color = if (state.nameError == null) MegaDriveDim else MegaDriveError,
+                    fontSize = 10.sp, fontFamily = MonoFontFamily)
+            } else {
+                Text("Folder/session: ${state.name}", color = MegaDriveOnSurface, fontSize = 12.sp, fontFamily = MonoFontFamily)
+            }
+            RetroTextField(state.displayName, viewModel::updateDisplayName, "Display name (optional)", Modifier.fillMaxWidth())
+            Text(state.displayNameError ?: "Shown in project tabs and search. Leave empty to use the folder name. Renaming keeps the same folder and terminals.",
+                color = if (state.displayNameError == null) MegaDriveDim else MegaDriveError,
+                fontSize = 10.sp, fontFamily = MonoFontFamily)
 
             // -- ADVANCED (collapsible) ------------------------------------
             Spacer(Modifier.height(4.dp))
@@ -252,7 +251,7 @@ fun AddEditProjectScreen(
                 onClick = { viewModel.save() },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = state.name.isNotBlank() &&
-                    state.nameError == null &&
+                    state.nameError == null && state.displayNameError == null &&
                     (state.targetType == ProjectTargetType.LOCAL || state.selectedServerId != null)
             )
         }
