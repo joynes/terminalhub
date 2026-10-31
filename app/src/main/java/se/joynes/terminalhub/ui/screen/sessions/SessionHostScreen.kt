@@ -140,6 +140,10 @@ fun SessionHostScreen(
     val tabAppearance by viewModel.tabAppearance.collectAsState()
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
+    val workPinStore = remember(context) { TerminalWorkPins(context) }
+    val workPins by workPinStore.pins.collectAsState()
+    DisposableEffect(workPinStore) { onDispose { workPinStore.close() } }
+    var showPinnedWork by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val keyBarReservedHeight = (keyBarRows.size * 36).dp
     val bottomBarReservedHeight = keyBarReservedHeight + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -497,8 +501,9 @@ fun SessionHostScreen(
     }
     val findStatus by tmuxWindowsViewModel.findStatus.collectAsState()
     val findProjects = shortcutProjects.filter { includeClosedInFind || projectTabs.any { tab -> tab.projectId == it.id } }
-    LaunchedEffect(quickFind != null, findProjects.map { it.id }) {
-        if (quickFind != null) tmuxWindowsViewModel.discoverWindows(findProjects.map { it.id })
+    LaunchedEffect(quickFind != null, showPinnedWork, workPins.map { it.projectId }, findProjects.map { it.id }) {
+        if (showPinnedWork) tmuxWindowsViewModel.discoverWindows(workPins.map { it.projectId })
+        else if (quickFind != null) tmuxWindowsViewModel.discoverWindows(findProjects.map { it.id })
         else tmuxWindowsViewModel.stopDiscovery()
     }
     LaunchedEffect(pendingFindWindow, activeProjectId, tmuxWindows) {
@@ -537,6 +542,20 @@ fun SessionHostScreen(
             }, onDismiss = { quickFind = null },
             onCreateProject = { quickFind = null; onAddProject(serverId) },
             includeClosed = includeClosedInFind, onIncludeClosedChange = viewModel::setFindIncludeClosedProjects, status = findStatus)
+    }
+
+    if (showPinnedWork) {
+        PinnedWorkDialog(workPins,
+            projectName = { id -> shortcutProjects.firstOrNull { it.id == id }?.displayTitle ?: "Unavailable project" },
+            windowName = { pin -> discoveredWindows[pin.projectId]?.windows?.firstOrNull { it.key == pin.windowKey }?.name ?: pin.name },
+            onChoose = { pin ->
+                if (shortcutProjects.none { it.id == pin.projectId }) shortcutMessage("This project is no longer available. You can unpin it.")
+                else {
+                    showPinnedWork = false
+                    pendingFindWindow = pin.projectId to pin.windowKey
+                    viewModel.openProject(pin.projectId)
+                }
+            }, onRemove = workPinStore::toggle, onDismiss = { showPinnedWork = false })
     }
 
     // Refresh scroll-to-bottom button visibility whenever the view's top row changes.
@@ -959,6 +978,7 @@ fun SessionHostScreen(
                         },
                         onReconnect = viewModel::reconnectProject,
                         onRenameProject = { renameProjectId = it },
+                        pinnedWorkProjects = workPins.map { it.projectId }.toSet(),
                         onRestartTmux = { projectId ->
                             projectTabs.firstOrNull { it.projectId == projectId }?.let { tab ->
                                 pendingTmuxRestart = PendingTmuxRestart(
@@ -1008,6 +1028,7 @@ fun SessionHostScreen(
                         expanded = showSettingsMenu,
                         onDismissRequest = { showSettingsMenu = false }
                     ) {
+                        DropdownMenuItem(text = { Text("📌 Active work") }, onClick = { showSettingsMenu = false; showPinnedWork = true })
                         DropdownMenuItem(text = { Text("Find…") }, onClick = { performShortcut(ShortcutAction.FIND_PROJECT) })
                         if (activeTab?.usesTmux == true) DropdownMenuItem(
                             text = { Text("New terminal") },
@@ -1145,7 +1166,9 @@ fun SessionHostScreen(
                     closeRequested = closeTerminalProjectId == activeProjectId,
                     onCloseRequestHandled = { closeTerminalProjectId = null },
                     renameRequested = renameTerminalProjectId == activeProjectId,
-                    onRenameRequestHandled = { renameTerminalProjectId = null })
+                    onRenameRequestHandled = { renameTerminalProjectId = null },
+                    workPins = workPins,
+                    onToggleWorkPin = { window -> activeProjectId?.let { id -> workPinStore.toggle(TerminalWorkPin(id, window.key, window.name)) } })
             }
 
             if (projectTabs.isEmpty()) {

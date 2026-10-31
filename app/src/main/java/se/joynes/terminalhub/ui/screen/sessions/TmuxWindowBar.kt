@@ -1,5 +1,6 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -52,7 +53,9 @@ fun TmuxWindowBar(
     closeRequested: Boolean = false,
     onCloseRequestHandled: () -> Unit = {},
     renameRequested: Boolean = false,
-    onRenameRequestHandled: () -> Unit = {}
+    onRenameRequestHandled: () -> Unit = {},
+    workPins: Set<TerminalWorkPin> = emptySet(),
+    onToggleWorkPin: (TmuxWindow) -> Unit = {}
 ) {
     var creating by remember(state.projectId) { mutableStateOf(false) }
     var selectedMenu by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
@@ -80,7 +83,7 @@ fun TmuxWindowBar(
     }
     LaunchedEffect(state.projectId, activeIndex) { if (activeIndex >= 0) listState.animateScrollToItem(activeIndex) }
 
-    if (windows.size != 1 || !state.connected || state.loading || state.busy || state.error != null) {
+    if (windows.any { w -> workPins.any { it.matches(state.projectId, w.key) } } || windows.size != 1 || !state.connected || state.loading || state.busy || state.error != null) {
     Column(modifier.fillMaxWidth().background(MegaDriveBg).testTag("project-terminal-bar")) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("TERMINALS", color = MegaDriveDim, fontFamily = MonoFontFamily, fontSize = 9.sp,
@@ -88,14 +91,16 @@ fun TmuxWindowBar(
             LazyRow(Modifier.weight(1f).testTag("project-terminal-tabs"), state = listState,
                 horizontalArrangement = Arrangement.spacedBy(4.dp), contentPadding = PaddingValues(vertical = 0.dp)) {
                 itemsIndexed(windows, key = { _, window -> window.id }) { position, window ->
+                    val pinned = workPins.any { it.matches(state.projectId, window.key) }
                     val name = window.name.map { if (it.isISOControl()) ' ' else it }.joinToString("").ifBlank { "Terminal ${window.index + 1}" }
                     Box(Modifier.width(tabWidth.dp).height(height)
-                        .background(if (window.active) MegaDrivePrimary.copy(alpha = 0.18f) else MegaDriveSurface)
+                        .border(if (pinned) 2.dp else 0.dp, if (pinned) MegaDriveWarning else androidx.compose.ui.graphics.Color.Transparent)
+                        .background(if (pinned) MegaDriveWarning.copy(alpha = if (window.active) .32f else .15f) else if (window.active) MegaDrivePrimary.copy(alpha = 0.18f) else MegaDriveSurface)
                         .combinedClickable(enabled = enabled, onClick = { if (!window.active) onSelect(window) },
                             onLongClick = { selectedMenu = window })
-                        .semantics { selected = window.active; contentDescription = "Terminal ${position + 1}: $name" }
+                        .semantics { selected = window.active; contentDescription = "Terminal ${position + 1}: $name" + if (pinned) ", active work" else "" }
                         .padding(horizontal = 6.dp), contentAlignment = Alignment.CenterStart) {
-                        Text("${position + 1} · $name" + if (window.panes > 1) " (${window.panes} panes)" else "", color = if (enabled || window.active) MegaDriveOnSurface else MegaDriveDim,
+                        Text((if (pinned) "📌 " else "") + "${position + 1} · $name" + if (window.panes > 1) " (${window.panes} panes)" else "", color = if (enabled || window.active) MegaDriveOnSurface else MegaDriveDim,
                             fontFamily = MonoFontFamily, fontSize = tabTextSize.sp, lineHeight = (tabTextSize * 1.3f).sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
@@ -141,6 +146,9 @@ fun TmuxWindowBar(
                                 else "Program names are recovery hints, not complete launch commands. Arguments and interactive state are not restored. Short-lived programs may not be observed.",
                                 style = MaterialTheme.typography.bodySmall)
                         }
+                    }
+                    TextButton(enabled = window.key.isNotBlank(), onClick = { onToggleWorkPin(window); selectedMenu = null }) {
+                        Text(if (workPins.any { it.matches(state.projectId, window.key) }) "Unmark active work" else "Mark as active work")
                     }
                     TextButton(enabled = enabled, onClick = { selectedMenu = null; renaming = window }) { Text("Rename terminal") }
                     TextButton(enabled = enabled && windows.size > 1, onClick = { selectedMenu = null; closing = window }) { Text("Close terminal") }

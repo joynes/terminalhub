@@ -44,6 +44,46 @@ class TmuxWindowBarTest {
         compose.runOnIdle { busy = true; requested = true }
         compose.onNodeWithText("Rename terminal").assertDoesNotExist()
     }
+    @Test fun singleWindowCanBePinnedFromInformationAndUnpinnedFromVisibleTab() {
+        val window = first.copy(key = "stable-window")
+        val single = state().copy(snapshot = TmuxWindowsSnapshot("\$1", listOf(window)))
+        var pins by mutableStateOf(emptySet<TerminalWorkPin>())
+        var info by mutableStateOf(true)
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(single, false, {}, {}, { _, _ -> }, {}, {},
+            infoRequested = info, onInfoRequestHandled = { info = false }, workPins = pins,
+            onToggleWorkPin = { pins = if (pins.isEmpty()) setOf(TerminalWorkPin(1, it.key, it.name)) else emptySet() }) } }
+        compose.onNodeWithText("Mark as active work").performScrollTo().performClick()
+        compose.onNodeWithContentDescription("Terminal 1: Codex, active work").assertIsSelected()
+            .performTouchInput { longClick() }
+        compose.onNodeWithText("Unmark active work").performScrollTo().performClick()
+        compose.onNodeWithTag("project-terminal-bar").assertDoesNotExist()
+    }
+
+    @Test fun workPinsSurviveStoreRecreationAndExternalClear() {
+        val base = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext
+        val file = "work-pin-test-${System.nanoTime()}"
+        val context = object : android.content.ContextWrapper(base) {
+            override fun getApplicationContext(): android.content.Context = this
+            override fun getSharedPreferences(name: String, mode: Int): android.content.SharedPreferences = base.getSharedPreferences(file, mode)
+        }
+        val store = TerminalWorkPins(context)
+        val pin = TerminalWorkPin(1, "window-key", "Codex")
+        var reopened: TerminalWorkPins? = null
+        try {
+            store.toggle(pin)
+            reopened = TerminalWorkPins(context)
+            assertEquals(setOf(pin), reopened.pins.value)
+            reopened.toggle(pin.copy(name = "Renamed"))
+            assertTrue(reopened.pins.value.isEmpty())
+            store.toggle(pin)
+            compose.runOnIdle { base.getSharedPreferences(file, 0).edit().clear().commit() }
+            compose.waitUntil { store.pins.value.isEmpty() }
+        } finally {
+            store.close(); reopened?.close()
+            base.getSharedPreferences(file, 0).edit().clear().commit()
+        }
+    }
+
     @get:Rule val compose = createComposeRule()
     private val first = TmuxWindow("@1", 0, "Codex", true, 1)
     private val second = TmuxWindow("@2", 1, "Tests", false, 1)

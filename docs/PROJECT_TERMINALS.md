@@ -99,3 +99,21 @@ a unit; pane creation is outside this feature.
   same process IDs, and close one window while preserving the other process.
 
 Real-tmux JVM tests require tmux installed locally; they skip where unavailable.
+
+## Mark active work
+
+Hold a terminal tab and choose **Mark as active work**. A pin and amber border
+identify it, and its project tab also gets a pin and amber border. A pinned
+single-terminal project keeps its terminal row visible. For an unmarked single
+terminal, open **Terminal information** from the session menu to mark it.
+
+Use **📌 Active work** in the session menu to jump between marked windows across
+projects. Marking does not select, reorder or restart anything; background
+programs continue as before. Window names in the list refresh when available.
+Use **Unpin** in that list, or **Unmark active work** on the terminal, to remove
+a mark. A missing window reports an error rather than switching to a different
+window that reused its tmux ID; its stale mark can still be removed in the list.
+
+Marks are device-local and survive app restarts and window renames through stable
+tmux window keys. They are excluded from configuration exports and cleared on
+full configuration import, alongside device-local terminal layouts.

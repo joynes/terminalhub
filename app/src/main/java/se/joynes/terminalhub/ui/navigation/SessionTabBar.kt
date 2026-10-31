@@ -61,7 +61,8 @@ fun SessionTabBar(
     tabHeight: Int = 28,
     tabTextSize: Int = 9,
     onNewTerminal: (Long) -> Unit = {},
-    onRenameProject: (Long) -> Unit = {}
+    onRenameProject: (Long) -> Unit = {},
+    pinnedWorkProjects: Set<Long> = emptySet()
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var menuTabId by remember { mutableStateOf<Long?>(null) }
@@ -163,6 +164,7 @@ fun SessionTabBar(
         ) {
             displayedTabs.forEach { tab ->
                 val isSelected = tab.sessionId != null && tab.sessionId == activeId
+                val hasPinnedWork = tab.projectId in pinnedWorkProjects
                 val bg = tabColor(tab.colorSeed, isSelected)
                 val textColor = when {
                     isSelected -> Color.White
@@ -190,6 +192,7 @@ fun SessionTabBar(
                                 .heightIn(min = tabHeight.dp)
                                 .testTag("project-tab-${tab.projectId}")
                                 .background(bg)
+                                .then(if (hasPinnedWork) Modifier.border(2.dp, MegaDriveWarning) else Modifier)
                                 .then(
                                     when (tab.projectId) {
                                         draggedTabId -> Modifier.border(2.dp, MegaDriveAccent)
@@ -265,7 +268,7 @@ fun SessionTabBar(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = tab.projectName.uppercase(),
+                                text = (if (hasPinnedWork) "📌 " else "") + tab.projectName.uppercase(),
                                 color = textColor,
                                 fontSize = tabTextSize.sp,
                                 lineHeight = (tabTextSize * 1.25f).sp,

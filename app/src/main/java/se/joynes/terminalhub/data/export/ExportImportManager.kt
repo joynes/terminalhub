@@ -190,6 +190,7 @@ class ExportImportManager @Inject constructor(
         securePrefsManager.clearAll()
         appContext.getSharedPreferences("session_host", Context.MODE_PRIVATE).edit().clear().apply()
         appContext.getSharedPreferences("tmux_window_layouts", Context.MODE_PRIVATE).edit().clear().apply()
+        appContext.getSharedPreferences("terminal_work_pins", Context.MODE_PRIVATE).edit().clear().apply()
 
         db.withTransaction {
             db.projectNoteDao().clearAll()
