@@ -68,4 +68,4 @@ internal fun voiceInputResult(
     VoiceInputResult(draft, false, recognizedText)
 }
 
-internal fun uploadedFileNamesText(fileNames: List<String>): String = fileNames.joinToString(" ")
+internal fun uploadedRemotePathsText(remotePaths: List<String>): String = remotePaths.joinToString(" ")

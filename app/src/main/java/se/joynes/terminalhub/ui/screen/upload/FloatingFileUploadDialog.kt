@@ -57,7 +57,7 @@ fun FloatingFileUploadDialog(
     var uploadQueue by remember { mutableStateOf<List<Pair<android.net.Uri, String>>>(emptyList()) }
     var totalFiles by remember { mutableStateOf(0) }
     var fileIndex by remember { mutableStateOf(0) }  // 0-indexed current file
-    var completedFileNames by remember { mutableStateOf<List<String>>(emptyList()) }
+    var completedRemotePaths by remember { mutableStateOf<List<String>>(emptyList()) }
 
     fun resolveFileName(uri: android.net.Uri): String {
         var name = uri.lastPathSegment ?: "file"
@@ -75,7 +75,7 @@ fun FloatingFileUploadDialog(
             val resolved = uris.map { it to resolveFileName(it) }
             totalFiles = resolved.size
             fileIndex = 0
-            completedFileNames = emptyList()
+            completedRemotePaths = emptyList()
             onSelectedUriChange(resolved.first().first)
             onSelectedNameChange(resolved.first().second)
             uploadQueue = resolved.drop(1)
@@ -98,7 +98,7 @@ fun FloatingFileUploadDialog(
             onSelectedNameChange(resolveFileName(initialUri))
             totalFiles = 1
             fileIndex = 0
-            completedFileNames = emptyList()
+            completedRemotePaths = emptyList()
         }
     }
 
@@ -115,11 +115,11 @@ fun FloatingFileUploadDialog(
     LaunchedEffect(uploadState) {
         val completed = uploadState as? UploadState.Done ?: return@LaunchedEffect
         val progress = advanceUploadBatch(
-            completedFileNames = completedFileNames,
-            completedFileName = completed.fileName,
+            completedRemotePaths = completedRemotePaths,
+            completedRemotePath = completed.remotePath,
             remainingFiles = uploadQueue.size
         )
-        completedFileNames = progress.completedFileNames
+        completedRemotePaths = progress.completedRemotePaths
         if (!progress.batchComplete) {
             val next = uploadQueue.first()
             uploadQueue = uploadQueue.drop(1)
@@ -128,7 +128,7 @@ fun FloatingFileUploadDialog(
             onSelectedUriChange(next.first)
             onSelectedNameChange(next.second)
         } else {
-            onUploadsCompleted(progress.completedFileNames)
+            onUploadsCompleted(progress.completedRemotePaths)
         }
     }
 

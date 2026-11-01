@@ -76,13 +76,13 @@ class TerminalTextInputTest {
     }
 
     @Test
-    fun allUploadedFileNamesAreInsertedWithoutRemotePaths() {
-        val inserted = uploadedFileNamesText(
-            listOf("first.txt", "second.jpg", "third-file.pdf")
+    fun allUploadedRemotePathsAreInsertedInSelectionOrder() {
+        val inserted = uploadedRemotePathsText(
+            listOf("/srv/demo/first.txt", "/srv/demo/second.jpg", "/srv/demo/third-file.pdf")
         )
         val result = insertTextAtCursor(TextFieldValue("open ", TextRange(5)), inserted)
 
-        assertEquals("open first.txt second.jpg third-file.pdf", result.text)
+        assertEquals("open /srv/demo/first.txt /srv/demo/second.jpg /srv/demo/third-file.pdf", result.text)
         assertEquals(result.text.length, result.selection.start)
     }
 }

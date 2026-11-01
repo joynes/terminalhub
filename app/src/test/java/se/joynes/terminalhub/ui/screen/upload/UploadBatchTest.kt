@@ -9,18 +9,18 @@ class UploadBatchTest {
 
     @Test
     fun `batch remains active while another selected file is queued`() {
-        val progress = advanceUploadBatch(emptyList(), "first.txt", remainingFiles = 2)
+        val progress = advanceUploadBatch(emptyList(), "/srv/projects/demo/first.txt", remainingFiles = 2)
 
-        assertEquals(listOf("first.txt"), progress.completedFileNames)
+        assertEquals(listOf("/srv/projects/demo/first.txt"), progress.completedRemotePaths)
         assertFalse(progress.batchComplete)
     }
 
     @Test
-    fun `final result contains every uploaded filename in selection order`() {
-        val first = advanceUploadBatch(emptyList(), "first.txt", remainingFiles = 1)
-        val final = advanceUploadBatch(first.completedFileNames, "second.txt", remainingFiles = 0)
+    fun `final result contains every uploaded remote path in selection order`() {
+        val first = advanceUploadBatch(emptyList(), "/srv/projects/demo/first.txt", remainingFiles = 1)
+        val final = advanceUploadBatch(first.completedRemotePaths, "/srv/projects/demo/second.txt", remainingFiles = 0)
 
-        assertEquals(listOf("first.txt", "second.txt"), final.completedFileNames)
+        assertEquals(listOf("/srv/projects/demo/first.txt", "/srv/projects/demo/second.txt"), final.completedRemotePaths)
         assertTrue(final.batchComplete)
     }
 }

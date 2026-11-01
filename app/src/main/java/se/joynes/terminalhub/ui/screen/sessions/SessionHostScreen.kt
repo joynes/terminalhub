@@ -1562,12 +1562,12 @@ fun SessionHostScreen(
                                 onSelectedUriChange = { fileUploadSelectedUriByProject[activeProjectId] = it },
                                 onSelectedNameChange = { fileUploadSelectedNameByProject[activeProjectId] = it },
                                 initialUri = activeFileUploadSelectedUri,
-                                onUploadsCompleted = { fileNames ->
+                                onUploadsCompleted = { remotePaths ->
                                     val projectId = activeProjectId
                                     val draft = textInputDraftByProject[projectId] ?: TextFieldValue()
                                     textInputDraftByProject[projectId] = insertTextAtCursor(
                                         draft,
-                                        uploadedFileNamesText(fileNames)
+                                        uploadedRemotePathsText(remotePaths)
                                     )
                                     fileUploadVisibleByProject[projectId] = false
                                     fileUploadSelectedUriByProject[projectId] = null
@@ -1576,10 +1576,10 @@ fun SessionHostScreen(
                                     textInputVisibleByProject[projectId] = true
                                     Toast.makeText(
                                         context,
-                                        if (fileNames.size == 1) {
-                                            "Uploaded filename inserted in text input"
+                                        if (remotePaths.size == 1) {
+                                            "Uploaded file path inserted in text input"
                                         } else {
-                                            "${fileNames.size} uploaded filenames inserted in text input"
+                                            "${remotePaths.size} uploaded file paths inserted in text input"
                                         },
                                         Toast.LENGTH_SHORT
                                     ).show()
