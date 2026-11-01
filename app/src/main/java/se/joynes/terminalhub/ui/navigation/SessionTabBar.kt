@@ -62,7 +62,9 @@ fun SessionTabBar(
     tabTextSize: Int = 9,
     onNewTerminal: (Long) -> Unit = {},
     onRenameProject: (Long) -> Unit = {},
-    pinnedWorkProjects: Set<Long> = emptySet()
+    pinnedWorkProjects: Set<Long> = emptySet(),
+    singleWindowProjects: Set<Long> = emptySet(),
+    onEditStartCommand: (Long) -> Unit = {}
 ) {
     val hapticFeedback = LocalHapticFeedback.current
     var menuTabId by remember { mutableStateOf<Long?>(null) }
@@ -290,6 +292,11 @@ fun SessionTabBar(
                                 text = { Text("New terminal", fontFamily = MonoFontFamily, fontSize = 12.sp) },
                                 enabled = tab.isConnected && !tab.isConnecting,
                                 onClick = { menuTabId = null; onNewTerminal(tab.projectId) }
+                            )
+                            if (tab.usesTmux && tab.projectId in singleWindowProjects) DropdownMenuItem(
+                                text = { Text("Start command", fontFamily = MonoFontFamily, fontSize = 12.sp) },
+                                enabled = tab.isConnected && !tab.isConnecting,
+                                onClick = { menuTabId = null; onEditStartCommand(tab.projectId) }
                             )
                             if (tab.targetType == ProjectTargetType.SSH) {
                                 DropdownMenuItem(

@@ -4,6 +4,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class TmuxWindowLayoutTest {
+    @Test fun startCommandFollowsStableKeyThroughRenameReorderAndRestoreWithoutExecuting() {
+        val command = "python report.py --title 'År 2026' | tee report.log"
+        val original = TmuxWindowLayout(listOf("Code", "Logs"), 0, listOf(
+            TmuxWindowMemory("code-key", startCommand = command), TmuxWindowMemory("logs-key", startCommand = "tail -f app.log")))
+        val restored = TmuxWindowsSnapshot("\$77", listOf(
+            TmuxWindow("@99", 0, "Logs renamed", true, 1, "logs-key", "zsh"),
+            TmuxWindow("@98", 1, "Code renamed", false, 1, "code-key", "zsh")))
+        val next = TmuxWindowLayout.from(restored, TmuxWindowLayout.decode(original.encode()))
+        assertEquals(listOf("tail -f app.log", command), next.memories.map { it.startCommand })
+        assertFalse(next.renderCreate("demo", "/work").contains(command))
+        val replacement = restored.copy(windows = listOf(restored.windows.first().copy(key = "new-key")))
+        assertEquals("", TmuxWindowLayout.from(replacement, next).memories.single().startCommand)
+    }
+
+    @Test fun versionTwoMigratesAndControlCharactersAreRejected() {
+        val bytes = java.io.ByteArrayOutputStream()
+        java.io.DataOutputStream(bytes).use {
+            it.writeInt(2); it.writeInt(0); it.writeInt(1); it.writeUTF("Code")
+            it.writeInt(1); it.writeUTF("stable-key"); it.writeBoolean(true); it.writeUTF("codex"); it.writeUTF("/work")
+        }
+        val old = TmuxWindowLayout.decode(bytes.toByteArray().joinToString("") { "%02x".format(it) })!!
+        assertEquals("", old.memories.single().startCommand)
+        assertEquals(TmuxProgram("codex", "/work"), old.memories.single().program)
+        listOf("echo ok\nexit", "bad\u0000", "x".repeat(8193)).forEach { command ->
+            assertTrue(runCatching { TmuxWindowLayout.validateStartCommand(command) }.isFailure)
+        }
+    }
     private fun snapshot(program: String = "codex", key: String = "stable-key", name: String = "Code") =
         TmuxWindowsSnapshot("\$1", listOf(TmuxWindow("@1", 0, name, true, 1, key, program, "/work/project")))
 

@@ -9,6 +9,21 @@ import se.joynes.terminalhub.data.model.*
 import se.joynes.terminalhub.data.ssh.*
 
 class TmuxWindowLayoutPersistenceTest {
+    @Test fun startCommandsPersistIndependentlyAndRemovalSurvivesPolling() = runBlocking {
+        val windows = TmuxWindowsSnapshot("\$1", listOf(
+            TmuxWindow("@1", 0, "Code", true, 1, "first-key"), TmuxWindow("@2", 1, "Logs", false, 1, "second-key")))
+        val store = TmuxWindowLayoutStore(context)
+        store.save(server, project, windows)
+        store.setStartCommand(server, project, "first-key", "codex resume --last -m gpt-6.1-sol")
+        store.setStartCommand(server, project, "second-key", "tail -f app.log")
+        store.save(server, project, windows)
+        val reopened = TmuxWindowLayoutStore(context)
+        assertEquals(listOf("codex resume --last -m gpt-6.1-sol", "tail -f app.log"), reopened.read(server, project)!!.memories.map { it.startCommand })
+        reopened.setStartCommand(server, project, "first-key", "")
+        store.save(server, project, windows)
+        assertEquals(listOf("", "tail -f app.log"), store.read(server, project)!!.memories.map { it.startCommand })
+        assertTrue(runCatching { store.setStartCommand(server, project, "missing-key", "bad") }.isFailure)
+    }
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val server = Server(name = "one", host = "fixture", username = "user", projectsFolder = "~/projects")
     private val project = Project(id = 3, serverId = 1, name = "project")

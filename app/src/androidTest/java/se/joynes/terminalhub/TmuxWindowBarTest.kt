@@ -17,6 +17,48 @@ import se.joynes.terminalhub.ui.theme.TerminalHubTheme
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
 class TmuxWindowBarTest {
+    @Test fun projectRequestEditsOnlyWindowDirectly() {
+        var requested by mutableStateOf(true)
+        var saved: Pair<TmuxWindow, String>? = null
+        val single = first.copy(key = "default-window")
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(
+            state().copy(snapshot = TmuxWindowsSnapshot("\$1", listOf(single))), false, {}, {}, { _, _ -> }, {}, {},
+            editStartCommandRequested = requested, onEditStartCommandRequestHandled = { requested = false },
+            onSaveStartCommand = { window, command -> saved = window to command }) } }
+        compose.onNodeWithText("Command").performTextReplacement("./backup.sh")
+        compose.onNodeWithText("SAVE").performClick()
+        compose.runOnIdle { assertEquals(single to "./backup.sh", saved); assertFalse(requested) }
+    }
+    @Test fun startCommandCanBeSavedPreparedAndRemovedForHiddenSingleWindow() {
+        var window by mutableStateOf(first.copy(key = "stable-key"))
+        var info by mutableStateOf(true)
+        var prepared: String? = null
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(
+            state().copy(snapshot = TmuxWindowsSnapshot("\$1", listOf(window))), false, {}, {}, { _, _ -> }, {}, {},
+            infoRequested = info, onInfoRequestHandled = { info = false },
+            onSaveStartCommand = { _, command -> window = window.copy(startCommand = command) },
+            onPrepareStartCommand = { prepared = it.startCommand }) } }
+        compose.onNodeWithText("Edit start command").performScrollTo().performClick()
+        compose.onNodeWithText("Command").performTextReplacement("python report.py --year 2026")
+        compose.onNodeWithText("SAVE").performClick()
+        compose.runOnIdle { assertNull(prepared); info = true }
+        compose.onNodeWithText("Prepare start command").performScrollTo().performClick()
+        compose.runOnIdle { assertEquals("python report.py --year 2026", prepared); info = true }
+        compose.onNodeWithText("Edit start command").performScrollTo().performClick()
+        compose.onNodeWithText("Command").assertTextContains("python report.py --year 2026")
+        compose.onNodeWithText("REMOVE").performClick()
+        compose.runOnIdle { info = true }
+        compose.onNodeWithText("Prepare start command").assertDoesNotExist()
+    }
+
+    @Test fun startCommandCannotBePreparedForInactiveTerminal() {
+        val other = second.copy(key = "other-key", startCommand = "tail -f app.log")
+        compose.setContent { TerminalHubTheme { TmuxWindowBar(
+            state().copy(snapshot = TmuxWindowsSnapshot("\$1", listOf(first, other))), false, {}, {}, { _, _ -> }, {}, {},
+            onPrepareStartCommand = { fail("Must select the terminal first") }) } }
+        compose.onNodeWithContentDescription("Terminal 2: Tests").performTouchInput { longClick() }
+        compose.onNodeWithText("Prepare start command").performScrollTo().assertIsNotEnabled()
+    }
     @Test fun renameShortcutWorksForHiddenSingleWindowAndEnterSavesOnce() {
         var requested by mutableStateOf(false)
         var renamed: Pair<TmuxWindow, String>? = null

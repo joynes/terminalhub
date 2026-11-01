@@ -43,6 +43,8 @@ class TmuxWindowsViewModel @Inject constructor(
     private var operation: Job? = null
     private val gate = Mutex()
     private val snapshots = mutableMapOf<Long, TmuxWindowsSnapshot>()
+    private val knownMutable = MutableStateFlow<Map<Long, TmuxWindowsSnapshot>>(emptyMap())
+    val knownWindows = knownMutable.asStateFlow()
     private val findMutable = MutableStateFlow<Map<Long, TmuxWindowsSnapshot>>(emptyMap())
     val findWindows = findMutable.asStateFlow()
     private val findStatusMutable = MutableStateFlow<String?>(null)
@@ -130,6 +132,11 @@ class TmuxWindowsViewModel @Inject constructor(
     fun select(window: TmuxWindow) = mutate("Switching terminal…") { current, snapshot -> remote.select(current.server, snapshot, window) }
     fun rename(window: TmuxWindow, name: String) = mutate("Renaming terminal…") { current, snapshot -> remote.rename(current.server, snapshot, window, name) }
     fun close(window: TmuxWindow) = mutate("Closing terminal…") { current, snapshot -> remote.close(current.server, snapshot, window) }
+    fun setStartCommand(window: TmuxWindow, command: String) = mutate("Saving start command…") { current, snapshot ->
+        require(snapshot.windows.any { it.id == window.id && it.key == window.key }) { "Terminal no longer exists." }
+        layouts.setStartCommand(current.server, current.project, window.key, command)
+        snapshot
+    }
 
     private fun mutate(label: String, action: suspend (Binding, TmuxWindowsSnapshot) -> TmuxWindowsSnapshot) {
         val current = binding ?: return
@@ -154,11 +161,12 @@ class TmuxWindowsViewModel @Inject constructor(
         val current = binding ?: return
         layouts.save(current.server, current.project, snapshot)
         val memories = layouts.read(current.server, current.project)?.memories.orEmpty().associateBy { it.key }
-        val enriched = snapshot.copy(windows = snapshot.windows.map { it.copy(lastProgram = memories[it.key]?.program) })
+        val enriched = snapshot.copy(windows = snapshot.windows.map { it.copy(lastProgram = memories[it.key]?.program,
+            startCommand = memories[it.key]?.startCommand.orEmpty()) })
         if (run != generation) return
         val previousActive = mutable.value.snapshot?.windows?.firstOrNull { it.active }?.id
         val changed = previousActive != null && previousActive != snapshot.windows.firstOrNull { it.active }?.id
-        mutable.value.projectId?.let { snapshots[it] = enriched }
+        mutable.value.projectId?.let { snapshots[it] = enriched; knownMutable.value = snapshots.toMap() }
         mutable.value = mutable.value.copy(snapshot = enriched, loading = false, error = null,
             selectionRevision = mutable.value.selectionRevision + if (changed) 1 else 0)
     }

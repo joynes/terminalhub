@@ -17,6 +17,20 @@ import se.joynes.terminalhub.ui.theme.TerminalHubTheme
 
 @RunWith(AndroidJUnit4::class)
 class SessionTabSwipeTest {
+    @Test fun startCommandMenuIsOnlyOfferedForProjectsWithOneKnownTerminal() {
+        val first = makeTab(1, "one").copy(usesTmux = true)
+        val second = makeTab(2, "many").copy(usesTmux = true)
+        var edited: Long? = null
+        composeRule.setContent { TerminalHubTheme {
+            SessionTabBar(listOf(first, second), first.sessionId, {}, { _, _ -> }, onReorder = {}, onAddProject = {},
+                singleWindowProjects = setOf(1), onEditStartCommand = { edited = it })
+        } }
+        composeRule.onNodeWithTag("project-tab-1").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Start command").performClick()
+        composeRule.runOnIdle { assertEquals(1L, edited) }
+        composeRule.onNodeWithTag("project-tab-2").performTouchInput { longClick() }
+        composeRule.onNodeWithText("Start command").assertDoesNotExist()
+    }
     
     @get:Rule val composeRule = createComposeRule()
 

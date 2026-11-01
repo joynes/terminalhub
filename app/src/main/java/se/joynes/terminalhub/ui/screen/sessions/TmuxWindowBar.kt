@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import se.joynes.terminalhub.data.ssh.TmuxWindow
 import se.joynes.terminalhub.data.ssh.TmuxWindowCommands
+import se.joynes.terminalhub.data.ssh.TmuxWindowLayout
 import se.joynes.terminalhub.ui.theme.*
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -55,17 +56,29 @@ fun TmuxWindowBar(
     renameRequested: Boolean = false,
     onRenameRequestHandled: () -> Unit = {},
     workPins: Set<TerminalWorkPin> = emptySet(),
-    onToggleWorkPin: (TmuxWindow) -> Unit = {}
+    onToggleWorkPin: (TmuxWindow) -> Unit = {},
+    onSaveStartCommand: (TmuxWindow, String) -> Unit = { _, _ -> },
+    onPrepareStartCommand: (TmuxWindow) -> Unit = {},
+    editStartCommandRequested: Boolean = false,
+    onEditStartCommandRequestHandled: () -> Unit = {}
 ) {
     var creating by remember(state.projectId) { mutableStateOf(false) }
     var selectedMenu by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
     var renaming by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
     var closing by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
+    var editingStartCommand by remember(state.projectId) { mutableStateOf<TmuxWindow?>(null) }
     val windows = state.snapshot?.windows.orEmpty()
     val enabled = state.connected && state.snapshot != null && !state.loading && !state.busy && !inputBusy
     val listState = rememberLazyListState()
     val activeIndex = windows.indexOfFirst { it.active }
     val height = maxOf(tabHeight, kotlin.math.ceil(tabTextSize * LocalDensity.current.fontScale * 1.3f + 8).toInt()).dp
+    LaunchedEffect(editStartCommandRequested, enabled, windows) {
+        if (editStartCommandRequested && enabled) {
+            if (windows.size == 1) editingStartCommand = windows.single()
+            else selectedMenu = windows.firstOrNull { it.active }
+            onEditStartCommandRequestHandled()
+        }
+    }
     LaunchedEffect(createRequested) {
         if (createRequested) { creating = true; onCreateRequestHandled() }
     }
@@ -138,6 +151,7 @@ fun TmuxWindowBar(
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text("Current program: ${latest.currentProgram.ifBlank { "Unavailable" }}")
                             if (latest.directory.isNotBlank()) Text("Current folder: ${latest.directory}")
+                            if (latest.startCommand.isNotBlank()) Text("Start command: ${latest.startCommand}")
                             latest.lastProgram?.let {
                                 Text("Last observed program: ${it.command}")
                                 Text("Last program folder: ${it.directory}")
@@ -147,6 +161,17 @@ fun TmuxWindowBar(
                                 style = MaterialTheme.typography.bodySmall)
                         }
                     }
+                    TextButton(enabled = enabled && window.key.isNotBlank(), onClick = {
+                        editingStartCommand = windows.firstOrNull { it.key == window.key } ?: window
+                        selectedMenu = null
+                    }) { Text("Edit start command") }
+                    val currentWindow = windows.firstOrNull { it.key == window.key && it.id == window.id }
+                    if (!currentWindow?.startCommand.isNullOrBlank()) {
+                        TextButton(enabled = enabled && currentWindow?.active == true, onClick = {
+                            currentWindow?.let(onPrepareStartCommand); selectedMenu = null
+                        }) { Text("Prepare start command") }
+                        if (currentWindow?.active != true) Text("Switch to this terminal to prepare its start command.", style = MaterialTheme.typography.bodySmall)
+                    }
                     TextButton(enabled = window.key.isNotBlank(), onClick = { onToggleWorkPin(window); selectedMenu = null }) {
                         Text(if (workPins.any { it.matches(state.projectId, window.key) }) "Unmark active work" else "Mark as active work")
                     }
@@ -155,6 +180,31 @@ fun TmuxWindowBar(
                     if (windows.size == 1) Text("Keep one terminal in the project. Restart session starts the project again.", style = MaterialTheme.typography.bodySmall)
                 }
             }, confirmButton = { TextButton(onClick = { selectedMenu = null }) { Text("DONE") } })
+    }
+    editingStartCommand?.let { window ->
+        key(window.key) {
+            var command by rememberSaveable { mutableStateOf(window.startCommand) }
+            val error = runCatching { TmuxWindowLayout.validateStartCommand(command) }.exceptionOrNull()?.message
+            AlertDialog(onDismissRequest = { editingStartCommand = null }, title = { Text("Start command") }, text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Save a command for ${window.name.ifBlank { "this terminal" }}. Prepare it from the terminal menu when needed. Saved on this device; never runs automatically.")
+                    OutlinedTextField(command, { command = it }, label = { Text("Command") }, singleLine = true,
+                        isError = error != null, modifier = Modifier.fillMaxWidth())
+                    error?.let { Text(it, color = MegaDriveWarning) }
+                }
+            }, confirmButton = {
+                TextButton(enabled = enabled && error == null, onClick = {
+                    onSaveStartCommand(window, command); editingStartCommand = null
+                }) { Text("SAVE") }
+            }, dismissButton = {
+                Row {
+                    TextButton(enabled = enabled && window.startCommand.isNotEmpty(), onClick = {
+                        onSaveStartCommand(window, ""); editingStartCommand = null
+                    }) { Text("REMOVE") }
+                    TextButton(onClick = { editingStartCommand = null }) { Text("CANCEL") }
+                }
+            })
+        }
     }
     renaming?.let { window -> TerminalNameDialog("Rename terminal", window.name, optional = false,
         enabled = enabled, onDismiss = { renaming = null }, onSave = { onRename(window, it); renaming = null }) }

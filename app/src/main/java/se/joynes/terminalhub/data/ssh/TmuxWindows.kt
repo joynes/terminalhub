@@ -8,7 +8,8 @@ import java.util.UUID
 
 data class TmuxProgram(val command: String, val directory: String)
 data class TmuxWindow(val id: String, val index: Int, val name: String, val active: Boolean, val panes: Int,
-    val key: String = "", val currentProgram: String = "", val directory: String = "", val lastProgram: TmuxProgram? = null)
+    val key: String = "", val currentProgram: String = "", val directory: String = "", val lastProgram: TmuxProgram? = null,
+    val startCommand: String = "")
 data class TmuxWindowsSnapshot(val sessionId: String, val windows: List<TmuxWindow>)
 
 /** All targets are tmux object IDs, scoped to the project's exact session. */

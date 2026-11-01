@@ -164,6 +164,7 @@ fun SessionHostScreen(
     val shortcutProjects by viewModel.shortcutProjects.collectAsState()
     val shortcutServers by viewModel.shortcutServers.collectAsState(initial = emptyList())
     var terminalInfoProjectId by remember { mutableStateOf<Long?>(null) }
+    var startCommandProjectId by remember { mutableStateOf<Long?>(null) }
     var showAboutDialog by remember { mutableStateOf(false) }
     var pendingTabClose by remember { mutableStateOf<PendingTabClose?>(null) }
     var pendingTmuxRestart by remember { mutableStateOf<PendingTmuxRestart?>(null) }
@@ -187,6 +188,7 @@ fun SessionHostScreen(
     val notesViewModel: ProjectNotesViewModel = hiltViewModel()
     val tmuxWindowsViewModel: TmuxWindowsViewModel = hiltViewModel()
     val tmuxWindows by tmuxWindowsViewModel.state.collectAsState()
+    val knownTmuxWindows by tmuxWindowsViewModel.knownWindows.collectAsState()
     val pendingInputSessions by viewModel.pendingInputSessions.collectAsState()
     val activeMacro by viewModel.pinnedMacro.state.collectAsState()
     val gitReviewViewModel: se.joynes.terminalhub.ui.screen.git.GitReviewViewModel = hiltViewModel()
@@ -979,6 +981,11 @@ fun SessionHostScreen(
                         onReconnect = viewModel::reconnectProject,
                         onRenameProject = { renameProjectId = it },
                         pinnedWorkProjects = workPins.map { it.projectId }.toSet(),
+                        singleWindowProjects = knownTmuxWindows.filterValues { it.windows.size == 1 }.keys,
+                        onEditStartCommand = { projectId ->
+                            startCommandProjectId = projectId
+                            viewModel.openProject(projectId)
+                        },
                         onRestartTmux = { projectId ->
                             projectTabs.firstOrNull { it.projectId == projectId }?.let { tab ->
                                 pendingTmuxRestart = PendingTmuxRestart(
@@ -1168,7 +1175,21 @@ fun SessionHostScreen(
                     renameRequested = renameTerminalProjectId == activeProjectId,
                     onRenameRequestHandled = { renameTerminalProjectId = null },
                     workPins = workPins,
-                    onToggleWorkPin = { window -> activeProjectId?.let { id -> workPinStore.toggle(TerminalWorkPin(id, window.key, window.name)) } })
+                    onToggleWorkPin = { window -> activeProjectId?.let { id -> workPinStore.toggle(TerminalWorkPin(id, window.key, window.name)) } },
+                    onSaveStartCommand = tmuxWindowsViewModel::setStartCommand,
+                    editStartCommandRequested = startCommandProjectId == activeProjectId,
+                    onEditStartCommandRequestHandled = { startCommandProjectId = null },
+                    onPrepareStartCommand = { window ->
+                        val live = tmuxWindowsViewModel.state.value
+                        if (canChangeTerminal() && live.projectId == activeProjectId &&
+                            live.snapshot?.windows?.any { it.id == window.id && it.key == window.key && it.active } == true) {
+                            activeProjectId?.let { id ->
+                                showTerminal()
+                                textInputDraftByProject[id] = TextFieldValue(window.startCommand, TextRange(window.startCommand.length))
+                                textInputVisibleByProject[id] = true
+                            }
+                        }
+                    })
             }
 
             if (projectTabs.isEmpty()) {

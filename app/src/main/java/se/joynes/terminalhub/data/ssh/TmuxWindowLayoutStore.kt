@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 import se.joynes.terminalhub.data.model.Project
 import se.joynes.terminalhub.data.model.Server
 
-data class TmuxWindowMemory(val key: String, val program: TmuxProgram? = null)
+data class TmuxWindowMemory(val key: String, val program: TmuxProgram? = null, val startCommand: String = "")
 
 /** Observations are recovery hints, never executable commands or process checkpoints. */
 data class TmuxWindowLayout(val names: List<String>, val active: Int, val memories: List<TmuxWindowMemory> = emptyList()) {
@@ -22,6 +22,7 @@ data class TmuxWindowLayout(val names: List<String>, val active: Int, val memori
         require(memories.isEmpty() || memories.size == names.size)
         require(memories.all { Regex("[a-zA-Z0-9@_-]{1,128}").matches(it.key) })
         require(memories.map { it.key }.distinct().size == memories.size)
+        memories.forEach { validateStartCommand(it.startCommand) }
         require(memories.all { it.program == null || listOf(it.program.command, it.program.directory).all { text -> text.length <= 8192 && '\u0000' !in text } })
     }
 
@@ -29,12 +30,13 @@ data class TmuxWindowLayout(val names: List<String>, val active: Int, val memori
         validate()
         val bytes = ByteArrayOutputStream()
         DataOutputStream(bytes).use { out ->
-            out.writeInt(2); out.writeInt(active); out.writeInt(names.size)
+            out.writeInt(3); out.writeInt(active); out.writeInt(names.size)
             names.forEach(out::writeUTF)
             out.writeInt(memories.size)
             memories.forEach {
                 out.writeUTF(it.key); out.writeBoolean(it.program != null)
                 it.program?.let { program -> out.writeUTF(program.command); out.writeUTF(program.directory) }
+                out.writeUTF(it.startCommand)
             }
         }
         return bytes.toByteArray().joinToString("") { "%02x".format(it) }
@@ -63,6 +65,11 @@ data class TmuxWindowLayout(val names: List<String>, val active: Int, val memori
     }
 
     companion object {
+        fun validateStartCommand(command: String) {
+            require(command.length <= 8192 && command.none(Character::isISOControl)) {
+                "Use one line, up to 8192 characters, without control characters."
+            }
+        }
         private val shells = setOf("sh", "bash", "zsh", "fish", "dash", "ksh", "tcsh", "csh", "ash", "nu", "xonsh", "pwsh")
         fun from(snapshot: TmuxWindowsSnapshot, previous: TmuxWindowLayout? = null): TmuxWindowLayout {
             val old = previous?.memories.orEmpty().associateBy { it.key }
@@ -70,7 +77,7 @@ data class TmuxWindowLayout(val names: List<String>, val active: Int, val memori
                 val command = window.currentProgram.substringAfterLast('/').removePrefix("-")
                 val observation = if (command.isNotBlank() && command !in shells && window.panes == 1)
                     TmuxProgram(window.currentProgram, window.directory) else null
-                TmuxWindowMemory(window.key, observation ?: old[window.key]?.program)
+                TmuxWindowMemory(window.key, observation ?: old[window.key]?.program, old[window.key]?.startCommand.orEmpty())
             } else emptyList()
             return TmuxWindowLayout(snapshot.windows.map { it.name }, snapshot.windows.indexOfFirst { it.active }, memories)
         }
@@ -78,13 +85,14 @@ data class TmuxWindowLayout(val names: List<String>, val active: Int, val memori
             if (text == null || text.length > 16_000_000 || text.length % 2 != 0) return null
             val bytes = ByteArray(text.length / 2) { text.substring(it * 2, it * 2 + 2).toInt(16).toByte() }
             DataInputStream(ByteArrayInputStream(bytes)).use { input ->
-                val version = input.readInt(); require(version in 1..2)
+                val version = input.readInt(); require(version in 1..3)
                 val active = input.readInt(); val count = input.readInt()
                 require(count in 1..128)
                 val names = List(count) { input.readUTF() }
                 val memories = if (version == 1) emptyList() else {
                     val size = input.readInt(); require(size == 0 || size == count)
-                    List(size) { TmuxWindowMemory(input.readUTF(), if (input.readBoolean()) TmuxProgram(input.readUTF(), input.readUTF()) else null) }
+                    List(size) { TmuxWindowMemory(input.readUTF(), if (input.readBoolean()) TmuxProgram(input.readUTF(), input.readUTF()) else null,
+                        if (version >= 3) input.readUTF() else "") }
                 }
                 TmuxWindowLayout(names, active, memories).also { it.validate(); require(input.available() == 0) }
             }
@@ -101,6 +109,16 @@ class TmuxWindowLayoutStore @Inject constructor(@ApplicationContext context: Con
         return MessageDigest.getInstance("SHA-256").digest(identity.toByteArray()).joinToString("") { "%02x".format(it) }
     }
     fun read(server: Server, project: Project): TmuxWindowLayout? = TmuxWindowLayout.decode(prefs.getString(key(server, project), null))
+    suspend fun setStartCommand(server: Server, project: Project, windowKey: String, command: String) = withContext(Dispatchers.IO) {
+        TmuxWindowLayout.validateStartCommand(command)
+        synchronized(prefs) {
+            val storageKey = key(server, project)
+            val layout = requireNotNull(TmuxWindowLayout.decode(prefs.getString(storageKey, null))) { "Refresh project terminals and try again." }
+            require(layout.memories.any { it.key == windowKey }) { "Terminal no longer exists. Refresh and try again." }
+            val updated = layout.copy(memories = layout.memories.map { if (it.key == windowKey) it.copy(startCommand = command) else it })
+            check(prefs.edit().putString(storageKey, updated.encode()).commit()) { "Could not save start command on this device." }
+        }
+    }
     suspend fun save(server: Server, project: Project, snapshot: TmuxWindowsSnapshot, onlyIfMissing: Boolean = false) = withContext(Dispatchers.IO) {
         val key = key(server, project)
         synchronized(prefs) {
