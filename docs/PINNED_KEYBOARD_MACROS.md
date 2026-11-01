@@ -31,6 +31,15 @@ respecting Android's accessibility timeout preference. Running banners remain
 available until completion or STOP. Starting a new run cancels the old banner's
 dismiss timer.
 
+## Find and browse actions
+
+Pinned actions use a compact, scrollable grid rather than a single-column list.
+The sheet uses most of the available screen height, with additional columns on
+wider screens. **Search actions** filters names without regard to case; the count
+shows how many actions match. Scroll to reach the last row. Tapping a card keeps
+the existing run/prepare behavior; holding it opens editing, deletion and sending
+to multiple projects. Recent input remains a separate list.
+
 ## Send to several projects
 
 Hold a pinned action and choose **Send to multiple projects**. All currently open

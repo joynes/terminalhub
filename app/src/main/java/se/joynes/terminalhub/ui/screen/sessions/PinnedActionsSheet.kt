@@ -5,6 +5,11 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -36,6 +41,10 @@ fun PinnedActionsSheet(
     onSendToProjects: ((PinnedActionEntity, Set<Long>) -> Boolean)? = null
 ) {
     var recent by remember { mutableStateOf(initiallyRecent) }
+    var pinSearch by remember { mutableStateOf("") }
+    val filteredPins = remember(pins, pinSearch) {
+        pins.filter { it.name.contains(pinSearch.trim(), ignoreCase = true) }
+    }
     var visibleCount by remember { mutableIntStateOf(20) }
     var selectedHistory by remember { mutableStateOf<TextInputHistoryEntity?>(null) }
     var selectedPin by remember { mutableStateOf<PinnedActionEntity?>(null) }
@@ -45,7 +54,7 @@ fun PinnedActionsSheet(
     val clipboard = LocalClipboardManager.current
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(Modifier.fillMaxWidth().fillMaxHeight(0.9f).padding(horizontal = 16.dp)) {
             Text("Pinned actions", style = MaterialTheme.typography.titleLarge)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 FilterChip(selected = !recent, onClick = { recent = false }, label = { Text("★ Pinned") })
@@ -58,7 +67,56 @@ fun PinnedActionsSheet(
                 else "Tap to send or prepare. Hold to edit, send to several projects or delete.",
                 style = MaterialTheme.typography.bodySmall
             )
-            LazyColumn(Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 480.dp).padding(vertical = 8.dp)) {
+            if (!recent) {
+                OutlinedTextField(
+                    value = pinSearch,
+                    onValueChange = { pinSearch = it },
+                    label = { Text("Search actions") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                )
+                Text(
+                    if (pinSearch.isBlank()) "${pins.size} actions" else "${filteredPins.size} of ${pins.size} actions",
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+                if (filteredPins.isEmpty()) {
+                    Text(
+                        if (pins.isEmpty()) "Pin recent input or tap New to create an action." else "No matching actions.",
+                        Modifier.padding(vertical = 16.dp)
+                    )
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 156.dp),
+                    modifier = Modifier.fillMaxWidth().weight(1f).testTag("pinned-actions-grid"),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(filteredPins, key = { it.id }) { action ->
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.fillMaxWidth().combinedClickable(
+                                onClick = { if (action.isMacro || action.sendEnter) onSend(action) else onPrepare(action.text) },
+                                onLongClick = { selectedPin = action }
+                            )
+                        ) {
+                            Column(Modifier.heightIn(min = 76.dp).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(action.name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    "${if (action.scope == "GLOBAL") "Global" else "Project"} · ${if (action.isMacro) "Macro" else if (action.sendEnter) "Send + Enter" else "Prepare"}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            } else LazyColumn(Modifier.fillMaxWidth().weight(1f).padding(vertical = 8.dp)) {
                 if (recent && !historyEnabled) {
                     item {
                         Text("Recent input history is off.", Modifier.padding(16.dp))
@@ -79,19 +137,7 @@ fun PinnedActionsSheet(
                     if (history.size > visibleCount) item {
                         TextButton(onClick = { visibleCount += 20 }, modifier = Modifier.fillMaxWidth()) { Text("Show more") }
                     }
-                } else {
-                    if (pins.isEmpty()) item { Text("Pin recent input or tap New to create an action.", Modifier.padding(16.dp)) }
-                    items(pins, key = { it.id }) { action ->
-                        ListItem(
-                            headlineContent = { Text(action.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
-                            supportingContent = { Text("${if (action.scope == "GLOBAL") "Global" else "Project"} · ${if (action.isMacro) "Keyboard macro" else if (action.sendEnter) "Send + Enter" else "Prepare in Text Input"}") },
-                            modifier = Modifier.combinedClickable(
-                                onClick = { if (action.isMacro || action.sendEnter) onSend(action) else onPrepare(action.text) },
-                                onLongClick = { selectedPin = action }
-                            ).heightIn(min = 64.dp)
-                        )
-                        HorizontalDivider()
-                    }
+
                 }
             }
         }

@@ -1,6 +1,10 @@
 package se.joynes.terminalhub
 
 import androidx.compose.runtime.*
+import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.test.platform.app.InstrumentationRegistry
+import java.io.File
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -122,4 +126,37 @@ class PinnedActionsSheetTest {
             assertNull(saved?.projectId)
         }
     }
+
+    @Test fun manyActionsRemainReachableAndLastActionCanRun() {
+        val actions = (1..40).map { PinnedActionEntity(id = it.toLong(), name = "Action $it", text = "command $it", scope = "GLOBAL") }
+        var sent: PinnedActionEntity? = null
+        rule.setContent { TerminalHubTheme {
+            PinnedActionsSheet(1, actions, emptyList(), onDismiss = {}, onPrepare = {},
+                onSend = { sent = it }, onSave = {}, onDeletePin = {}, onDeleteHistory = {})
+        } }
+        rule.onNodeWithText("Action 1").assertIsDisplayed()
+        rule.onNodeWithText("Action 2").assertIsDisplayed()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        File(context.getExternalFilesDir(null), "macro-grid.png").outputStream().use {
+            rule.onNodeWithTag("pinned-actions-grid").captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        rule.onNodeWithTag("pinned-actions-grid").performScrollToNode(hasText("Action 40"))
+        rule.onNodeWithText("Action 40").assertIsDisplayed().performClick()
+        rule.runOnIdle { assertEquals(actions.last(), sent) }
+    }
+
+    @Test fun searchFindsActionsBeyondTheVisibleGridAndKeepsLongPressMenu() {
+        val actions = (1..40).map { PinnedActionEntity(id = it.toLong(), name = "Action $it", text = "command $it", scope = "GLOBAL") }
+        rule.setContent { TerminalHubTheme {
+            PinnedActionsSheet(1, actions, emptyList(), onDismiss = {}, onPrepare = {},
+                onSend = {}, onSave = {}, onDeletePin = {}, onDeleteHistory = {})
+        } }
+        rule.onNodeWithText("Search actions").performTextInput("ACTION 40")
+        rule.onNodeWithText("1 of 40 actions").assertIsDisplayed()
+        rule.onNodeWithText("Action 1").assertDoesNotExist()
+        rule.onNodeWithText("Action 40").assertIsDisplayed().performTouchInput { longClick() }
+        rule.onNodeWithText("Edit action").assertIsDisplayed()
+        rule.onNodeWithText("Delete action").assertIsDisplayed()
+    }
+
 }
