@@ -53,3 +53,11 @@ portrait navigation, filtering, sorting, independent download selection, returni
 from preview at the same scroll position, image display and native PDF page
 rendering, zoom and temporary-file cleanup. Existing folder-permission, download,
 location and viewport tests remain applicable.
+
+## Recovering closed SSH channels
+
+Window discovery, file browsing, uploads, downloads and project notes open short-lived
+channels on shared SSH transports. If opening a channel fails, TerminalHub retires
+that transport for new work and tries one fresh connection. Existing terminal
+channels retain their leases. Only channel creation is retried: commands and file
+operations that have already started are never automatically replayed.

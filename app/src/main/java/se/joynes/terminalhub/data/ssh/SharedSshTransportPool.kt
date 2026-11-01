@@ -65,6 +65,36 @@ class SharedSshTransportPool @Inject constructor(
         }
     }
 
+    suspend fun acquireCommandTransfer(server: Server, password: String?, privateKeyPem: String?): Pair<SshTransportLease, SshAuxiliarySession> =
+        acquireTransferChannel(server, password, privateKeyPem) { it.openAuxiliarySession() }
+
+    suspend fun acquireSftpTransfer(server: Server, password: String?, privateKeyPem: String?): Pair<SshTransportLease, SshAuxiliarySftp> =
+        acquireTransferChannel(server, password, privateKeyPem) { it.openSftpSession() }
+
+    /** Retry channel creation only. Commands, file writes and other operations are never replayed. */
+    private suspend fun <T> acquireTransferChannel(
+        server: Server,
+        password: String?,
+        privateKeyPem: String?,
+        open: (SshTransportLease) -> T
+    ): Pair<SshTransportLease, T> {
+        repeat(2) { attempt ->
+            val lease = acquireTransfer(server, password, privateKeyPem)
+            try {
+                return lease to open(lease)
+            } catch (cancelled: CancellationException) {
+                lease.release()
+                throw cancelled
+            } catch (error: Exception) {
+                // Retire the failed transport for future work, preserving sibling project leases.
+                lease.invalidate()
+                if (attempt == 1) throw error
+                logger.log(LogLevel.WARN, TAG, "Transfer channel open failed; retrying with a fresh SSH transport")
+            }
+        }
+        error("Unreachable")
+    }
+
     private suspend fun acquireLease(
         server: Server,
         password: String?,

@@ -40,9 +40,9 @@ class ScpDownloader @Inject constructor(
         privateKeyPem: String?,
         remoteDir: String
     ): List<RemoteFileEntry> = withContext(Dispatchers.IO) {
-        val lease = transportPool.acquireTransfer(server, password, privateKeyPem)
+        val (lease, auxiliary) = transportPool.acquireSftpTransfer(server, password, privateKeyPem)
         try {
-            lease.openSftpSession().use { session ->
+            auxiliary.use { session ->
                 val client = session.client
                 val directory = resolveSftpPath(client, remoteDir)
                 client.ls(directory)
@@ -100,8 +100,9 @@ class ScpDownloader @Inject constructor(
             var lease: SshTransportLease? = null
             var outputStream: OutputStream? = initialOutput
             try {
-                lease = transportPool.acquireTransfer(server, password, privateKeyPem)
-                lease.openSftpSession().use { session ->
+                val (acquiredLease, auxiliary) = transportPool.acquireSftpTransfer(server, password, privateKeyPem)
+                lease = acquiredLease
+                auxiliary.use { session ->
                     staging?.attach(session)
                     val client = session.client
                     val remotePath = joinRemotePath(resolveSftpPath(client, remoteDir), fileName)

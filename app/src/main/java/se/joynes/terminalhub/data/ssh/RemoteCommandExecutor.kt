@@ -23,9 +23,9 @@ class RemoteCommandExecutor @Inject constructor(
     private val credentials: SecurePrefsManager
 ) {
     suspend fun run(server: Server, command: String): RemoteCommandResult = withContext(Dispatchers.IO) {
-        val lease = pool.acquireTransfer(server, credentials.getPassword(server.id), credentials.getPrivateKey(server.id))
+        val (lease, auxiliary) = pool.acquireCommandTransfer(server, credentials.getPassword(server.id), credentials.getPrivateKey(server.id))
         try {
-            lease.openAuxiliarySession().use { channel ->
+            auxiliary.use { channel ->
                 coroutineScope {
                     val pending = async(Dispatchers.IO) {
                         val session = channel.session

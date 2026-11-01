@@ -38,8 +38,9 @@ class ScpUploader @Inject constructor(
             requireValidTransferFileName(fileName)
             var lease: SshTransportLease? = null
             try {
-                lease = transportPool.acquireTransfer(server, password, privateKeyPem)
-                lease.openSftpSession().use { session ->
+                val (acquiredLease, auxiliary) = transportPool.acquireSftpTransfer(server, password, privateKeyPem)
+                lease = acquiredLease
+                auxiliary.use { session ->
                     val client = session.client
                     val resolvedDir = resolveSftpPath(client, remoteDir)
                     val destination = joinRemotePath(resolvedDir, fileName)

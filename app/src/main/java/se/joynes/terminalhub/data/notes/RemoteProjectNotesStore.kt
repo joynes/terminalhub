@@ -91,9 +91,9 @@ class RemoteProjectNotesStore @Inject constructor(
         }
 
     private suspend fun <T> withClient(server: Server, block: (SFTPv3Client) -> T): T = withContext(Dispatchers.IO) {
-        val lease = pool.acquireTransfer(server, credentials.getPassword(server.id), credentials.getPrivateKey(server.id))
+        val (lease, auxiliary) = pool.acquireSftpTransfer(server, credentials.getPassword(server.id), credentials.getPrivateKey(server.id))
         try {
-            lease.openSftpSession().use { session ->
+            auxiliary.use { session ->
                 session.client.setCharset("UTF-8")
                 // Close just this auxiliary channel to unblock a stalled read, not all tabs.
                 coroutineScope {
