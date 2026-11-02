@@ -19,6 +19,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -40,7 +46,7 @@ import se.joynes.terminalhub.ui.theme.*
 private fun tabColor(seed: Int, active: Boolean): Color {
     val hue = ((seed.toLong() and 0x7FFFFFFF) % 360).toFloat()
     return if (active)
-        Color.hsl(hue, saturation = 0.60f, lightness = 0.30f)
+        Color.hsl(hue, saturation = 0.60f, lightness = 0.36f)
     else
         Color.hsl(hue, saturation = 0.30f, lightness = 0.12f)
 }
@@ -193,8 +199,20 @@ fun SessionTabBar(
                                 .width(tabWidth.dp)
                                 .heightIn(min = tabHeight.dp)
                                 .testTag("project-tab-${tab.projectId}")
+                                .semantics { selected = isSelected; role = Role.Tab }
                                 .background(bg)
                                 .then(if (hasPinnedWork) Modifier.border(2.dp, MegaDriveWarning) else Modifier)
+                                .then(if (isSelected) Modifier.drawWithContent {
+                                    drawContent()
+                                    // Inset the selection outline so a pinned project's amber edge stays visible.
+                                    val inset = if (hasPinnedWork) 3.dp.toPx() else 1.dp.toPx()
+                                    val stroke = 2.dp.toPx()
+                                    drawRect(Color.White, Offset(inset, inset),
+                                        androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+                                    drawRect(MegaDrivePrimary, Offset(inset + stroke, size.height - inset - 4.dp.toPx()),
+                                        androidx.compose.ui.geometry.Size((size.width - (inset + stroke) * 2).coerceAtLeast(0f), 3.dp.toPx()))
+                                } else Modifier)
                                 .then(
                                     when (tab.projectId) {
                                         draggedTabId -> Modifier.border(2.dp, MegaDriveAccent)
@@ -275,6 +293,7 @@ fun SessionTabBar(
                                 fontSize = tabTextSize.sp,
                                 lineHeight = (tabTextSize * 1.25f).sp,
                                 fontFamily = MonoFontFamily,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier.fillMaxWidth()
