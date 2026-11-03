@@ -944,13 +944,7 @@ fun SessionHostScreen(
             onDismiss = { renameProjectId = null },
             onSave = { viewModel.renameProject(projectId, it); renameProjectId = null })
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
-            .imePadding()
-            .background(MegaDriveBg)
-    ) {
+    SessionHostLayout {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1765,6 +1759,11 @@ fun SessionHostScreen(
                 }
             }
     }
+}
+
+@Composable
+private fun SessionHostLayout(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxSize().statusBarsPadding().imePadding().background(MegaDriveBg), content = content)
 }
 
 @Composable

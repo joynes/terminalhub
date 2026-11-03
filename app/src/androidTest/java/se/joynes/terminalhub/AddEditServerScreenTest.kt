@@ -34,10 +34,10 @@ class AddEditServerScreenTest {
         composeRule.setContent {
             TerminalHubTheme { AddEditServerScreen(serverId = null, onBack = {}) }
         }
-        composeRule.onNodeWithText("Host or IP address *", useUnmergedTree = true)
-            .performTextInput("192.168.1.1")
-        composeRule.onNodeWithText("SSH username *", useUnmergedTree = true)
-            .performTextInput("admin")
+        composeRule.onNode(hasText("Host or IP address *") and hasSetTextAction())
+            .performScrollTo().performTextInput("192.168.1.1")
+        composeRule.onNode(hasText("SSH username *") and hasSetTextAction())
+            .performScrollTo().performTextInput("admin")
         composeRule.onNodeWithText("[ SAVE ]").assertIsEnabled()
     }
 
@@ -47,13 +47,13 @@ class AddEditServerScreenTest {
             TerminalHubTheme { AddEditServerScreen(serverId = null, onBack = {}) }
         }
 
-        composeRule.onNodeWithText("[ I HAVE A PRIVATE KEY ]").assertIsDisplayed()
+        composeRule.onNodeWithText("[ I HAVE A PRIVATE KEY ]").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Paste an existing PEM private key to replace the local key.")
             .assertDoesNotExist()
 
         composeRule.onNodeWithText("[ I HAVE A PRIVATE KEY ]").performClick()
         composeRule.onNodeWithText("Paste an existing PEM private key to replace the local key.")
-            .assertIsDisplayed()
+            .performScrollTo().assertIsDisplayed()
     }
 
     @Test

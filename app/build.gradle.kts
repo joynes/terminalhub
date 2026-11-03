@@ -1,10 +1,13 @@
 import java.util.Properties
+import org.gradle.testing.jacoco.tasks.JacocoReport
+import org.gradle.testing.jacoco.tasks.JacocoCoverageVerification
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.ksp)
+    jacoco
 }
 
 fun gitCommitCount(): Int = try {
@@ -88,6 +91,10 @@ android {
         }
     }
     buildTypes {
+        debug {
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
+        }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
@@ -108,11 +115,68 @@ android {
         compose = true
         buildConfig = true
     }
+    testCoverage {
+        // 0.8.16's ASM operation limit rejects the large Compose terminal screen.
+        jacocoVersion = "0.8.14"
+    }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/io.netty.versions.properties"
+        }
+    }
+}
+
+jacoco { toolVersion = "0.8.14" }
+
+// Keep authored Compose/UI code, coroutine bodies and data classes in the denominator.
+// Only Android, Hilt and Room generated classes are excluded.
+val appCoverageClasses = fileTree(layout.buildDirectory.dir(
+    "intermediates/classes/diagnosticDebug/transformDiagnosticDebugClassesWithAsm/dirs"
+)) {
+    include("se/joynes/terminalhub/**", "com/trilead/ssh2/**")
+    exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.*", "**/Hilt_*", "**/Dagger*",
+        "**/*_Factory*", "**/*_MembersInjector*", "**/*_GeneratedInjector*",
+        "**/*_HiltModules*", "**/*_Impl*", "**/HiltTestActivity*")
+}
+
+val appCoverageData = fileTree(layout.buildDirectory) {
+    include("outputs/unit_test_code_coverage/diagnosticDebugUnitTest/*.exec",
+        "outputs/code_coverage/diagnosticDebugAndroidTest/connected/**/*.ec")
+}
+
+tasks.register<JacocoReport>("appCoverageReport") {
+    group = "verification"
+    description = "Merge diagnostic JVM and emulator coverage for all authored app code."
+    dependsOn("testDiagnosticDebugUnitTest", "createDiagnosticDebugCoverageReport")
+    executionData.setFrom(appCoverageData)
+    classDirectories.setFrom(appCoverageClasses)
+    sourceDirectories.setFrom(files("src/main/java"))
+    doFirst {
+        check(appCoverageClasses.files.isNotEmpty()) { "No app classes found; coverage cannot be reported." }
+        check(appCoverageData.files.any { it.extension == "exec" } && appCoverageData.files.any { it.extension == "ec" }) {
+            "Both JVM and emulator execution data are required for combined app coverage."
+        }
+    }
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/appCoverageReport/report.xml"))
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/appCoverageReport/html"))
+    }
+}
+
+tasks.register<JacocoCoverageVerification>("appCoverageVerification") {
+    group = "verification"
+    description = "Require at least 95% line coverage across authored app code."
+    dependsOn("appCoverageReport")
+    executionData.setFrom(appCoverageData)
+    classDirectories.setFrom(appCoverageClasses)
+    sourceDirectories.setFrom(files("src/main/java"))
+    violationRules {
+        rule {
+            limit { counter = "LINE"; value = "COVEREDRATIO"; minimum = "0.95".toBigDecimal() }
         }
     }
 }
