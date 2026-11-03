@@ -201,11 +201,9 @@ fun SessionTabBar(
                                 .testTag("project-tab-${tab.projectId}")
                                 .semantics { selected = isSelected; role = Role.Tab }
                                 .background(bg)
-                                .then(if (hasPinnedWork) Modifier.border(2.dp, MegaDriveWarning) else Modifier)
                                 .then(if (isSelected) Modifier.drawWithContent {
                                     drawContent()
-                                    // Inset the selection outline so a pinned project's amber edge stays visible.
-                                    val inset = if (hasPinnedWork) 3.dp.toPx() else 1.dp.toPx()
+                                    val inset = 1.dp.toPx()
                                     val stroke = 2.dp.toPx()
                                     drawRect(Color.White, Offset(inset, inset),
                                         androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),

@@ -102,8 +102,9 @@ Real-tmux JVM tests require tmux installed locally; they skip where unavailable.
 
 ## Mark active work
 
-Hold a terminal tab and choose **Mark as active work**. A pin and amber border
-identify it, and its project tab also gets a pin and amber border. A pinned
+Hold a terminal tab and choose **Mark as active work**. A pin icon identifies it,
+and its project tab also gets a pin icon. Pinning does not change a tab's border
+or background; those indicate the selected project or terminal. A pinned
 single-terminal project keeps its terminal row visible. For an unmarked single
 terminal, open **Terminal information** from the session menu to mark it.
 
