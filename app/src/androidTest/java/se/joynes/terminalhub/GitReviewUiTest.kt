@@ -49,10 +49,9 @@ class GitReviewUiTest {
             GitReviewDialog(state().copy(file = file, patch = patch), {}, {}, {}, {}, {}, {})
         } }
         compose.onNodeWithTag("git-fullscreen").assertExists()
-        compose.onNodeWithTag("git-diff-scroll").performScrollToIndex(240)
+        compose.onNodeWithTag("git-diff-scroll").performScrollToNode(hasText("END240", substring = true))
         compose.onNodeWithText("END240", substring = true).assertIsDisplayed()
-        compose.onNodeWithTag("git-diff-scroll").performTouchInput { swipeDown() }
-        compose.onNodeWithTag("git-diff-scroll").performScrollToIndex(1)
+        compose.onNodeWithTag("git-diff-scroll").performScrollToNode(hasText("val line1 =", substring = true))
         compose.onNodeWithText("val line1 =", substring = true).assertIsDisplayed()
         compose.onNodeWithText("WINDOW").performClick()
         compose.onNodeWithTag("git-windowed").assertExists()

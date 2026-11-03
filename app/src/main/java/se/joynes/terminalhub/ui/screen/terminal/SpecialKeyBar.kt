@@ -148,6 +148,11 @@ fun SpecialKeyBar(
                             if (keyId == "PINNED_ACTIONS") contentDescription = "Pinned actions"
                             if (keyId == "PROJECT_NOTES") contentDescription = "Project notes"
                             if (keyId == "GIT_REVIEW") contentDescription = "Git changes"
+                            if (keyId == "UPLOAD") contentDescription = "Upload files"
+                            if (keyId == "DOWNLOAD") contentDescription = "Browse remote files"
+                            if (keyId == "TEXT_INPUT") contentDescription = "Open text input"
+                            if (keyId == "VOICE_INPUT") contentDescription = "Voice input"
+                            if (keyId == "KEYBOARD") contentDescription = "Toggle keyboard"
                         },
                         active = active,
                         highlighted = keyId in normalizedHighlights,

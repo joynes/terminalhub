@@ -42,7 +42,10 @@ class TmuxWindowIntegrationTest {
 
     @Before fun setup() {
         assumeTrue("A local tmux is needed for integration tests", binary != null)
-        tmux("-f /dev/null new-session -d -s project -c ${q(working.path)} /bin/sh")
+        tmux("-f /dev/null new-session -d -s project -n Fixture -c ${q(working.path)} /bin/sh")
+        // Automatic shell-title updates are unrelated to the mutations under test
+        // and can otherwise change an unrelated window between two snapshots.
+        tmux("set-window-option -g automatic-rename off")
     }
     @After fun cleanup() {
         if (binary != null) runCatching { tmux("kill-server") }

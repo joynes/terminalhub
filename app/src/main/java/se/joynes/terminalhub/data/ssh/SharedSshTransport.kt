@@ -106,13 +106,13 @@ class TrileadSshTransportConnector @Inject constructor(
     }
 }
 
-private class TrileadSshTransport(
+internal class TrileadSshTransport(
     private val connection: Connection,
     private val logger: AppLogger,
     private val settingsRepository: AppSettingsRepository,
-    private val runtimeRepository: AppRuntimeRepository
+    private val runtimeRepository: AppRuntimeRepository,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 ) : SshTransport {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val projectIds = AtomicReference<Set<Long>>(emptySet())
     private val auxiliaryChannelPermits = Semaphore(AUXILIARY_CHANNEL_CAPACITY, true)
     private val keepaliveJob: Job = scope.launch { keepaliveLoop() }

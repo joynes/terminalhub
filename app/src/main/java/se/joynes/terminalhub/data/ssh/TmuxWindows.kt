@@ -5,7 +5,8 @@ import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
 import javax.inject.Inject
 import java.util.UUID
-import java.util.Base64
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 data class TmuxProgram(val command: String, val directory: String)
 data class TmuxWindow(val id: String, val index: Int, val name: String, val active: Boolean, val panes: Int,
@@ -14,6 +15,7 @@ data class TmuxWindow(val id: String, val index: Int, val name: String, val acti
 data class TmuxWindowsSnapshot(val sessionId: String, val windows: List<TmuxWindow>)
 
 /** All targets are tmux object IDs, scoped to the project's exact session. */
+@OptIn(ExperimentalEncodingApi::class)
 object TmuxWindowCommands {
     internal const val START = "TERMINALHUB_WINDOWS_V3"
     private const val LEGACY_START = "TERMINALHUB_WINDOWS_V2"
@@ -39,7 +41,7 @@ object TmuxWindowCommands {
         "tmux set-option -w -t $quotedTarget @terminalhub_literal_name ${quote(name)}; " +
         "tmux rename-window -t $quotedTarget -- '#{@terminalhub_literal_name}'; " +
         "tmux set-option -wF -t $quotedTarget @terminalhub_rendered_name '#{window_name}'; " +
-        "tmux set-option -w -t $quotedTarget @terminalhub_label_base64 ${quote(Base64.getEncoder().encodeToString(name.toByteArray(Charsets.UTF_8)))}; "
+        "tmux set-option -w -t $quotedTarget @terminalhub_label_base64 ${quote(Base64.encode(name.toByteArray(Charsets.UTF_8)))}; "
 
     fun validateName(name: String) {
         require(name.codePointCount(0, name.length) <= 64 && name.none(Character::isISOControl)) {
@@ -122,7 +124,7 @@ object TmuxWindowCommands {
             require(windowId.matches(row[0]) && row[2] in listOf("0", "1")) { "Invalid tmux window." }
             require(Regex("[a-zA-Z0-9@_-]{1,128}").matches(row[5])) { "Invalid terminal identity." }
             val name = if (rowSize == 9 && row[8].isNotEmpty()) {
-                String(Base64.getDecoder().decode(row[8]), Charsets.UTF_8).also(::validateName)
+                String(Base64.decode(row[8]), Charsets.UTF_8).also(::validateName)
             } else row[4]
             TmuxWindow(row[0], row[1].toInt(), name, row[2] == "1", row[3].toInt(), row[5], row[6], row[7])
         }

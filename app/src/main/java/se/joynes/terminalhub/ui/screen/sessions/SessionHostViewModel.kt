@@ -510,104 +510,108 @@ class SessionHostViewModel @Inject constructor(
             return
         }
         val conn = connectToServer(srv)
-        conn.bindProject(project.id, project.name)
-        val setupCmd = engine.renderSetup(srv, project, windowLayouts.read(srv, project).takeIf { project.useTmux })
-        val attachCmd = engine.renderAttach(srv, project)
-        val customScript = engine.renderCustomScript(srv, project)
-        val aiCmd = engine.renderAiCommand(project)
-        when (val attempt = awaitSshConnectionAttempt(conn.connected, conn.lastErrorMessage, SSH_CONNECT_TIMEOUT_MS)) {
-            SshConnectionAttemptResult.Connected -> {
-                connectionErrors.value = connectionErrors.value - project.id
-            }
-            is SshConnectionAttemptResult.Failed -> {
-                conn.hostKeyChallenge.value?.let { challenge ->
-                    _hostKeyChallenges.value = _hostKeyChallenges.value + (project.id to challenge)
+        var registeredWithTerminal = false
+        try {
+            conn.bindProject(project.id, project.name)
+            val setupCmd = engine.renderSetup(srv, project, windowLayouts.read(srv, project).takeIf { project.useTmux })
+            val attachCmd = engine.renderAttach(srv, project)
+            val customScript = engine.renderCustomScript(srv, project)
+            val aiCmd = engine.renderAiCommand(project)
+            when (val attempt = awaitSshConnectionAttempt(conn.connected, conn.lastErrorMessage, SSH_CONNECT_TIMEOUT_MS)) {
+                SshConnectionAttemptResult.Connected -> {
+                    connectionErrors.value = connectionErrors.value - project.id
                 }
-                recordConnectionError(project, attempt.message)
-                sshManager.destroySession(conn.sessionId)
+                is SshConnectionAttemptResult.Failed -> {
+                    conn.hostKeyChallenge.value?.let { challenge ->
+                        _hostKeyChallenges.value = _hostKeyChallenges.value + (project.id to challenge)
+                    }
+                    recordConnectionError(project, attempt.message)
+                    return
+                }
+            }
+            if (sessionManager.isProjectClosed(project.id)) {
                 return
             }
-        }
-        if (sessionManager.isProjectClosed(project.id)) {
-            sshManager.destroySession(conn.sessionId)
-            return
-        }
-        val setupOutput = if (setupCmd.isNotBlank()) conn.runSilent(setupCmd) else ""
-        if (project.useTmux && listOf("TMUX_SESSION_CREATED", "TMUX_SESSION_EXISTS", "TMUX_WINDOWS_RESTORED").none(setupOutput::contains)) {
-            recordConnectionError(project, "Could not create or restore project terminals. Reconnect to try again.")
-            sshManager.destroySession(conn.sessionId)
-            return
-        }
-        val gitCloneFailed = setupOutput.contains(ScriptTemplateEngine.GIT_CLONE_FAILED_MARKER)
-        val shouldRunStartupCommands = if (project.useTmux) {
-            setupOutput.contains("TMUX_SESSION_CREATED")
-        } else {
-            true
-        }
-        conn.awaitOutputQuiescence(requireNewOutput = true)
-
-        if (attachCmd.isNotBlank()) {
-            conn.send("$attachCmd\n")
-            conn.awaitTransportQuiescence()
-        }
-        if (!sessionManager.isProjectClosed(project.id)) {
-            val switchToReplacement = shouldSwitchToReplacementSession(
-                autoSwitch = autoSwitch,
-                replacementSessionId = replacementSessionId,
-                activeSessionId = activeId.value
-            )
-            sessionManager.register(
-                conn.sessionId,
-                conn,
-                project.name,
-                project.id,
-                isTmux = project.useTmux,
-                tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null,
-                lastOpenedAt = project.lastOpenedAt
-            )
-            replacementSessionId?.let {
-                sessionManager.close(it, killTmuxSession = false, selectReplacementIfActive = false)
+            val setupOutput = if (setupCmd.isNotBlank()) conn.runSilent(setupCmd) else ""
+            if (project.useTmux && listOf("TMUX_SESSION_CREATED", "TMUX_SESSION_EXISTS", "TMUX_WINDOWS_RESTORED").none(setupOutput::contains)) {
+                recordConnectionError(project, "Could not create or restore project terminals. Reconnect to try again.")
+                return
             }
-            if (switchToReplacement) {
-                sessionManager.switchTo(TerminalSessionId(conn.sessionId))
+            val gitCloneFailed = setupOutput.contains(ScriptTemplateEngine.GIT_CLONE_FAILED_MARKER)
+            val shouldRunStartupCommands = if (project.useTmux) {
+                setupOutput.contains("TMUX_SESSION_CREATED")
+            } else {
+                true
             }
-        } else {
-            sshManager.destroySession(conn.sessionId)
-            return
-        }
+            conn.awaitOutputQuiescence(requireNewOutput = true)
 
-        if (gitCloneFailed) {
-            logger.log(
-                LogLevel.WARN,
-                "SessionHostViewModel",
-                "Git clone failed for project=${project.name} url=${project.gitUrl}"
-            )
-            conn.send("printf '\\n[TerminalHub] Git clone failed for ${project.name}. Check git/network/path on the server.\\n'\n")
-        }
-
-        conn.awaitTransportQuiescence()
-        if (!gitCloneFailed && shouldRunStartupCommands && customScript.isNotBlank()) {
-            conn.send("$customScript\n")
-            conn.awaitTransportQuiescence()
-        }
-
-        if (!gitCloneFailed && shouldRunStartupCommands && aiCmd.isNotBlank()) {
-            conn.awaitTransportQuiescence()
-            conn.send("$aiCmd\n")
-        }
-        if (setupOutput.contains("TMUX_WINDOWS_RESTORED")) {
-            _uiMessages.tryEmit("Restored terminals for ${project.name}. Start programs in each terminal when ready.")
-        }
-        // Bootstrap every connected project after upgrade, including tabs never selected.
-        // A late read must not overwrite a newer layout saved by a window action.
-        if (project.useTmux && windowLayouts.read(srv, project) == null) viewModelScope.launch {
-            try {
-                val snapshot = remoteWindows.list(srv, project)
-                if (sessionManager.getConnectionForProject(project.id) === conn && !sessionManager.isProjectClosed(project.id)) {
-                    windowLayouts.save(srv, project, snapshot, onlyIfMissing = true)
+            if (attachCmd.isNotBlank()) {
+                conn.send("$attachCmd\n")
+                conn.awaitTransportQuiescence()
+            }
+            if (!sessionManager.isProjectClosed(project.id)) {
+                val switchToReplacement = shouldSwitchToReplacementSession(
+                    autoSwitch = autoSwitch,
+                    replacementSessionId = replacementSessionId,
+                    activeSessionId = activeId.value
+                )
+                sessionManager.register(
+                    conn.sessionId,
+                    conn,
+                    project.name,
+                    project.id,
+                    isTmux = project.useTmux,
+                    tmuxSessionName = if (project.useTmux) engine.sessionName(project) else null,
+                    lastOpenedAt = project.lastOpenedAt
+                )
+                registeredWithTerminal = true
+                replacementSessionId?.let {
+                    sessionManager.close(it, killTmuxSession = false, selectReplacementIfActive = false)
                 }
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { logger.log(LogLevel.WARN, "SessionRecovery", "Could not capture terminal layout for projectId=${project.id}") }
+                if (switchToReplacement) {
+                    sessionManager.switchTo(TerminalSessionId(conn.sessionId))
+                }
+            } else {
+                return
+            }
+
+            if (gitCloneFailed) {
+                logger.log(
+                    LogLevel.WARN,
+                    "SessionHostViewModel",
+                    "Git clone failed for project=${project.name} url=${project.gitUrl}"
+                )
+                conn.send("printf '\\n[TerminalHub] Git clone failed for ${project.name}. Check git/network/path on the server.\\n'\n")
+            }
+
+            conn.awaitTransportQuiescence()
+            if (!gitCloneFailed && shouldRunStartupCommands && customScript.isNotBlank()) {
+                conn.send("$customScript\n")
+                conn.awaitTransportQuiescence()
+            }
+
+            if (!gitCloneFailed && shouldRunStartupCommands && aiCmd.isNotBlank()) {
+                conn.awaitTransportQuiescence()
+                conn.send("$aiCmd\n")
+            }
+            if (setupOutput.contains("TMUX_WINDOWS_RESTORED")) {
+                _uiMessages.tryEmit("Restored terminals for ${project.name}. Start programs in each terminal when ready.")
+            }
+            // Bootstrap every connected project after upgrade, including tabs never selected.
+            // A late read must not overwrite a newer layout saved by a window action.
+            if (project.useTmux && windowLayouts.read(srv, project) == null) viewModelScope.launch {
+                try {
+                    val snapshot = remoteWindows.list(srv, project)
+                    if (sessionManager.getConnectionForProject(project.id) === conn && !sessionManager.isProjectClosed(project.id)) {
+                        windowLayouts.save(srv, project, snapshot, onlyIfMissing = true)
+                    }
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { logger.log(LogLevel.WARN, "SessionRecovery", "Could not capture terminal layout for projectId=${project.id}") }
+            }
+        } finally {
+            // Until registration, this activation owns the transport, including when
+            // its coroutine is cancelled by closing a tab or leaving the screen.
+            if (!registeredWithTerminal) sshManager.destroySession(conn.sessionId)
         }
     }
 
@@ -767,7 +771,12 @@ class SessionHostViewModel @Inject constructor(
         _dbProjects.value = _dbProjects.value.filter { it.id != projectId }
         connectingProjectIds.value = connectingProjectIds.value - projectId
         connectionErrors.value = connectionErrors.value - projectId
-        sessionId?.let { sessionManager.close(it, killTmuxSession = killTmuxSession) }
+        val liveSessions = sessionManager.sessions.value
+        val targets = liveSessions.filter { it.projectId == projectId }.mapTo(linkedSetOf()) { it.id }
+        // A replacement may already have registered while the UI still holds the old ID.
+        // Include an absent stale ID, but never an ID known to belong to another project.
+        sessionId?.takeIf { id -> liveSessions.none { it.id == id } }?.let(targets::add)
+        targets.forEach { sessionManager.close(it, killTmuxSession = killTmuxSession) }
     }
 
     fun closeProject(

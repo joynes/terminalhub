@@ -44,16 +44,25 @@ class AppRuntimeRepository @Inject constructor(
     fun onProcessStarted(): AppRuntimeState {
         val previous = readState()
         val now = System.currentTimeMillis()
+        // A second process loss can happen before any recovered transport registers.
+        // Preserve the outstanding recovery snapshot until there is live session state.
+        val remoteToRecover = previous.remoteProjectIds.ifEmpty {
+            if (previous.recoveryPending) previous.recoveryRemoteProjectIds else emptySet()
+        }
+        val localToRecover = previous.localProjectIds.ifEmpty {
+            if (previous.recoveryPending) previous.recoveryLocalProjectIds else emptySet()
+        }
+        val activeToRecover = previous.activeProjectId
+            ?: previous.recoveryActiveProjectId.takeIf { previous.recoveryPending }
         val hadRecoverableState = previous.foregroundServiceRunning ||
-            previous.remoteProjectIds.isNotEmpty() ||
-            previous.localProjectIds.isNotEmpty()
+            remoteToRecover.isNotEmpty() || localToRecover.isNotEmpty() || previous.recoveryPending
         val restartReason = if (hadRecoverableState) {
             buildString {
                 append("previous_process_lost")
                 append(" serviceRunning=").append(previous.foregroundServiceRunning)
-                append(" remoteProjects=").append(previous.remoteProjectIds.sorted())
-                append(" localProjects=").append(previous.localProjectIds.sorted())
-                append(" activeProject=").append(previous.activeProjectId)
+                append(" remoteProjects=").append(remoteToRecover.sorted())
+                append(" localProjects=").append(localToRecover.sorted())
+                append(" activeProject=").append(activeToRecover)
                 append(" lastBackgroundAt=").append(previous.lastBackgroundAt)
                 append(" lastServiceStopReason=").append(previous.lastServiceStopReason)
                 append(" lastServiceStopAt=").append(previous.lastServiceStopAt)
@@ -69,9 +78,9 @@ class AppRuntimeRepository @Inject constructor(
             localProjectIds = emptySet(),
             foregroundServiceRunning = false,
             recoveryPending = hadRecoverableState,
-            recoveryRemoteProjectIds = previous.remoteProjectIds,
-            recoveryLocalProjectIds = previous.localProjectIds,
-            recoveryActiveProjectId = previous.activeProjectId,
+            recoveryRemoteProjectIds = remoteToRecover,
+            recoveryLocalProjectIds = localToRecover,
+            recoveryActiveProjectId = activeToRecover,
             lastProcessRestartReason = restartReason
         )
         persist(next)

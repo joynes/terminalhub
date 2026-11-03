@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.*
@@ -110,7 +111,9 @@ class PinnedMacroUiTest {
             PinnedActionsSheet(1, listOf(macro), emptyList(), onDismiss = {}, onPrepare = { error("Macro must execute its steps") },
                 onSend = { sent = it }, onSave = {}, onDeletePin = {}, onDeleteHistory = {})
         } }
-        compose.onNodeWithText("Stop and send").performClick()
+        compose.onNodeWithTag("pinned-actions-grid").performScrollToNode(hasText("Stop and send"))
+        // Verify the card's activation semantics independently of the opening sheet animation.
+        compose.onNodeWithText("Stop and send").performSemanticsAction(SemanticsActions.OnClick) { it() }
         compose.runOnIdle { assertEquals(macro, sent) }
         compose.onNodeWithText("Stop and send").performTouchInput { longClick() }
         compose.onNodeWithText("Prepare in Text Input").assertDoesNotExist()
