@@ -19,7 +19,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
@@ -201,16 +200,7 @@ fun SessionTabBar(
                                 .testTag("project-tab-${tab.projectId}")
                                 .semantics { selected = isSelected; role = Role.Tab }
                                 .background(bg)
-                                .then(if (isSelected) Modifier.drawWithContent {
-                                    drawContent()
-                                    val inset = 1.dp.toPx()
-                                    val stroke = 2.dp.toPx()
-                                    drawRect(Color.White, Offset(inset, inset),
-                                        androidx.compose.ui.geometry.Size(size.width - inset * 2, size.height - inset * 2),
-                                        style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
-                                    drawRect(MegaDrivePrimary, Offset(inset + stroke, size.height - inset - 4.dp.toPx()),
-                                        androidx.compose.ui.geometry.Size((size.width - (inset + stroke) * 2).coerceAtLeast(0f), 3.dp.toPx()))
-                                } else Modifier)
+                                .then(if (isSelected) Modifier.border(2.dp, MegaDriveWarning) else Modifier)
                                 .then(
                                     when (tab.projectId) {
                                         draggedTabId -> Modifier.border(2.dp, MegaDriveAccent)

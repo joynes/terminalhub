@@ -1,5 +1,6 @@
 package se.joynes.terminalhub.ui.screen.sessions
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -106,7 +107,8 @@ fun TmuxWindowBar(
                     val pinned = workPins.any { it.matches(state.projectId, window.key) }
                     val name = window.name.map { if (it.isISOControl()) ' ' else it }.joinToString("").ifBlank { "Terminal ${window.index + 1}" }
                     Box(Modifier.width(tabWidth.dp).height(height)
-                        .background(if (window.active) MegaDrivePrimary.copy(alpha = 0.18f) else MegaDriveSurface)
+                        .then(if (window.active) Modifier.border(2.dp, MegaDriveWarning) else Modifier)
+                        .background(if (window.active) MegaDriveWarning.copy(alpha = 0.32f) else MegaDriveSurface)
                         .combinedClickable(enabled = enabled, onClick = { if (!window.active) onSelect(window) },
                             onLongClick = { selectedMenu = window })
                         .semantics { selected = window.active; contentDescription = "Terminal ${position + 1}: $name" + if (pinned) ", active work" else "" }
