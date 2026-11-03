@@ -155,7 +155,8 @@ tasks.register<JacocoReport>("appCoverageReport") {
     sourceDirectories.setFrom(files("src/main/java"))
     doFirst {
         check(appCoverageClasses.files.isNotEmpty()) { "No app classes found; coverage cannot be reported." }
-        check(appCoverageData.files.any { it.extension == "exec" } && appCoverageData.files.any { it.extension == "ec" }) {
+        check(appCoverageData.files.any { it.extension == "exec" && it.length() > 0 } &&
+            appCoverageData.files.any { it.extension == "ec" && it.length() > 0 }) {
             "Both JVM and emulator execution data are required for combined app coverage."
         }
     }

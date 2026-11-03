@@ -35,9 +35,9 @@ class ScpUploader @Inject constructor(
         remoteDir: String
     ): Flow<ScpUploadProgress> = channelFlow {
         withContext(Dispatchers.IO) {
-            requireValidTransferFileName(fileName)
             var lease: SshTransportLease? = null
             try {
+                requireValidTransferFileName(fileName)
                 val (acquiredLease, auxiliary) = transportPool.acquireSftpTransfer(server, password, privateKeyPem)
                 lease = acquiredLease
                 auxiliary.use { session ->

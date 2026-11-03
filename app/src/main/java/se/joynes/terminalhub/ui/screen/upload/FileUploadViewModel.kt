@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import se.joynes.terminalhub.data.repository.ProjectRepository
 import se.joynes.terminalhub.data.repository.ServerRepository
@@ -32,6 +35,7 @@ class FileUploadViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uploadStates = MutableStateFlow<Map<Long, UploadState>>(emptyMap())
+    private val uploads = mutableMapOf<Long, Job>()
 
     fun uploadState(projectId: Long): Flow<UploadState> =
         _uploadStates.map { it[projectId] ?: UploadState.Idle }
@@ -41,8 +45,8 @@ class FileUploadViewModel @Inject constructor(
     }
 
     fun startUpload(serverId: Long, projectId: Long, uri: Uri, context: Context) {
-        if (_uploadStates.value[projectId] is UploadState.Uploading) return
-        viewModelScope.launch {
+        if (uploads[projectId]?.isActive == true || _uploadStates.value[projectId] is UploadState.Uploading) return
+        val upload = viewModelScope.launch(start = CoroutineStart.LAZY) {
             try {
                 val server  = serverRepo.getById(serverId)  ?: error("Server not found")
                 val project = projectRepo.getById(projectId) ?: error("Project not found")
@@ -65,10 +69,16 @@ class FileUploadViewModel @Inject constructor(
                 }
 
                 setUploadState(projectId, UploadState.Done(fileName, "$remotePath/$fileName"))
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 setUploadState(projectId, UploadState.Error(e.message ?: "Upload failed"))
+            } finally {
+                uploads.remove(projectId)
             }
         }
+        uploads[projectId] = upload
+        upload.start()
     }
 
     private fun setUploadState(projectId: Long, state: UploadState) {

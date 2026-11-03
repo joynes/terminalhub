@@ -57,7 +57,10 @@ internal fun PinnedActionEditor(initial: PinnedActionEntity, projectId: Long, on
     val validation = remember(steps) { runCatching { TerminalMacro.validate(steps) }.exceptionOrNull()?.message }
     val canSave = if (macro) validation == null && decodeError == null else text.isNotBlank()
 
-    fun update(index: Int, value: MacroStepDraft) { drafts = drafts.toMutableList().apply { this[index] = value }; decodeError = null }
+    fun update(id: Long, change: MacroStepDraft.() -> MacroStepDraft) {
+        drafts = drafts.map { if (it.id == id) it.change() else it }
+        decodeError = null
+    }
     fun move(from: Int, to: Int) { drafts = drafts.toMutableList().apply { add(to, removeAt(from)) } }
     fun add(step: MacroStep) {
         if (drafts.size < TerminalMacro.MAX_STEPS) {
@@ -135,21 +138,21 @@ internal fun PinnedActionEditor(initial: PinnedActionEntity, projectId: Long, on
                                             modifier = Modifier.semantics { contentDescription = "Move step ${index + 1} down" }) { Text("↓") }
                                     }
                                     when (draft.kind) {
-                                        "text" -> OutlinedTextField(draft.value, { update(index, draft.copy(value = it)) },
+                                        "text" -> OutlinedTextField(draft.value, { text -> update(draft.id) { copy(value = text) } },
                                             label = { Text("Text for step ${index + 1}") }, modifier = Modifier.fillMaxWidth(), minLines = 2, maxLines = 5)
-                                        "pause" -> OutlinedTextField(draft.value, { update(index, draft.copy(value = it)) },
+                                        "pause" -> OutlinedTextField(draft.value, { text -> update(draft.id) { copy(value = text) } },
                                             label = { Text("Pause ${index + 1} (milliseconds)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true,
                                             modifier = Modifier.fillMaxWidth())
                                         else -> {
-                                            OutlinedTextField(draft.value, { update(index, draft.copy(value = it)) },
+                                            OutlinedTextField(draft.value, { text -> update(draft.id) { copy(value = text) } },
                                                 label = { Text("Key for step ${index + 1}") }, supportingText = { Text("One character, SPACE, ENTER, TAB, ESC, arrows, HOME, END, PAGE_UP/DOWN, INSERT, DELETE, BACKSPACE or F1–F12.") },
                                                 modifier = Modifier.fillMaxWidth(), singleLine = true)
                                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                FilterChip(draft.ctrl, { update(index, draft.copy(ctrl = !draft.ctrl)) }, label = { Text("Ctrl") })
-                                                FilterChip(draft.alt, { update(index, draft.copy(alt = !draft.alt)) }, label = { Text("Alt") })
-                                                FilterChip(draft.shift, { update(index, draft.copy(shift = !draft.shift)) }, label = { Text("Shift") })
+                                                FilterChip(draft.ctrl, { update(draft.id) { copy(ctrl = !ctrl) } }, label = { Text("Ctrl") })
+                                                FilterChip(draft.alt, { update(draft.id) { copy(alt = !alt) } }, label = { Text("Alt") })
+                                                FilterChip(draft.shift, { update(draft.id) { copy(shift = !shift) } }, label = { Text("Shift") })
                                             }
-                                            OutlinedTextField(draft.repeat, { update(index, draft.copy(repeat = it)) }, label = { Text("Repeat step ${index + 1}") },
+                                            OutlinedTextField(draft.repeat, { text -> update(draft.id) { copy(repeat = text) } }, label = { Text("Repeat step ${index + 1}") },
                                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
                                         }
                                     }

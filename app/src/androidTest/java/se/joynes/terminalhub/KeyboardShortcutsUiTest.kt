@@ -3,6 +3,7 @@ package se.joynes.terminalhub
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.KeyEvent
+import android.view.inspector.WindowInspector
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.rememberScrollState
@@ -48,6 +49,15 @@ class KeyboardShortcutsUiTest {
     private fun press(code: Int, meta: Int = 0) {
         compose.waitForIdle()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
+        // Compose idleness does not imply that Android has transferred native
+        // key focus to a just-opened dialog window yet.
+        compose.waitUntil(timeoutMillis = 5_000) {
+            var focused = false
+            instrumentation.runOnMainSync {
+                focused = WindowInspector.getGlobalWindowViews().lastOrNull { it.isShown }?.hasWindowFocus() == true
+            }
+            focused
+        }
         instrumentation.sendKeySync(event(code, meta = meta))
         instrumentation.sendKeySync(event(code, KeyEvent.ACTION_UP, meta))
         compose.waitForIdle()

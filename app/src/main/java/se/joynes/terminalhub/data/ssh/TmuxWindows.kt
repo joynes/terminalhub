@@ -28,6 +28,15 @@ object TmuxWindowCommands {
         else -> quote(value)
     }
 
+    /** Expand a constant format, with the user's name supplied only as option data.
+     * This avoids format evaluation and older tmux's argv quoting of dollar signs.
+     * quotedTarget is an internally constructed shell expression for validated tmux IDs.
+     */
+    internal fun nameWindow(quotedTarget: String, name: String): String =
+        "tmux set-option -w -t $quotedTarget @terminalhub_literal_name ${quote(name)}; " +
+        "tmux rename-window -t $quotedTarget -- '#{@terminalhub_literal_name}'; " +
+        "tmux set-option -wu -t $quotedTarget @terminalhub_literal_name; "
+
     fun validateName(name: String) {
         require(name.codePointCount(0, name.length) <= 64 && name.none(Character::isISOControl)) {
             "Use up to 64 characters, without line breaks or control characters."
@@ -70,10 +79,9 @@ object TmuxWindowCommands {
         val chosenName = name.trim().ifBlank {
             generateSequence(2) { it + 1 }.map { "Terminal $it" }.first { candidate -> snapshot.windows.none { it.name == candidate } }
         }
-        // tmux treats names as formats, even after shell quoting. Escape its format introducer.
-        val label = " -n ${quote(chosenName.replace("#", "##"))}"
         return login(verify(snapshot) +
-            "new_id=\$(tmux new-window -d -P -F '#{window_id}' -t ${quote(snapshot.sessionId + ":")} -c ${path(folder)}$label); " +
+            "new_id=\$(tmux new-window -d -P -F '#{window_id}' -t ${quote(snapshot.sessionId + ":")} -c ${path(folder)} -n Terminal); " +
+            nameWindow("\"\$session_id:\$new_id\"", chosenName) +
             "tmux select-window -t \"\$session_id:\$new_id\"; " + renderList("\"\$session_id\""))
     }
 
@@ -84,7 +92,7 @@ object TmuxWindowCommands {
         validateName(name)
         require(name.isNotBlank()) { "Enter a terminal name." }
         return login(verify(snapshot, window) +
-            "tmux rename-window -t ${quote(snapshot.sessionId + ":" + window.id)} -- ${quote(name.trim().replace("#", "##"))}; " + renderList("\"\$session_id\""))
+            nameWindow(quote(snapshot.sessionId + ":" + window.id), name.trim()) + renderList("\"\$session_id\""))
     }
 
     fun close(snapshot: TmuxWindowsSnapshot, window: TmuxWindow): String {

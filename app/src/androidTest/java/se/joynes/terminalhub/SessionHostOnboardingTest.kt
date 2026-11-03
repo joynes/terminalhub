@@ -61,6 +61,7 @@ class SessionHostOnboardingTest {
         sessionManager.sessions.value.forEach { sessionManager.close(it.id) }
         context.getSharedPreferences("session_host", Context.MODE_PRIVATE).edit().clear().commit()
         db.clearAllTables()
+        settingsRepository.setBackgroundSshRecommendationHandled()
     }
 
     @Test
@@ -106,7 +107,7 @@ class SessionHostOnboardingTest {
                 }
             }
 
-            composeRule.onNodeWithText("SERVER READY").assertIsDisplayed()
+            composeRule.onNodeWithText(if (BuildConfig.IS_DIAGNOSTIC) "NO LOCAL PROJECTS" else "SERVER READY").assertIsDisplayed()
             composeRule.onNodeWithText("[ + ADD PROJECT ]").assertIsEnabled()
         }
     }

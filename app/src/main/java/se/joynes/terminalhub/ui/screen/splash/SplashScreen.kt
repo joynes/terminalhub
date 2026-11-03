@@ -22,7 +22,9 @@ fun SplashScreen(
     onAuthSuccess: () -> Unit,
     viewModel: SplashViewModel = hiltViewModel()
 ) {
-    val authState by viewModel.authState.collectAsState()
+    // Capture the state for this composition: the effect must observe the same value
+    // as its key, even if availability changes before the coroutine starts.
+    val authState = viewModel.authState.collectAsState().value
     val context = LocalContext.current
 
     // Auto-check biometric availability on first composition

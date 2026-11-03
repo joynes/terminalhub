@@ -46,15 +46,16 @@ data class TmuxWindowLayout(val names: List<String>, val active: Int, val memori
     fun renderCreate(sessionName: String, folder: String): String {
         validate()
         fun q(value: String) = TmuxWindowCommands.quote(value)
-        fun label(value: String) = q(value.replace("#", "##"))
         return buildString {
             append("( set -e; restore_name=${q("terminalhub-restore-" + UUID.randomUUID())}; ")
             append("trap 'tmux kill-session -t \"=\$restore_name\" 2>/dev/null || true' EXIT; ")
-            append("restore_session=\$(tmux new-session -d -P -F '#{session_id}' -s \"\$restore_name\" -c ${TmuxWindowCommands.path(folder)} -n ${label(names.first())}); ")
+            append("restore_session=\$(tmux new-session -d -P -F '#{session_id}' -s \"\$restore_name\" -c ${TmuxWindowCommands.path(folder)} -n Terminal); ")
             append("restore_active=\$(tmux display-message -p -t \"\$restore_session:\" '#{window_id}'); ")
+            append(TmuxWindowCommands.nameWindow("\"\$restore_session:\$restore_active\"", names.first()))
             memories.firstOrNull()?.let { append("tmux set-option -w -t \"\$restore_session:\$restore_active\" @terminalhub_window_key ${q(it.key)}; ") }
             names.drop(1).forEachIndexed { index, name ->
-                append("restore_window=\$(tmux new-window -d -P -F '#{window_id}' -t \"\$restore_session:\" -c ${TmuxWindowCommands.path(folder)} -n ${label(name)}); ")
+                append("restore_window=\$(tmux new-window -d -P -F '#{window_id}' -t \"\$restore_session:\" -c ${TmuxWindowCommands.path(folder)} -n Terminal); ")
+                append(TmuxWindowCommands.nameWindow("\"\$restore_session:\$restore_window\"", name))
                 memories.getOrNull(index + 1)?.let { append("tmux set-option -w -t \"\$restore_session:\$restore_window\" @terminalhub_window_key ${q(it.key)}; ") }
                 if (index + 1 == active) append("restore_active=\$restore_window; ")
             }

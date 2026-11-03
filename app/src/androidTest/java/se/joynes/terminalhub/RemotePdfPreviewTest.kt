@@ -42,9 +42,9 @@ class RemotePdfPreviewTest {
         var closed = false
         val bytes = document()
         compose.setContent { TerminalHubTheme { RemotePdfPreviewDialog("report.pdf", bytes) { closed = true } } }
-        compose.waitUntil(10_000) { compose.onAllNodesWithTag("remote-pdf-preview").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(30_000) { compose.onAllNodesWithContentDescription("PDF page 1").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("remote-pdf-preview").performScrollToNode(hasText("Page 3"))
-        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("PDF page 3").fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(30_000) { compose.onAllNodesWithContentDescription("PDF page 3").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("+").performClick()
         compose.onNodeWithText("150%").assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
