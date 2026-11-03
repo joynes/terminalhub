@@ -24,6 +24,34 @@ import se.joynes.terminalhub.ui.theme.*
 
 data class SearchMatch(val row: Int)
 
+/** Match terminal rows, joining only real soft wraps and counting a boundary hit once. */
+internal fun findTerminalSearchRows(
+    query: String,
+    firstRow: Int,
+    lastRowExclusive: Int,
+    rowText: (Int) -> String,
+    isWrapped: (Int) -> Boolean
+): List<SearchMatch> {
+    val term = query.trim()
+    if (term.isEmpty()) return emptyList()
+    val cache = mutableMapOf<Int, String>()
+    fun text(row: Int) = cache.getOrPut(row) { rowText(row) }
+    return buildList {
+        for (row in firstRow until lastRowExclusive) {
+            val current = text(row)
+            if (current.contains(term, ignoreCase = true)) {
+                add(SearchMatch(row))
+            } else if (row + 1 < lastRowExclusive && isWrapped(row)) {
+                val index = (current + text(row + 1)).indexOf(term,
+                    startIndex = (current.length - term.length + 1).coerceAtLeast(0), ignoreCase = true)
+                if (index >= 0 && index < current.length && index + term.length > current.length) {
+                    add(SearchMatch(row))
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun TerminalSearchOverlay(
     initialQuery: String,
@@ -47,25 +75,8 @@ fun TerminalSearchOverlay(
         val transcriptRows = screen.activeTranscriptRows
         val cols = emulator.mColumns
         val rows = emulator.mRows
-        val found = mutableListOf<SearchMatch>()
-        val term = q.trim()
-        if (term.isNotEmpty()) {
-            // Read each row exactly once (selY1 == selY2 reads one row).
-            // Also probe row + next row to catch terms that wrap a line boundary.
-            for (row in -transcriptRows until rows) {
-                val current = screen.getSelectedText(0, row, cols, row) ?: ""
-                if (current.contains(term, ignoreCase = true)) {
-                    found.add(SearchMatch(row))
-                    continue
-                }
-                if (row + 1 < rows) {
-                    val next = screen.getSelectedText(0, row + 1, cols, row + 1) ?: ""
-                    if ((current + next).contains(term, ignoreCase = true)) {
-                        found.add(SearchMatch(row))
-                    }
-                }
-            }
-        }
+        val found = findTerminalSearchRows(q, -transcriptRows, rows,
+            { row -> screen.getSelectedText(0, row, cols, row) ?: "" }, screen::getLineWrap)
         matches = found
         // Default to the FIRST (highest-up) match so the user sees the top-most hit.
         currentIndex = 0

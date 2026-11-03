@@ -58,8 +58,14 @@ class KeyboardShortcutsUiTest {
             }
             focused
         }
-        instrumentation.sendKeySync(event(code, meta = meta))
-        instrumentation.sendKeySync(event(code, KeyEvent.ACTION_UP, meta))
+        // Dispatch through the focused native decor view (and its Window.Callback).
+        // OS injection can race the IME/input dispatcher after screenshots; these
+        // component tests verify the app's dialog dispatch, not that OS queue.
+        instrumentation.runOnMainSync {
+            val decor = WindowInspector.getGlobalWindowViews().last { it.isShown && it.hasWindowFocus() }
+            decor.dispatchKeyEvent(event(code, meta = meta))
+            decor.dispatchKeyEvent(event(code, KeyEvent.ACTION_UP, meta))
+        }
         compose.waitForIdle()
     }
     @Test fun dispatcherConsumesRepeatsAndReleaseWithoutModifiersButLeavesTypingAlone() {

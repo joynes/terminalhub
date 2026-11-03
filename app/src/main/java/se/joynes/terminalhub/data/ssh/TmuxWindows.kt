@@ -5,6 +5,7 @@ import se.joynes.terminalhub.data.model.Server
 import se.joynes.terminalhub.domain.ScriptTemplateEngine
 import javax.inject.Inject
 import java.util.UUID
+import java.util.Base64
 
 data class TmuxProgram(val command: String, val directory: String)
 data class TmuxWindow(val id: String, val index: Int, val name: String, val active: Boolean, val panes: Int,
@@ -14,7 +15,8 @@ data class TmuxWindowsSnapshot(val sessionId: String, val windows: List<TmuxWind
 
 /** All targets are tmux object IDs, scoped to the project's exact session. */
 object TmuxWindowCommands {
-    internal const val START = "TERMINALHUB_WINDOWS_V2"
+    internal const val START = "TERMINALHUB_WINDOWS_V3"
+    private const val LEGACY_START = "TERMINALHUB_WINDOWS_V2"
     internal const val END = "TERMINALHUB_WINDOWS_END"
     private val sessionId = Regex("\\$\\d+")
     private val windowId = Regex("@\\d+")
@@ -29,13 +31,15 @@ object TmuxWindowCommands {
     }
 
     /** Expand a constant format, with the user's name supplied only as option data.
-     * This avoids format evaluation and older tmux's argv quoting of dollar signs.
+     * Older tmux versions sanitize dollar signs in window names. Keep the requested
+     * label alongside the resulting name, so external renames can still be detected.
      * quotedTarget is an internally constructed shell expression for validated tmux IDs.
      */
     internal fun nameWindow(quotedTarget: String, name: String): String =
         "tmux set-option -w -t $quotedTarget @terminalhub_literal_name ${quote(name)}; " +
         "tmux rename-window -t $quotedTarget -- '#{@terminalhub_literal_name}'; " +
-        "tmux set-option -wu -t $quotedTarget @terminalhub_literal_name; "
+        "tmux set-option -wF -t $quotedTarget @terminalhub_rendered_name '#{window_name}'; " +
+        "tmux set-option -w -t $quotedTarget @terminalhub_label_base64 ${quote(Base64.getEncoder().encodeToString(name.toByteArray(Charsets.UTF_8)))}; "
 
     fun validateName(name: String) {
         require(name.codePointCount(0, name.length) <= 64 && name.none(Character::isISOControl)) {
@@ -58,10 +62,12 @@ object TmuxWindowCommands {
         // -o only sets an absent option. The logical key survives rename and server restoration.
         "tmux set-option -woq -t \"\$session_id:\$window_id\" @terminalhub_window_key '${UUID.randomUUID()}-'\"\$window_id\"; " +
         "window_name=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{window_name}'); " +
+        // Base64 avoids older tmux escaping dollar signs even in display-message output.
+        "window_label=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{?#{==:#{window_name},#{@terminalhub_rendered_name}},#{@terminalhub_label_base64},}'); " +
         "window_key=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{@terminalhub_window_key}'); " +
         "window_program=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{pane_current_command}'); " +
         "window_directory=\$(tmux display-message -p -t \"\$session_id:\$window_id\" '#{pane_current_path}'); " +
-        "printf '%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000' \"\$window_id\" \"\$window_index\" \"\$window_active\" \"\$window_panes\" \"\$window_name\" \"\$window_key\" \"\$window_program\" \"\$window_directory\"; " +
+        "printf '%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000%s\\000' \"\$window_id\" \"\$window_index\" \"\$window_active\" \"\$window_panes\" \"\$window_name\" \"\$window_key\" \"\$window_program\" \"\$window_directory\" \"\$window_label\"; " +
         "done; printf '%s\\000' '$END'"
 
     private fun verify(snapshot: TmuxWindowsSnapshot, window: TmuxWindow? = null): String {
@@ -105,15 +111,20 @@ object TmuxWindowCommands {
     }
 
     fun parse(output: String): TmuxWindowsSnapshot {
-        val start = output.indexOf("$START\u0000")
+        val marker = if (output.contains("$START\u0000")) START else LEGACY_START
+        val rowSize = if (marker == START) 9 else 8
+        val start = output.indexOf("$marker\u0000")
         val end = output.lastIndexOf("\u0000$END\u0000")
         require(start >= 0 && end > start) { "Could not read project terminals. Reconnect the project and refresh." }
-        val fields = output.substring(start + START.length + 1, end).split('\u0000')
-        require(sessionId.matches(fields.first()) && fields.size >= 9 && (fields.size - 1) % 8 == 0) { "Invalid tmux terminal list." }
-        val windows = fields.drop(1).chunked(8).map { row ->
+        val fields = output.substring(start + marker.length + 1, end).split('\u0000')
+        require(sessionId.matches(fields.first()) && fields.size >= rowSize + 1 && (fields.size - 1) % rowSize == 0) { "Invalid tmux terminal list." }
+        val windows = fields.drop(1).chunked(rowSize).map { row ->
             require(windowId.matches(row[0]) && row[2] in listOf("0", "1")) { "Invalid tmux window." }
             require(Regex("[a-zA-Z0-9@_-]{1,128}").matches(row[5])) { "Invalid terminal identity." }
-            TmuxWindow(row[0], row[1].toInt(), row[4], row[2] == "1", row[3].toInt(), row[5], row[6], row[7])
+            val name = if (rowSize == 9 && row[8].isNotEmpty()) {
+                String(Base64.getDecoder().decode(row[8]), Charsets.UTF_8).also(::validateName)
+            } else row[4]
+            TmuxWindow(row[0], row[1].toInt(), name, row[2] == "1", row[3].toInt(), row[5], row[6], row[7])
         }
         require(windows.size <= 128 && windows.map { it.id }.distinct().size == windows.size &&
             windows.map { it.key }.distinct().size == windows.size && windows.count { it.active } == 1) {

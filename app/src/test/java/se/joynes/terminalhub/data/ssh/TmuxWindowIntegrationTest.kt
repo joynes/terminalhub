@@ -16,7 +16,7 @@ import se.joynes.terminalhub.domain.ScriptTemplateEngine
 class TmuxWindowIntegrationTest {
     private val folder = Files.createTempDirectory(File("/tmp").toPath(), "thtw-").toFile()
     private val working = File(folder, "project ' å").apply { mkdirs() }
-    private val binary = listOf("/opt/homebrew/bin/tmux", "/usr/bin/tmux").firstOrNull { File(it).canExecute() }
+    private val binary = listOfNotNull(System.getenv("TERMINALHUB_TEST_TMUX"), "/opt/homebrew/bin/tmux", "/usr/bin/tmux").firstOrNull { File(it).canExecute() }
     private val socket get() = File(folder, "owned.sock").path
     private fun q(value: String) = "'" + value.replace("'", "'\\''") + "'"
 
@@ -149,6 +149,14 @@ class TmuxWindowIntegrationTest {
         val renamed = execute(TmuxWindowCommands.rename(created, added, rename))
         assertEquals(rename, renamed.windows.single { it.id == added.id }.name)
         assertFalse(marker.exists())
+    }
+
+    @Test fun `external rename overrides the apps literal name memory`() {
+        val created = execute(TmuxWindowCommands.create(snapshot(), working.path, "Comma, #{session_name} \$HOME"))
+        val window = created.windows.single { it.active }
+        assertEquals("Comma, #{session_name} \$HOME", window.name)
+        tmux("rename-window -t ${q(created.sessionId + ":" + window.id)} External")
+        assertEquals("External", snapshot().windows.single { it.id == window.id }.name)
     }
 
     @Test fun `reconnecting project does not kill healthy windows if another pane is dead`() {

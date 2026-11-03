@@ -94,6 +94,19 @@ class SessionHostOnboardingTest {
                 remoteWindows = remoteWindows
             )
 
+            if (BuildConfig.IS_DIAGNOSTIC) {
+                // Diagnostic startup intentionally creates a local project. Finish
+                // that bootstrap before arranging the empty-list state under test;
+                // otherwise its asynchronous insert races the empty-screen assertion.
+                composeRule.runOnIdle { viewModel.init() }
+                composeRule.waitUntil(10_000) { sessionManager.sessions.value.isNotEmpty() }
+                composeRule.runOnIdle {
+                    sessionManager.sessions.value.forEach { sessionManager.close(it.id) }
+                }
+                db.projectDao().clearAll()
+                composeRule.waitUntil(10_000) { viewModel.projectTabs.value.isEmpty() }
+            }
+
             composeRule.setContent {
                 TerminalHubTheme {
                     SessionHostScreen(

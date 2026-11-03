@@ -116,7 +116,7 @@ class ConfigurationBackupTest {
     }
 
     @Test fun legacyBackupSuppliesDefaultsAndKeepsPreferencesThatAreNotPresent() = runBlocking {
-        settings.setKeyBarHighlightIntensity(.63f); settings.setTextInputPanelOpacity(.72f)
+        settings.setKeyBarHighlightIntensity(.23f); settings.setTextInputPanelOpacity(.72f)
         file.writeText("""
             # legacy configuration
             version: 1
@@ -136,8 +136,8 @@ class ConfigurationBackupTest {
         assertNull(server.keyAlias); assertEquals("~/terminalhub", server.projectsFolder)
         val project = db.projectDao().getAll().first().single()
         assertTrue(project.useTmux); assertEquals("cd {{PROJECT_PATH}}", project.customScript)
-        assertEquals("", project.aiCommand); assertEquals(0, project.colorSeed)
-        assertEquals(.63f, settings.settings.value.keyBarHighlightIntensity)
+        assertEquals("", project.aiCommand); assertTrue(project.colorSeed != 0)
+        assertEquals(.23f, settings.settings.value.keyBarHighlightIntensity)
         assertEquals(.72f, settings.settings.value.textInputPanelOpacity)
     }
 

@@ -147,8 +147,12 @@ public final class TerminalSession extends TerminalOutput {
      * @param columns The number of columns in the terminal window.
      * @param rows    The number of rows in the terminal window.
      */
-    public void initializeEmulator(int columns, int rows, int cellWidthPixels, int cellHeightPixels) {
+    public synchronized void initializeEmulator(int columns, int rows, int cellWidthPixels, int cellHeightPixels) {
         mEmulator = new TerminalEmulator(this, columns, rows, cellWidthPixels, cellHeightPixels, mTranscriptRows, mClient);
+
+        // A tab may be closed before a TerminalView first supplies its size.
+        // Rendering that closed session later must never start a new shell.
+        if (mShellPid == -1) return;
 
         if (mRemoteSession) {
             mShellPid = 0;
@@ -283,12 +287,17 @@ public final class TerminalSession extends TerminalOutput {
     }
 
     /** Finish this terminal session by sending SIGKILL to the shell. */
-    public void finishIfRunning() {
+    public synchronized void finishIfRunning() {
         if (mRemoteSession) {
             notifyRemoteProcessExit(mShellExitStatus);
             return;
         }
-        if (isRunning()) {
+        if (mShellPid == 0) {
+            // PID zero means "not started", but kill(0, ...) targets our process group.
+            cleanupResources(0);
+            return;
+        }
+        if (mShellPid > 0) {
             try {
                 Os.kill(mShellPid, OsConstants.SIGKILL);
             } catch (ErrnoException e) {

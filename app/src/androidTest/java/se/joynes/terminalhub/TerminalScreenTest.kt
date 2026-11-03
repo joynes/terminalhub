@@ -1,7 +1,10 @@
 package se.joynes.terminalhub
 
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
+import org.junit.Before
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Rule
 import org.junit.Test
@@ -10,9 +13,11 @@ import se.joynes.terminalhub.ui.screen.terminal.TerminalScreen
 import se.joynes.terminalhub.ui.theme.TerminalHubTheme
 
 @RunWith(AndroidJUnit4::class)
+@HiltAndroidTest
 class TerminalScreenTest {
-    
-    @get:Rule val composeRule = createComposeRule()
+    @get:Rule(order = 0) val hilt = HiltAndroidRule(this)
+    @get:Rule(order = 1) val composeRule = createAndroidComposeRule<HiltTestActivity>()
+    @Before fun setup() { hilt.inject() }
 
 
     @Test
@@ -21,8 +26,8 @@ class TerminalScreenTest {
             TerminalHubTheme { TerminalScreen() }
         }
         composeRule.onNodeWithText("ESC").assertIsDisplayed()
-        composeRule.onNodeWithText("TAB").assertIsDisplayed()
-        composeRule.onNodeWithText("CTRL-C").assertIsDisplayed()
+        composeRule.onNodeWithText("⇥").assertIsDisplayed()
+        composeRule.onNodeWithText("CTRL").assertIsDisplayed()
     }
 
     @Test
