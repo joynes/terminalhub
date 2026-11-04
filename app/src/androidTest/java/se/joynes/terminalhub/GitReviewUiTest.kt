@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.*
@@ -72,18 +73,41 @@ class GitReviewUiTest {
         } }
         compose.onNodeWithTag("git-fullscreen").assertExists()
         hideTestKeyboard()
-        compose.onNodeWithTag("git-diff-scroll").performScrollToNode(hasText("END240", substring = true))
-        compose.onNodeWithText("END240", substring = true).performScrollTo()
-        compose.onNodeWithText("END240", substring = true).assertIsDisplayed()
-        compose.onNodeWithTag("git-diff-scroll").performScrollToNode(hasText("val line1 =", substring = true))
-        compose.onNodeWithText("val line1 =", substring = true).performScrollTo()
-        compose.onNodeWithText("val line1 =", substring = true).assertIsDisplayed()
+        val list = compose.onNodeWithTag("git-diff-scroll")
+        list.performScrollToIndex(240)
+        list.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 100_000f) }
+        assertDiffTextVisible("END240")
+        list.performScrollToIndex(0)
+        list.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, -100_000f) }
+        assertDiffTextVisible("val line1 =")
         compose.onNodeWithText("WINDOW").performClick()
         compose.onNodeWithTag("git-windowed").assertExists()
         compose.onNodeWithText("FULL SCREEN").performClick()
         compose.onNodeWithTag("git-fullscreen").assertExists()
         compose.onNodeWithText("A+").performClick()
         compose.onNodeWithText("A−").performClick()
+    }
+
+    private fun assertDiffTextVisible(text: String) {
+        val node = compose.onNodeWithText(text, substring = true)
+        try {
+            compose.waitUntil(5000) { runCatching { node.assertIsDisplayed() }.isSuccess }
+            node.assertIsDisplayed()
+        } catch (error: Throwable) {
+            val details = buildString {
+                appendLine("Git diff text: $text")
+                appendLine("Text bounds: ${runCatching { node.fetchSemanticsNode().boundsInRoot }.getOrNull()}")
+                appendLine("List bounds: ${compose.onNodeWithTag("git-diff-scroll").fetchSemanticsNode().boundsInRoot}")
+                appendLine(compose.onNodeWithTag("git-diff-scroll").printToString())
+            }
+            runCatching {
+                val context = InstrumentationRegistry.getInstrumentation().targetContext
+                File(context.getExternalFilesDir(null), "ci-git-scroll.png").outputStream().use {
+                    compose.onNodeWithTag("git-fullscreen").captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+            }
+            throw AssertionError(details, error)
+        }
     }
 
     @Test fun modesAndRefreshGiveImmediateLoadingFeedback() {

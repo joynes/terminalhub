@@ -84,7 +84,9 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect
-          script: ./gradlew :app:appCoverageVerification
+          script: |
+            ./gradlew :app:connectedDiagnosticDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=se.joynes.terminalhub.GitReviewUiTest || { adb pull /sdcard/Android/data/se.joynes.terminalhub.diag/files/ci-git-scroll.png app/build/reports/androidTests/; exit 1; }
+            ./gradlew :app:appCoverageVerification
       - name: Summarize measured coverage
         if: always() && hashFiles('app/build/reports/jacoco/appCoverageReport/report.xml') != ''
         run: python3 scripts/coverage_summary.py app/build/reports/jacoco/appCoverageReport/report.xml --json app/build/reports/jacoco/summary.json >> "$GITHUB_STEP_SUMMARY"

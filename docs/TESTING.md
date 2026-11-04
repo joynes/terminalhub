@@ -61,5 +61,10 @@ summary in the workflow run. The workflow requires no signing key or application
 credentials. Actions are pinned to commit hashes and receive read-only repository
 permissions.
 
+The Git diff UI regression group runs first for faster feedback on emulator
+scrolling failures. A failure records viewport/semantic bounds and a screenshot
+when capture is available. The subsequent complete suite has no class filter;
+its coverage must still reach 95% before the job passes.
+
 The presence of a 95% gate is a requirement, not evidence that 95% has already
 been reached. Use the report and workflow result to see the measured value.
