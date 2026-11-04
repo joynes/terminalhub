@@ -138,7 +138,7 @@ val appCoverageClasses = fileTree(layout.buildDirectory.dir(
     include("se/joynes/terminalhub/**", "com/trilead/ssh2/**")
     exclude("**/R.class", "**/R\$*.class", "**/BuildConfig.*", "**/Hilt_*", "**/Dagger*",
         "**/*_Factory*", "**/*_MembersInjector*", "**/*_GeneratedInjector*",
-        "**/*_HiltModules*", "**/*_Impl*", "**/HiltTestActivity*")
+        "**/*_HiltModules*", "**/*_HiltComponents*", "**/*_Impl*", "**/HiltTestActivity*")
 }
 
 val appCoverageData = fileTree(layout.buildDirectory) {
@@ -152,7 +152,7 @@ tasks.register<JacocoReport>("appCoverageReport") {
     dependsOn("testDiagnosticDebugUnitTest", "createDiagnosticDebugCoverageReport")
     executionData.setFrom(appCoverageData)
     classDirectories.setFrom(appCoverageClasses)
-    sourceDirectories.setFrom(files("src/main/java"))
+    sourceDirectories.setFrom(files("src/main/java", "src/diagnostic/java"))
     doFirst {
         check(appCoverageClasses.files.isNotEmpty()) { "No app classes found; coverage cannot be reported." }
         check(appCoverageData.files.any { it.extension == "exec" && it.length() > 0 } &&
@@ -174,7 +174,7 @@ tasks.register<JacocoCoverageVerification>("appCoverageVerification") {
     dependsOn("appCoverageReport")
     executionData.setFrom(appCoverageData)
     classDirectories.setFrom(appCoverageClasses)
-    sourceDirectories.setFrom(files("src/main/java"))
+    sourceDirectories.setFrom(files("src/main/java", "src/diagnostic/java"))
     violationRules {
         rule {
             limit { counter = "LINE"; value = "COVEREDRATIO"; minimum = "0.95".toBigDecimal() }

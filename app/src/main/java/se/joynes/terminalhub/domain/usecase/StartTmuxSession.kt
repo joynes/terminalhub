@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import se.joynes.terminalhub.data.ssh.SshManager
 import se.joynes.terminalhub.data.ssh.TmuxIntegration
+import se.joynes.terminalhub.data.ssh.TmuxWindowCommands
 import javax.inject.Inject
 
 class StartTmuxSession @Inject constructor(
@@ -13,8 +14,9 @@ class StartTmuxSession @Inject constructor(
     suspend operator fun invoke(sessionId: String, tmuxName: String): Boolean = withContext(Dispatchers.IO) {
         // This would need the underlying JSch session; for now send via shell
         val conn = sshManager.getSession(sessionId) ?: return@withContext false
-        conn.send("tmux new-session -d -s '$tmuxName' 2>/dev/null || true\n")
-        conn.send("tmux attach-session -t '$tmuxName'\n")
+        val quotedName = TmuxWindowCommands.quote(tmuxName)
+        conn.send("tmux new-session -d -s $quotedName 2>/dev/null || true\n")
+        conn.send("tmux attach-session -t $quotedName\n")
         true
     }
 }

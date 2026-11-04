@@ -36,6 +36,7 @@ class TerminalSearchOverlayTest {
             }
         } }
         compose.waitUntil(5000) { ::view.isInitialized && view.mEmulator != null }
+        hideTestKeyboard()
         compose.runOnIdle {
             val bytes = output(view.mEmulator.mColumns).toByteArray()
             session.emulator.append(bytes, bytes.size)
@@ -76,8 +77,9 @@ class TerminalSearchOverlayTest {
     }
     @Test fun searchWithoutAnAttachedTerminalStillAllowsTypingAndDismissal() {
         var dismissed = false
-        compose.setContent { TerminalHubTheme { TerminalSearchOverlay("", null, { dismissed = true }) } }
+        compose.setContent { TerminalHubTheme { Box(Modifier.fillMaxSize().imePadding()) { TerminalSearchOverlay("", null, { dismissed = true }) } } }
         compose.onNode(hasSetTextAction()).performTextInput("query")
+        hideTestKeyboard()
         compose.onNodeWithText("0").assertIsDisplayed()
         compose.onNodeWithText("✕").performClick()
         compose.runOnIdle { assertTrue(dismissed) }

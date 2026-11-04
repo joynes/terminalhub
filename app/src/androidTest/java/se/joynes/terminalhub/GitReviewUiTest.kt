@@ -26,6 +26,28 @@ class GitReviewUiTest {
     private fun state() = GitReviewState(projectName = "demo", repository = "/projects/demo", repositories = listOf("/projects/demo"),
         snapshot = GitReviewSnapshot("/projects/demo", "main", "abc123 · Example commit", listOf(file)))
 
+    @Test fun repositoryChoiceEmptyCommitAndRetryStayInTheCurrentReviewContext() {
+        var current by mutableStateOf(GitReviewState(projectName = "demo", loading = false, repositories = listOf("/one", "/two")))
+        var retries = 0
+        compose.setContent { TerminalHubTheme { GitReviewDialog(current, { current = state().copy(repository = it, repositories = listOf("/one", "/two")) },
+            { current = current.copy(mode = it, snapshot = current.snapshot?.copy(files = emptyList())) },
+            { retries++ }, {}, { retries++ }, {}) } }
+        compose.onNodeWithText("Choose a repository").assertIsDisplayed()
+        compose.onNodeWithText("/two").performClick()
+        compose.onNodeWithText("one").performClick()
+        compose.runOnIdle { assertEquals("/one", current.repository) }
+        compose.onNodeWithText(GitReviewMode.COMMIT.label).performClick()
+        compose.onNodeWithText("No file changes in this commit.").assertIsDisplayed()
+        compose.onNodeWithText("abc123 · Example commit").assertIsDisplayed()
+        compose.runOnIdle { current = current.copy(error = "Fixture server error") }
+        compose.onNodeWithText("RETRY").performClick()
+        compose.runOnIdle { assertEquals(1, retries); current = current.copy(file = file) }
+        compose.onNodeWithText("RETRY").performClick()
+        compose.runOnIdle { assertEquals(2, retries); current = current.copy(error = null, patch = "", truncated = true) }
+        compose.onNodeWithText("Large diff: showing the beginning only.").assertExists()
+        compose.onNodeWithText("No text differences. The file may have changed since the list was loaded.").assertExists()
+    }
+
     @Test fun fileOpensDiffAndCanReturnToFileList() {
         var current by mutableStateOf(state())
         compose.setContent { TerminalHubTheme {
@@ -49,9 +71,12 @@ class GitReviewUiTest {
             GitReviewDialog(state().copy(file = file, patch = patch), {}, {}, {}, {}, {}, {})
         } }
         compose.onNodeWithTag("git-fullscreen").assertExists()
+        hideTestKeyboard()
         compose.onNodeWithTag("git-diff-scroll").performScrollToNode(hasText("END240", substring = true))
+        compose.onNodeWithText("END240", substring = true).performScrollTo()
         compose.onNodeWithText("END240", substring = true).assertIsDisplayed()
         compose.onNodeWithTag("git-diff-scroll").performScrollToNode(hasText("val line1 =", substring = true))
+        compose.onNodeWithText("val line1 =", substring = true).performScrollTo()
         compose.onNodeWithText("val line1 =", substring = true).assertIsDisplayed()
         compose.onNodeWithText("WINDOW").performClick()
         compose.onNodeWithTag("git-windowed").assertExists()

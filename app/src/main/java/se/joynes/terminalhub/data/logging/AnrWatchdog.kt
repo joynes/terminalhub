@@ -82,7 +82,7 @@ object AnrWatchdog {
         anrFile.delete()
     }
 
-    private fun writePendingAnr(context: Context, lagMs: Long) {
+    internal fun writePendingAnr(context: Context, lagMs: Long) {
         val crashDir = File(context.filesDir, CRASH_DIR).apply { mkdirs() }
         val report = buildString {
             append("timestamp=").append(currentUtcTimestamp()).append('\n')

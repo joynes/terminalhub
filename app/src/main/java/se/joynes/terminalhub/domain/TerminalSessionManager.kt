@@ -157,6 +157,12 @@ class TerminalSessionManager @Inject constructor(
                     logger.log(LogLevel.WARN, TAG, "SSH lost: $projectName — notifying terminal")
                     terminalSession.notifyRemoteProcessExit(0)
                 }
+                // Connection changes also happen while the user stays on the same tab.
+                // Publish on the UI thread, where entries are registered and closed, so
+                // the disconnected overlay and reconnect-all see the current state.
+                kotlinx.coroutines.withContext(Dispatchers.Main.immediate) {
+                    if (entries[sessionId]?.conn === conn) publishSessions()
+                }
             }
         }
 

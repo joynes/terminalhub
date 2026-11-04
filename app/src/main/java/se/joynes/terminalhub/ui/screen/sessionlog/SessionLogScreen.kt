@@ -13,6 +13,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import se.joynes.terminalhub.data.db.entity.SessionLogEntity
 import se.joynes.terminalhub.ui.components.*
 import se.joynes.terminalhub.ui.theme.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
 
 @Composable
 fun SessionLogScreen(
@@ -20,6 +24,15 @@ fun SessionLogScreen(
     viewModel: SessionLogViewModel = hiltViewModel()
 ) {
     val logs by viewModel.logs.collectAsState()
+    val context = LocalContext.current
+    val exporting by viewModel.exporting.collectAsState()
+    val exportMessage by viewModel.exportMessage.collectAsState()
+    val export = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        uri?.let { viewModel.export(context, it) }
+    }
+    LaunchedEffect(exportMessage) {
+        exportMessage?.let { Toast.makeText(context, it, Toast.LENGTH_LONG).show(); viewModel.exportMessage.value = null }
+    }
 
     Scaffold(
         topBar = {
@@ -27,7 +40,7 @@ fun SessionLogScreen(
                 title = "SESSION LOG",
                 onBack = onBack,
                 actions = {
-                    IconButton(onClick = { viewModel.export() }) {
+                    IconButton(enabled = !exporting, onClick = { export.launch("terminalhub-session-log.txt") }) {
                         Text("EXP", color = MegaDriveWarning, fontSize = 10.sp, fontFamily = MonoFontFamily)
                     }
                 }

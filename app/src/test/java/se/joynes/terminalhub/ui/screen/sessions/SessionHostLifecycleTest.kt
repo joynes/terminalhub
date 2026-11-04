@@ -183,6 +183,32 @@ class SessionHostLifecycleTest {
         verify(connection).runSilent(ScriptTemplateEngine().renderKillTmux(a))
         assertNull(vm.projectTabs.value.single { it.projectId == 1L }.connectionError)
     }
+    @Test fun restartingWithoutALiveTransportUsesAndReleasesAMaintenanceConnectionBeforeReplacingTerminal() = runTest(dispatcher) {
+        whenever(sessions.getConnectionForProject(1)).thenReturn(null)
+        vm.restartTmuxProject(1); runCurrent()
+        verify(connection).runSilent(ScriptTemplateEngine().renderKillTmux(a))
+        verify(ssh).destroySession("new-session")
+        assertEquals(TerminalSessionId("new-session"), active.value)
+        assertEquals(3, live.value.size)
+    }
+    @Test fun failedMaintenanceConnectionLeavesExistingTabsAndAlwaysReleasesItsLease() = runTest(dispatcher) {
+        whenever(sessions.getConnectionForProject(1)).thenReturn(null)
+        connected.value = false; errors.value = "Maintenance authentication failed"
+        vm.restartTmuxProject(1); runCurrent()
+        assertEquals(TerminalSessionId("old-1"), active.value)
+        assertEquals(3, live.value.size)
+        assertEquals("Maintenance authentication failed", vm.projectTabs.value.single { it.projectId == 1L }.connectionError)
+        verify(ssh).destroySession("new-session")
+        verify(connection, never()).runSilent(any())
+    }
+    @Test fun cancelledMaintenanceCommandReleasesItsTransportAndKeepsExistingTerminal() = runTest(dispatcher) {
+        whenever(sessions.getConnectionForProject(1)).thenReturn(null)
+        whenever(connection.runSilent(any())).thenAnswer { throw CancellationException("Restart cancelled") }
+        vm.restartTmuxProject(1); runCurrent()
+        verify(ssh).destroySession("new-session")
+        assertEquals(3, live.value.size)
+        assertEquals(TerminalSessionId("old-1"), active.value)
+    }
     @Test fun restartWithoutServerAndRestartingALocalProjectCannotKillOtherSessions() = runTest(dispatcher) {
         vm.restartTmuxProject(3); runCurrent(); verifyNoInteractions(connect)
         whenever(servers.getById(1)).thenReturn(null)

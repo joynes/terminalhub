@@ -38,6 +38,14 @@ are explicitly skipped when their credentials are absent. Local tmux and OpenSSH
 SFTP process integrations run when those tools are installed; CI installs both.
 Do not pass personal server credentials to routine CI.
 
+Remote host workflow tests simulate the SSH channel boundary only. They exercise
+the real ViewModels, Room database, terminal emulator, connection lifecycle, tmux
+window protocol handling, macros and multi-project routing. Separate native tmux
+and SFTP integration tests exercise real local processes. Navigation and document
+picker tests use isolated diagnostic data and inspect the files actually written.
+The session-log export tests cover both a chosen document and a failed destination
+followed by a successful retry.
+
 JaCoCo 0.8.14 is pinned for compatibility with the project's large Compose
 functions. The terminal screen's outer layout is a separate composition to keep
 its bytecode within instrumentation limits.
