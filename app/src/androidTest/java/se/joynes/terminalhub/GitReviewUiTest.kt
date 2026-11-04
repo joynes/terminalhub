@@ -77,6 +77,8 @@ class GitReviewUiTest {
         list.performScrollToIndex(240)
         list.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, 100_000f) }
         assertDiffTextVisible("END240")
+        androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            .executeShellCommand("screencap -p /sdcard/Download/git-diff-end.png")
         list.performScrollToIndex(0)
         list.performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, -100_000f) }
         assertDiffTextVisible("val line1 =")
@@ -88,25 +90,63 @@ class GitReviewUiTest {
         compose.onNodeWithText("A−").performClick()
     }
 
+    @Test fun windowedReviewKeepsPanelTapsInsideAndBackdropReturnsFromFileBeforeClosing() {
+        var current by mutableStateOf(state().copy(file = file, patch = "+example"))
+        var backs = 0; var dismissals = 0
+        compose.setContent { TerminalHubTheme { GitReviewDialog(current, {}, {}, {},
+            { backs++; current = current.copy(file = null, patch = null) }, {}, { dismissals++ }) } }
+        compose.onNodeWithText("WINDOW").performClick()
+        compose.onNodeWithText("Git · demo").performClick()
+        compose.runOnIdle { assertEquals(0, backs); assertEquals(0, dismissals) }
+        compose.onNodeWithTag("git-window-backdrop").performTouchInput { click(androidx.compose.ui.geometry.Offset(1f, 1f)) }
+        compose.runOnIdle { assertEquals(1, backs); assertEquals(0, dismissals) }
+        compose.onNodeWithTag("git-file-list").assertExists()
+        compose.onNodeWithTag("git-window-backdrop").performTouchInput { click(androidx.compose.ui.geometry.Offset(1f, 1f)) }
+        compose.runOnIdle { assertEquals(1, backs); assertEquals(1, dismissals) }
+    }
+
     private fun assertDiffTextVisible(text: String) {
         val node = compose.onNodeWithText(text, substring = true)
         try {
-            compose.waitUntil(5000) { runCatching { node.assertIsDisplayed() }.isSuccess }
+            compose.waitUntil(5000) { runCatching {
+                node.assertIsDisplayed()
+                assertFalse("The whole wrapped code row must be visible above system bars", node.isNotDisplayed())
+            }.isSuccess }
             node.assertIsDisplayed()
+            assertFalse("The whole wrapped code row must be visible above system bars", node.isNotDisplayed())
         } catch (error: Throwable) {
+            val semantic = node.fetchSemanticsNode()
             val details = buildString {
                 appendLine("Git diff text: $text")
                 appendLine("Text bounds: ${runCatching { node.fetchSemanticsNode().boundsInRoot }.getOrNull()}")
                 appendLine("List bounds: ${compose.onNodeWithTag("git-diff-scroll").fetchSemanticsNode().boundsInRoot}")
                 appendLine(compose.onNodeWithTag("git-diff-scroll").printToString())
-            }
-            runCatching {
-                val context = InstrumentationRegistry.getInstrumentation().targetContext
-                File(context.getExternalFilesDir(null), "ci-git-scroll.png").outputStream().use {
-                    compose.onNodeWithTag("git-fullscreen").captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+                compose.runOnIdle {
+                    val layout = semantic.javaClass.methods.firstOrNull { it.name.startsWith("getLayoutInfo") }
+                        ?.invoke(semantic) as? androidx.compose.ui.layout.LayoutInfo
+                    var parent = layout
+                    while (parent != null) {
+                        appendLine("Layout: ${parent.javaClass.name} placed=${parent.isPlaced} size=${parent.width}x${parent.height}")
+                        parent = parent.parentInfo
+                    }
+                    fun describe(view: android.view.View) {
+                        if (view.parent !is android.view.View || view.javaClass.simpleName.contains("Compose")) {
+                            val rect = android.graphics.Rect()
+                            val visible = view.getGlobalVisibleRect(rect)
+                            val window = IntArray(2); view.getLocationInWindow(window)
+                            val screen = IntArray(2); view.getLocationOnScreen(screen)
+                            appendLine("View: ${view.javaClass.name} shown=${view.isShown} focus=${view.hasWindowFocus()} size=${view.width}x${view.height} visible=$visible rect=$rect window=${window.toList()} screen=${screen.toList()}")
+                        }
+                        if (view is android.view.ViewGroup) for (i in 0 until view.childCount) describe(view.getChildAt(i))
+                    }
+                    android.view.inspector.WindowInspector.getGlobalWindowViews().forEach(::describe)
                 }
             }
-            throw AssertionError(details, error)
+            val screenshot = runCatching {
+                androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+                    .executeShellCommand("screencap -p /sdcard/Download/ci-git-scroll.png")
+            }
+            throw AssertionError("$details\nNative screenshot: $screenshot", error)
         }
     }
 

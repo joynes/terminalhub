@@ -16,12 +16,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import android.view.WindowManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import se.joynes.terminalhub.data.git.*
 import se.joynes.terminalhub.ui.theme.MonoFontFamily
 
@@ -39,97 +44,113 @@ fun GitReviewDialog(
     var fontSize by rememberSaveable { mutableIntStateOf(14) }
     Dialog(
         onDismissRequest = { if (state.file != null) onBack() else onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        // In Compose 1.7, disabling the default width also measures the height from
+        // screenHeightDp, ignoring the smaller native window viewport on Android 15.
+        // Keep native measurement and explicitly request a full-size window instead.
+        properties = DialogProperties(usePlatformDefaultWidth = true)
     ) {
-        Surface(
-            color = CodePalette.background,
-            contentColor = CodePalette.foreground,
-            modifier = (if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.85f))
-                .testTag(if (fullScreen) "git-fullscreen" else "git-windowed")
-        ) {
-            Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Git · ${state.projectName}", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    TextButton(onClick = { fullScreen = !fullScreen }) { Text(if (fullScreen) "WINDOW" else "FULL SCREEN") }
-                    TextButton(onClick = onDismiss) { Text("CLOSE") }
-                }
-                if (state.file == null) {
+        val window = (LocalView.current.parent as DialogWindowProvider).window
+        SideEffect {
+            if (window.attributes.width != WindowManager.LayoutParams.MATCH_PARENT ||
+                window.attributes.height != WindowManager.LayoutParams.MATCH_PARENT) {
+                window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+            }
+        }
+        Box(Modifier.fillMaxSize().testTag("git-dialog-window"), contentAlignment = Alignment.Center) {
+            if (!fullScreen) Box(Modifier.matchParentSize().testTag("git-window-backdrop").pointerInput(state.file) {
+                detectTapGestures { if (state.file != null) onBack() else onDismiss() }
+            })
+            Surface(
+                color = CodePalette.background,
+                contentColor = CodePalette.foreground,
+                modifier = (if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.85f))
+                    .testTag(if (fullScreen) "git-fullscreen" else "git-windowed")
+                    .pointerInput(Unit) {}
+            ) {
+                Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 4.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(state.snapshot?.let { "Branch: ${it.branch}" } ?: "Git repositories",
-                            modifier = Modifier.weight(1f), color = CodePalette.secondary)
-                        TextButton(onClick = onRefresh, enabled = !state.loading) { Text("REFRESH") }
+                        Text("Git · ${state.projectName}", modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        TextButton(onClick = { fullScreen = !fullScreen }) { Text(if (fullScreen) "WINDOW" else "FULL SCREEN") }
+                        TextButton(onClick = onDismiss) { Text("CLOSE") }
                     }
-                    state.repository?.let { repo ->
-                        Text(repo, color = CodePalette.secondary, fontSize = 12.sp, maxLines = 2)
-                        if (state.repositories.size > 1) {
-                            Row(Modifier.horizontalScroll(rememberScrollState())) {
-                                state.repositories.forEach { candidate ->
-                                    FilterChip(selected = candidate == repo, onClick = { onRepository(candidate) },
-                                        label = { Text(candidate.substringAfterLast('/')) }, modifier = Modifier.padding(end = 6.dp))
-                                }
-                            }
+                    if (state.file == null) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(state.snapshot?.let { "Branch: ${it.branch}" } ?: "Git repositories",
+                                modifier = Modifier.weight(1f), color = CodePalette.secondary)
+                            TextButton(onClick = onRefresh, enabled = !state.loading) { Text("REFRESH") }
                         }
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            GitReviewMode.entries.forEach { mode ->
-                                FilterChip(selected = mode == state.mode, onClick = { onMode(mode) }, label = { Text(mode.label) })
-                            }
-                        }
-                        Text(state.mode.explanation, color = CodePalette.secondary, fontSize = 13.sp, lineHeight = 18.sp)
-                        if (state.mode == GitReviewMode.COMMIT) {
-                            state.snapshot?.let { Text(it.commit, fontSize = 14.sp, modifier = Modifier.padding(vertical = 8.dp)) }
-                        }
-                    }
-                } else {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = onBack) { Text("‹ FILES") }
-                        Text(state.mode.label, Modifier.weight(1f), color = CodePalette.secondary, fontSize = 13.sp)
-                        TextButton(onClick = { fontSize = (fontSize - 1).coerceAtLeast(11) }, enabled = fontSize > 11) { Text("A−") }
-                        TextButton(onClick = { fontSize = (fontSize + 1).coerceAtMost(22) }, enabled = fontSize < 22) { Text("A+") }
-                    }
-                    Text(state.file.path, fontFamily = MonoFontFamily, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
-                }
-                if (state.loading) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth().testTag("git-loading"))
-                    Text("Reading from server…", color = CodePalette.secondary, fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp))
-                }
-                state.error?.let { error ->
-                    Text(error, color = CodePalette.removedMarker, modifier = Modifier.padding(vertical = 12.dp))
-                    TextButton(onClick = { if (state.file != null) onFile(state.file) else onRefresh() }) { Text("RETRY") }
-                }
-                when {
-                    state.patch != null -> key(state.repository, state.mode, state.file) {
-                        GitDiffContent(state.patch, state.file?.path.orEmpty(), fontSize, state.truncated, Modifier.weight(1f))
-                    }
-                    state.file == null && state.snapshot != null -> {
-                        val listState = rememberLazyListState()
-                        if (state.snapshot.files.isEmpty() && !state.loading) {
-                            Text(if (state.mode == GitReviewMode.COMMIT) "No file changes in this commit." else "No changes in this view.",
-                                color = CodePalette.secondary, modifier = Modifier.padding(vertical = 24.dp))
-                        }
-                        LazyColumn(Modifier.weight(1f).testTag("git-file-list"), state = listState) {
-                            items(state.snapshot.files, key = { it.path }) { file ->
-                                Column(Modifier.fillMaxWidth().clickable { onFile(file) }.padding(vertical = 14.dp)) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                        Text(when { file.isUntracked -> "NEW"; file.status.startsWith("A") -> "+"; file.status.startsWith("D") -> "−"; else -> file.status },
-                                            color = if (file.status.startsWith("D")) CodePalette.removedMarker else CodePalette.addedMarker,
-                                            fontFamily = MonoFontFamily, modifier = Modifier.widthIn(min = 30.dp))
-                                        Text(file.path, fontFamily = MonoFontFamily, fontSize = 14.sp)
+                        state.repository?.let { repo ->
+                            Text(repo, color = CodePalette.secondary, fontSize = 12.sp, maxLines = 2)
+                            if (state.repositories.size > 1) {
+                                Row(Modifier.horizontalScroll(rememberScrollState())) {
+                                    state.repositories.forEach { candidate ->
+                                        FilterChip(selected = candidate == repo, onClick = { onRepository(candidate) },
+                                            label = { Text(candidate.substringAfterLast('/')) }, modifier = Modifier.padding(end = 6.dp))
                                     }
-                                    file.previousPath?.let { Text("From: $it", color = CodePalette.secondary, fontSize = 12.sp) }
                                 }
-                                HorizontalDivider(color = CodePalette.secondary.copy(alpha = 0.2f))
+                            }
+                            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                GitReviewMode.entries.forEach { mode ->
+                                    FilterChip(selected = mode == state.mode, onClick = { onMode(mode) }, label = { Text(mode.label) })
+                                }
+                            }
+                            Text(state.mode.explanation, color = CodePalette.secondary, fontSize = 13.sp, lineHeight = 18.sp)
+                            if (state.mode == GitReviewMode.COMMIT) {
+                                state.snapshot?.let { Text(it.commit, fontSize = 14.sp, modifier = Modifier.padding(vertical = 8.dp)) }
                             }
                         }
+                    } else {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = onBack) { Text("‹ FILES") }
+                            Text(state.mode.label, Modifier.weight(1f), color = CodePalette.secondary, fontSize = 13.sp)
+                            TextButton(onClick = { fontSize = (fontSize - 1).coerceAtLeast(11) }, enabled = fontSize > 11) { Text("A−") }
+                            TextButton(onClick = { fontSize = (fontSize + 1).coerceAtMost(22) }, enabled = fontSize < 22) { Text("A+") }
+                        }
+                        Text(state.file.path, fontFamily = MonoFontFamily, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
                     }
-                    !state.loading && state.file == null && state.error == null && state.repository == null -> {
-                        if (state.repositories.isEmpty()) {
-                            Text("No Git repository found in this project folder or its parent folders.", modifier = Modifier.padding(vertical = 24.dp))
-                        } else {
-                            Text("Choose a repository", modifier = Modifier.padding(vertical = 12.dp))
-                            LazyColumn(Modifier.weight(1f)) {
-                                items(state.repositories) { repo ->
-                                    Text(repo, Modifier.fillMaxWidth().clickable { onRepository(repo) }.padding(vertical = 16.dp), fontFamily = MonoFontFamily)
+                    if (state.loading) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth().testTag("git-loading"))
+                        Text("Reading from server…", color = CodePalette.secondary, fontSize = 13.sp, modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                    state.error?.let { error ->
+                        Text(error, color = CodePalette.removedMarker, modifier = Modifier.padding(vertical = 12.dp))
+                        TextButton(onClick = { if (state.file != null) onFile(state.file) else onRefresh() }) { Text("RETRY") }
+                    }
+                    when {
+                        state.patch != null -> key(state.repository, state.mode, state.file) {
+                            GitDiffContent(state.patch, state.file?.path.orEmpty(), fontSize, state.truncated, Modifier.weight(1f))
+                        }
+                        state.file == null && state.snapshot != null -> {
+                            val listState = rememberLazyListState()
+                            if (state.snapshot.files.isEmpty() && !state.loading) {
+                                Text(if (state.mode == GitReviewMode.COMMIT) "No file changes in this commit." else "No changes in this view.",
+                                    color = CodePalette.secondary, modifier = Modifier.padding(vertical = 24.dp))
+                            }
+                            LazyColumn(Modifier.weight(1f).testTag("git-file-list"), state = listState) {
+                                items(state.snapshot.files, key = { it.path }) { file ->
+                                    Column(Modifier.fillMaxWidth().clickable { onFile(file) }.padding(vertical = 14.dp)) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                            Text(when { file.isUntracked -> "NEW"; file.status.startsWith("A") -> "+"; file.status.startsWith("D") -> "−"; else -> file.status },
+                                                color = if (file.status.startsWith("D")) CodePalette.removedMarker else CodePalette.addedMarker,
+                                                fontFamily = MonoFontFamily, modifier = Modifier.widthIn(min = 30.dp))
+                                            Text(file.path, fontFamily = MonoFontFamily, fontSize = 14.sp)
+                                        }
+                                        file.previousPath?.let { Text("From: $it", color = CodePalette.secondary, fontSize = 12.sp) }
+                                    }
+                                    HorizontalDivider(color = CodePalette.secondary.copy(alpha = 0.2f))
+                                }
+                            }
+                        }
+                        !state.loading && state.file == null && state.error == null && state.repository == null -> {
+                            if (state.repositories.isEmpty()) {
+                                Text("No Git repository found in this project folder or its parent folders.", modifier = Modifier.padding(vertical = 24.dp))
+                            } else {
+                                Text("Choose a repository", modifier = Modifier.padding(vertical = 12.dp))
+                                LazyColumn(Modifier.weight(1f)) {
+                                    items(state.repositories) { repo ->
+                                        Text(repo, Modifier.fillMaxWidth().clickable { onRepository(repo) }.padding(vertical = 16.dp), fontFamily = MonoFontFamily)
+                                    }
                                 }
                             }
                         }

@@ -66,5 +66,11 @@ scrolling failures. A failure records viewport/semantic bounds and a screenshot
 when capture is available. The subsequent complete suite has no class filter;
 its coverage must still reach 95% before the job passes.
 
+The long Git diff regression requires the entire wrapped first/last code row to
+remain visible above Android's system bars. It caught a Compose 1.7 custom-width
+dialog measuring itself against the screen instead of its native window. The
+dialog now uses native window constraints; a separate test preserves the windowed
+backdrop's back/close behavior. CI retains a native screenshot of the final row.
+
 The presence of a 95% gate is a requirement, not evidence that 95% has already
 been reached. Use the report and workflow result to see the measured value.
